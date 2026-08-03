@@ -43,6 +43,14 @@ def _descriptor() -> ProviderDescriptor:
     )
 
 
+def _trusted_origins(public_bytes: bytes) -> dict[tuple[str, str], frozenset[str]]:
+    return {
+        ("example.provider", signing_key_id(public_bytes)): frozenset(
+            {"https://plugins.example.test/releases"}
+        )
+    }
+
+
 def test_fixed_vector_verifies_exact_artifact_and_manifest() -> None:
     provenance, descriptor, public_bytes = _fixture()
 
@@ -51,6 +59,7 @@ def test_fixed_vector_verifies_exact_artifact_and_manifest() -> None:
         io.BytesIO(_ARTIFACT),
         descriptor,
         {signing_key_id(public_bytes): public_bytes},
+        _trusted_origins(public_bytes),
     )
 
 
@@ -61,6 +70,7 @@ def test_fixed_vector_verifies_exact_artifact_and_manifest() -> None:
         ("signature", PluginTrustReason.SIGNATURE_INVALID),
         ("artifact", PluginTrustReason.ARTIFACT_DIGEST_MISMATCH),
         ("manifest", PluginTrustReason.MANIFEST_PROVENANCE_MISMATCH),
+        ("origin", PluginTrustReason.ORIGIN_UNTRUSTED),
     ],
 )
 def test_verification_returns_only_stable_failure_reason(
@@ -69,6 +79,7 @@ def test_verification_returns_only_stable_failure_reason(
     provenance, descriptor, public_bytes = _fixture()
     keys = {signing_key_id(public_bytes): public_bytes}
     artifact = _ARTIFACT
+    origins = _trusted_origins(public_bytes)
     if change == "unknown_key":
         keys = {}
     elif change == "signature":
@@ -82,10 +93,12 @@ def test_verification_returns_only_stable_failure_reason(
         )
     elif change == "artifact":
         artifact += b"changed"
-    else:
+    elif change == "manifest":
         descriptor = ProviderDescriptor(
             "other.provider", "1.2.3", "0.1", (), "schema.json", (), "manifest"
         )
+    else:
+        origins = {}
 
     with pytest.raises(PluginTrustError) as raised:
         verify_provenance(
@@ -93,8 +106,43 @@ def test_verification_returns_only_stable_failure_reason(
             io.BytesIO(artifact),
             descriptor,
             keys,
+            origins,
         )
 
     assert raised.value.reason is reason
     assert raised.value.context == {"reason": reason.value}
     assert public_bytes.hex() not in str(raised.value.context)
+
+
+def test_origin_trust_is_bound_to_provider_and_signing_key() -> None:
+    provenance, descriptor, public_bytes = _fixture()
+    key_id = signing_key_id(public_bytes)
+
+    with pytest.raises(PluginTrustError) as raised:
+        verify_provenance(
+            provenance,
+            io.BytesIO(_ARTIFACT),
+            descriptor,
+            {key_id: public_bytes},
+            {("other.provider", key_id): frozenset({provenance.origin})},
+        )
+
+    assert raised.value.reason is PluginTrustReason.ORIGIN_UNTRUSTED
+
+
+def test_manifest_mismatch_precedes_origin_rejection() -> None:
+    provenance, _, public_bytes = _fixture()
+    descriptor = ProviderDescriptor(
+        "other.provider", "1.2.3", "0.1", (), "schema.json", (), "manifest"
+    )
+
+    with pytest.raises(PluginTrustError) as raised:
+        verify_provenance(
+            provenance,
+            io.BytesIO(_ARTIFACT),
+            descriptor,
+            {signing_key_id(public_bytes): public_bytes},
+            {},
+        )
+
+    assert raised.value.reason is PluginTrustReason.MANIFEST_PROVENANCE_MISMATCH
