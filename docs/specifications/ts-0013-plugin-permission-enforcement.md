@@ -27,6 +27,10 @@ This specification defines the initial public and internal contract for this cap
 
 The permission service resolves a manifest request and policy into a granted capability set used to build the plugin context.
 
+The initial policy is default-deny. Privileged capabilities map one-to-one to
+named permissions (`network`, `secrets`, and `filesystem_write`); an unknown or
+ungranted request fails with a safe diagnostic before privileged work starts.
+
 ## Verification
 
 - An ungranted secret capability is unavailable in plugin context.
@@ -36,4 +40,3 @@ The permission service resolves a manifest request and policy into a granted cap
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
