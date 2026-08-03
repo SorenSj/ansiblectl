@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Ansiblectl maintainers" }]
+dependencies = ["PyYAML>=6.0.2,<7"]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Environment :: Console",
@@ -30,6 +31,7 @@ dev = [
   "pytest>=8.3,<9",
   "pytest-cov>=6,<7",
   "ruff>=0.9,<1",
+  "types-PyYAML>=6.0.12.20250822,<7",
 ]
 
 [tool.hatch.build.targets.wheel]

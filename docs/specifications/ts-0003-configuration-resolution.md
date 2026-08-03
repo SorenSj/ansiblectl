@@ -28,6 +28,13 @@ This specification defines the initial public and internal contract for this cap
 
 The configuration service receives source locations and command overrides and returns a validated model plus non-secret provenance metadata.
 
+The initial YAML schema contains `schema_version: 1`, optional `project_name`,
+optional `log_level` (`debug`, `info`, `warning`, or `error`), and optional
+`secrets` mappings whose values are `provider:key` references. The documented
+files are `~/.config/ansiblectl/config.yaml`, `.ansiblectl/config.yaml`, and
+`ansiblectl.yaml` within the selected workspace. `ANSIBLECTL_LOG_LEVEL` is the
+only environment override in this initial contract.
+
 ## Verification
 
 - A higher-precedence valid value overrides a lower-precedence value.
@@ -37,4 +44,3 @@ The configuration service receives source locations and command overrides and re
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-

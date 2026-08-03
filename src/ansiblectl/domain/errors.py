@@ -15,3 +15,7 @@ class WorkspaceNotFoundError(WorkspaceError):
 
 class WorkspaceValidationError(WorkspaceError):
     """Raised when workspace metadata is malformed or unsupported."""
+
+
+class ConfigurationError(DomainError):
+    """Raised when configuration cannot be safely parsed or validated."""
