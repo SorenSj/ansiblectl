@@ -27,6 +27,11 @@ This specification defines the initial public and internal contract for this cap
 
 The state port exposes typed reads, writes, invalidation, and inspection; callers do not access storage paths directly.
 
+The initial workspace store uses `.ansiblectl/state.json`, with
+`schema_version: 1` and named cache entries containing source identity and
+invalidation condition. Writes use temporary-file replacement. Corrupt or
+unsupported state fails safely and instructs the operator to remove that file.
+
 ## Verification
 
 - A corrupt cache is discarded or reported without corrupting workspace data.
@@ -36,4 +41,3 @@ The state port exposes typed reads, writes, invalidation, and inspection; caller
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
