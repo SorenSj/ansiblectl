@@ -27,6 +27,17 @@ uv run ansiblectl --workspace ~/automation/example workspace show
 
 This creates only `.ansiblectl/workspace.json` beneath the selected workspace.
 
+Resolve and inspect the currently configured inventory in human or stable JSON
+form:
+
+```console
+uv run ansiblectl inventory show
+uv run ansiblectl --output-format json inventory show
+```
+
+Until inventory providers are configured, the composition root returns an
+empty, valid inventory.
+
 ## Project governance
 
 The repository is the authoritative source for Ansiblectl's normative

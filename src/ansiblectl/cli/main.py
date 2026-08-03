@@ -9,10 +9,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
 
+from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.status import StatusService
 from ansiblectl.application.workspace import WorkspaceService
-from ansiblectl.cli.composition import build_status_service, build_workspace_service
+from ansiblectl.cli.composition import (
+    build_inventory_service,
+    build_status_service,
+    build_workspace_service,
+)
 from ansiblectl.domain.errors import WorkspaceError
+from ansiblectl.domain.inventory import InventoryError, ResolvedInventory
 from ansiblectl.domain.workspace import Workspace
 
 EXIT_SUCCESS = 0
@@ -62,6 +68,9 @@ def build_parser() -> argparse.ArgumentParser:
         "path", type=Path, nargs="?", help="Workspace directory (default: current directory)."
     )
     workspace_commands.add_parser("show", help="Show the selected or discovered workspace.")
+    inventory = subcommands.add_parser("inventory", help="Resolve and inspect inventory.")
+    inventory_commands = inventory.add_subparsers(dest="inventory_command", required=True)
+    inventory_commands.add_parser("show", help="Show the resolved inventory.")
     return parser
 
 
@@ -70,6 +79,7 @@ def main(
     *,
     status_service: StatusService | None = None,
     workspace_service: WorkspaceService | None = None,
+    inventory_service: InventoryService | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
     current_directory: Path | None = None,
@@ -98,6 +108,14 @@ def main(
             print(f"Workspace error: {error}", file=stderr)
             return EXIT_EXPECTED_FAILURE
         _render_workspace(workspace, options.output_format, stdout)
+    elif arguments.command == "inventory":
+        inventory_service_instance = inventory_service or build_inventory_service()
+        try:
+            inventory = inventory_service_instance.resolve()
+        except InventoryError as error:
+            print(f"Inventory error: {error}", file=stderr)
+            return EXIT_EXPECTED_FAILURE
+        _render_inventory(inventory, options.output_format, stdout)
     return EXIT_SUCCESS
 
 
@@ -139,3 +157,27 @@ def _render_workspace(workspace: Workspace, output_format: str, output: TextIO |
         return
     print(f"Workspace: {workspace.root}", file=output)
     print(f"Metadata: {workspace.metadata_path}", file=output)
+
+
+def _render_inventory(
+    inventory: ResolvedInventory, output_format: str, output: TextIO | None
+) -> None:
+    """Render the stable inventory result only at the CLI boundary."""
+
+    if output_format == "json":
+        print(
+            json.dumps(
+                {
+                    **inventory.canonical(),
+                    "diagnostics": list(inventory.diagnostics),
+                    "provenance": dict(sorted(inventory.provenance.items())),
+                },
+                sort_keys=True,
+            ),
+            file=output,
+        )
+        return
+    print(f"Hosts: {len(inventory.hosts)}", file=output)
+    print(f"Groups: {len(inventory.groups)}", file=output)
+    for diagnostic in inventory.diagnostics:
+        print(f"Diagnostic: {diagnostic}", file=output)

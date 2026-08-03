@@ -1,5 +1,6 @@
 """CLI contract tests."""
 
+import json
 from io import StringIO
 from pathlib import Path
 
@@ -8,6 +9,7 @@ import pytest
 from ansiblectl.application.status import Status
 from ansiblectl.cli.main import EXIT_EXPECTED_FAILURE, EXIT_INVALID_INPUT, EXIT_SUCCESS, main
 from ansiblectl.domain.errors import WorkspaceNotFoundError
+from ansiblectl.domain.inventory import Host, ResolvedInventory
 from ansiblectl.domain.workspace import Workspace
 
 
@@ -98,3 +100,34 @@ def test_workspace_init_uses_the_composition_root(tmp_path: Path) -> None:
     assert result == EXIT_SUCCESS
     assert '"schema_version": 1' in output.getvalue()
     assert (tmp_path / ".ansiblectl/workspace.json").is_file()
+
+
+class FakeInventoryService:
+    def resolve(self) -> ResolvedInventory:
+        host = Host("web-1", "192.0.2.10", {"role": "web"}, "fixture")
+        return ResolvedInventory({"web-1": host}, {"web": ("web-1",)}, {"web-1": "fixture"}, ())
+
+
+def test_inventory_show_renders_injected_resolved_inventory() -> None:
+    output = StringIO()
+
+    result = main(
+        ["--output-format", "json", "inventory", "show"],
+        inventory_service=FakeInventoryService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue()) == {
+        "diagnostics": [],
+        "groups": {"web": ["web-1"]},
+        "hosts": {"web-1": {"address": "192.0.2.10", "variables": {"role": "web"}}},
+        "provenance": {"web-1": "fixture"},
+    }
+
+
+def test_inventory_show_uses_composition_root() -> None:
+    output = StringIO()
+
+    assert main(["--output-format", "json", "inventory", "show"], stdout=output) == EXIT_SUCCESS
+    assert json.loads(output.getvalue())["hosts"] == {}
