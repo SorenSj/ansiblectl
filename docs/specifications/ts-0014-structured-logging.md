@@ -27,6 +27,11 @@ This specification defines the initial public and internal contract for this cap
 
 The logging port accepts a typed LogEvent; sinks render console or configured destinations without changing event semantics.
 
+The initial `LogEvent` schema contains ISO-8601 UTC timestamp, level, stable
+event name, optional correlation identifier, and structured fields. Fields
+named `secret`, `token`, `password`, `credential`, or `key` are redacted before
+any sink receives a record. Plugins use the public `PluginLogger` protocol.
+
 ## Verification
 
 - A captured log record contains mandatory fields.
@@ -36,4 +41,3 @@ The logging port accepts a typed LogEvent; sinks render console or configured de
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
