@@ -45,6 +45,8 @@ def test_history_lists_only_executions_newest_first(tmp_path: Path) -> None:
                     "stderr_reference": None,
                     "diagnostic": "Execution exceeded its configured timeout.",
                     "mode": "apply",
+                    "requested_revision": "main",
+                    "resolved_revision": "abc123",
                     "targeting": {
                         "limit": "web",
                         "tags": ["deploy"],
@@ -63,7 +65,10 @@ def test_history_lists_only_executions_newest_first(tmp_path: Path) -> None:
     assert records[0].targeting.limit == "web"
     assert records[0].targeting.tags == ("deploy",)
     assert records[0].mode.value == "apply"
+    assert records[0].requested_revision == "main"
+    assert records[0].resolved_revision == "abc123"
     assert records[1].mode.value == "check"
+    assert records[1].resolved_revision is None
     assert records[1].elapsed_seconds == 0.0
     assert JsonLinesExecutionHistory(tmp_path).get("run-1") == records[1]
 

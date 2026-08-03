@@ -57,6 +57,7 @@ class ExecutionRequest:
     cancel_requested: bool = False
     targeting: ExecutionTargeting = field(default_factory=ExecutionTargeting)
     mode: ExecutionMode = ExecutionMode.CHECK
+    resolved_revision: str | None = None
 
     def __post_init__(self) -> None:
         if not self.argv or any(not argument for argument in self.argv):
@@ -76,6 +77,7 @@ class ExecutionRequest:
         timeout_seconds: float | None = None,
         targeting: ExecutionTargeting | None = None,
         mode: ExecutionMode = ExecutionMode.CHECK,
+        resolved_revision: str | None = None,
     ) -> ExecutionRequest:
         """Create a request that retains the validated canonical playbook and revision."""
 
@@ -87,6 +89,7 @@ class ExecutionRequest:
             selected_playbook,
             targeting=targeting or ExecutionTargeting(),
             mode=mode,
+            resolved_revision=resolved_revision,
         )
 
 
@@ -103,6 +106,8 @@ class ExecutionResult:
     diagnostic: str | None = None
     targeting: ExecutionTargeting = field(default_factory=ExecutionTargeting)
     mode: ExecutionMode = ExecutionMode.CHECK
+    requested_revision: str | None = None
+    resolved_revision: str | None = None
 
 
 @dataclass(frozen=True)
@@ -119,6 +124,8 @@ class ExecutionRecord:
     diagnostic: str | None = None
     targeting: ExecutionTargeting = field(default_factory=ExecutionTargeting)
     mode: ExecutionMode = ExecutionMode.CHECK
+    requested_revision: str | None = None
+    resolved_revision: str | None = None
 
 
 @dataclass(frozen=True)

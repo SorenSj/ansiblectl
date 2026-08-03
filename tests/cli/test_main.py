@@ -562,6 +562,8 @@ class FakeExecutionHistoryService:
         1.25,
         "/workspace/.ansiblectl/runs/stdout.log",
         targeting=ExecutionTargeting("web", ("deploy",), ("slow",)),
+        requested_revision="main",
+        resolved_revision="abc123",
     )
 
     def list(self) -> tuple[ExecutionRecord, ...]:
@@ -596,6 +598,8 @@ def test_execution_list_renders_safe_machine_history(tmp_path: Path) -> None:
         "skip_tags": ["slow"],
         "tags": ["deploy"],
     }
+    assert payload["executions"][0]["requested_revision"] == "main"
+    assert payload["executions"][0]["resolved_revision"] == "abc123"
 
 
 def test_execution_show_renders_one_human_record(tmp_path: Path) -> None:

@@ -34,6 +34,8 @@ class LocalExecutionAdapter:
                 diagnostic="Execution was cancelled before process start.",
                 targeting=request.targeting,
                 mode=request.mode,
+                requested_revision=_requested_revision(request),
+                resolved_revision=request.resolved_revision,
             )
         try:
             completed = subprocess.run(
@@ -60,6 +62,8 @@ class LocalExecutionAdapter:
                 _join_diagnostics("Execution exceeded its configured timeout.", diagnostic),
                 request.targeting,
                 request.mode,
+                _requested_revision(request),
+                request.resolved_revision,
             )
         except OSError as error:
             return ExecutionResult(
@@ -70,6 +74,8 @@ class LocalExecutionAdapter:
                 diagnostic=f"Execution could not start: {error.__class__.__name__}.",
                 targeting=request.targeting,
                 mode=request.mode,
+                requested_revision=_requested_revision(request),
+                resolved_revision=request.resolved_revision,
             )
         status = ExecutionStatus.COMPLETED if completed.returncode == 0 else ExecutionStatus.FAILED
         stdout_reference, stderr_reference, diagnostic = _persist_outputs(
@@ -85,6 +91,8 @@ class LocalExecutionAdapter:
             diagnostic,
             request.targeting,
             request.mode,
+            _requested_revision(request),
+            request.resolved_revision,
         )
 
 
@@ -128,3 +136,7 @@ def _write_stream(path: Path, stream: str | bytes | None) -> str | None:
 
 def _join_diagnostics(primary: str, secondary: str | None) -> str:
     return primary if secondary is None else f"{primary} {secondary}"
+
+
+def _requested_revision(request: ExecutionRequest) -> str | None:
+    return None if request.selected_playbook is None else request.selected_playbook.revision

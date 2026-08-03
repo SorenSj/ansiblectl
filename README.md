@@ -107,6 +107,10 @@ revision to the current `HEAD`. Default apply policy additionally requires a
 clean worktree; Ansiblectl's own `.ansiblectl` runtime files are excluded from
 that dirty-state calculation.
 
+Run output and `execution list/show` distinguish the supplied revision label
+from its resolved immutable Git commit, making later attribution independent of
+branch or tag movement.
+
 Captured Ansible output is not echoed directly. Non-empty stdout and stderr are
 stored with owner-only permissions below `.ansiblectl/runs`, and the command
 returns their file references for diagnosis.

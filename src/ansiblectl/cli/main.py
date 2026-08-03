@@ -484,6 +484,8 @@ def _render_run_result(
             "stdout_reference": execution.stdout_reference,
             "targeting": _targeting_record(execution.targeting),
             "mode": execution.mode.value,
+            "requested_revision": execution.requested_revision,
+            "resolved_revision": execution.resolved_revision,
         }
     )
     if output_format == "json":
@@ -506,6 +508,10 @@ def _render_run_result(
         print(f"Execution: {execution.execution_id}", file=output)
         print(f"Status: {execution.status.value}", file=output)
         print(f"Mode: {execution.mode.value}", file=output)
+        if execution.requested_revision:
+            print(f"Requested revision: {execution.requested_revision}", file=output)
+        if execution.resolved_revision:
+            print(f"Resolved revision: {execution.resolved_revision}", file=output)
         if execution.stdout_reference:
             print(f"Stdout: {execution.stdout_reference}", file=output)
         if execution.stderr_reference:
@@ -532,6 +538,10 @@ def _render_execution_records(
         print(f"Timestamp: {record.timestamp}", file=output)
         print(f"Status: {record.status.value}", file=output)
         print(f"Mode: {record.mode.value}", file=output)
+        if record.requested_revision:
+            print(f"Requested revision: {record.requested_revision}", file=output)
+        if record.resolved_revision:
+            print(f"Resolved revision: {record.resolved_revision}", file=output)
         if record.stdout_reference:
             print(f"Stdout: {record.stdout_reference}", file=output)
         if record.stderr_reference:
@@ -553,6 +563,8 @@ def _execution_record(record: ExecutionRecord) -> dict[str, object]:
         "timestamp": record.timestamp,
         "targeting": _targeting_record(record.targeting),
         "mode": record.mode.value,
+        "requested_revision": record.requested_revision,
+        "resolved_revision": record.resolved_revision,
     }
 
 

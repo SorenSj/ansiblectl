@@ -152,6 +152,8 @@ def _parse_record(data: Any) -> ExecutionRecord | None:
         diagnostic=_optional_string(fields, "diagnostic"),
         targeting=_targeting(fields.get("targeting")),
         mode=ExecutionMode(_optional_string(fields, "mode") or ExecutionMode.CHECK),
+        requested_revision=_optional_string(fields, "requested_revision"),
+        resolved_revision=_optional_string(fields, "resolved_revision"),
     )
 
 

@@ -164,6 +164,7 @@ def test_confirmed_apply_omits_check_argument(tmp_path: Path) -> None:
     assert request is not None
     assert "--check" not in request.argv
     assert request.mode is ExecutionMode.APPLY
+    assert request.resolved_revision == "abc"
     assert policy.requests[0].operation == "run.apply"
     assert policy.requests[0].attributes["repository_dirty"] is False
     assert policy.requests[0].attributes["resolved_revision"] == "abc"

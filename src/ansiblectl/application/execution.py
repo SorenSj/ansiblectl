@@ -42,6 +42,12 @@ class ExecutionService:
                             "skip_tags": list(request.targeting.skip_tags),
                         },
                         "mode": request.mode,
+                        "requested_revision": (
+                            None
+                            if request.selected_playbook is None
+                            else request.selected_playbook.revision
+                        ),
+                        "resolved_revision": request.resolved_revision,
                     },
                 )
             )

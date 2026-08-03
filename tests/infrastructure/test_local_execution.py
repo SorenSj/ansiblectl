@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from ansiblectl.domain.execution import ExecutionRequest, ExecutionStatus
+from ansiblectl.domain.playbook import PlaybookReference
 from ansiblectl.infrastructure.local_execution import LocalExecutionAdapter
 
 
@@ -71,13 +72,20 @@ def test_adapter_persists_non_empty_output_as_private_references(
 
     monkeypatch.setattr(subprocess, "run", completed)
 
-    result = LocalExecutionAdapter().execute(
-        ExecutionRequest(("ansible-playbook", "site.yml"), tmp_path, {})
+    request = ExecutionRequest.for_playbook(
+        ("ansible-playbook", "site.yml"),
+        tmp_path,
+        {},
+        PlaybookReference(tmp_path / "site.yml", "main"),
+        resolved_revision="abc123",
     )
+    result = LocalExecutionAdapter().execute(request)
 
     assert result.status is ExecutionStatus.FAILED
     assert result.stdout_reference is not None
     assert result.stderr_reference is not None
+    assert result.requested_revision == "main"
+    assert result.resolved_revision == "abc123"
     stdout_path = Path(result.stdout_reference)
     stderr_path = Path(result.stderr_reference)
     assert stdout_path.read_text(encoding="utf-8") == "play recap\n"

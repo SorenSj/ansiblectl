@@ -130,6 +130,7 @@ class RunService:
                 timeout_seconds,
                 targeting,
                 mode,
+                None if repository is None else repository.resolved_revision,
             )
             return GovernedExecutionResult(report, self.execution.execute(request))
 

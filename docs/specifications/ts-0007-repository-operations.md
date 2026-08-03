@@ -37,6 +37,8 @@ Execution preflight resolves both the requested revision and `HEAD` to commit
 identifiers and requires equality before policy evaluation. Inspection reports
 tracked and untracked workspace changes while excluding only Ansiblectl's own
 `.ansiblectl` runtime directory.
+The resolved commit identifier is propagated into the execution record rather
+than relying on a mutable branch or tag label for later attribution.
 
 For a clean repository, the initial Git sync runs fixed `git fetch --prune` and
 `git checkout --detach REVISION` argument vectors. It reports the repository

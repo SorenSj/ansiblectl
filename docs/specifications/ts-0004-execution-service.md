@@ -47,6 +47,10 @@ Records contain timestamp, identifier, classified status, exit code, elapsed
 time, safe output references, and a safe diagnostic. History inspection never
 dereferences captured output automatically.
 
+When repository preflight is configured, execution requests, results, events,
+and history retain both the requested revision label and the resolved commit
+identifier. Older records without these fields remain readable.
+
 Check-mode executions may carry validated optional targeting: one Ansible host
 limit, task tags, and skipped task tags. The application layer emits these as
 separate argument-vector elements, and completed execution events retain the
@@ -69,6 +73,7 @@ evaluated as `run.check`. Execution events and history retain the selected mode.
 - A confirmed apply request omits `--check` and remains subject to the policy gate.
 - In the default deny mode, apply without an explicit host limit is blocked before materialization.
 - Run preflight requires the requested Git revision at HEAD; default apply policy also requires a clean worktree.
+- Execution history distinguishes the requested revision from the resolved immutable commit.
 
 ## Non-goals
 
