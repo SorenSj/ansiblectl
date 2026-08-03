@@ -20,6 +20,7 @@ from ansiblectl.application.playbook import PlaybookValidationResult, PlaybookVa
 from ansiblectl.application.plugins import PluginDiscoveryService
 from ansiblectl.application.repository import RepositoryService
 from ansiblectl.application.run import RunService
+from ansiblectl.application.state import CacheEntrySummary, StateService
 from ansiblectl.application.status import StatusService
 from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.cli.composition import (
@@ -30,13 +31,14 @@ from ansiblectl.cli.composition import (
     build_plugin_discovery_service,
     build_repository_service,
     build_run_service,
+    build_state_service,
     build_status_service,
     build_workspace_service,
     execution_environment,
 )
 from ansiblectl.cli.outcomes import render_outcome
 from ansiblectl.domain.configuration import EffectiveConfiguration
-from ansiblectl.domain.errors import ConfigurationError, ExecutionError, WorkspaceError
+from ansiblectl.domain.errors import ConfigurationError, ExecutionError, StateError, WorkspaceError
 from ansiblectl.domain.execution import (
     ExecutionRecord,
     ExecutionRetentionResult,
@@ -166,6 +168,9 @@ def build_parser() -> argparse.ArgumentParser:
     config = subcommands.add_parser("config", help="Inspect effective configuration safely.")
     config_commands = config.add_subparsers(dest="config_command", required=True)
     config_commands.add_parser("show", help="Show redacted effective configuration.")
+    state = subcommands.add_parser("state", help="Inspect workspace cache metadata safely.")
+    state_commands = state.add_subparsers(dest="state_command", required=True)
+    state_commands.add_parser("show", help="Show cache metadata without stored values.")
     inventory = subcommands.add_parser("inventory", help="Resolve and inspect inventory.")
     inventory_commands = inventory.add_subparsers(dest="inventory_command", required=True)
     inventory_show = inventory_commands.add_parser("show", help="Show the resolved inventory.")
@@ -275,6 +280,7 @@ def main(
     status_service: StatusService | None = None,
     workspace_service: WorkspaceService | None = None,
     configuration_service: ConfigurationService | None = None,
+    state_service: StateService | None = None,
     inventory_service: InventoryService | None = None,
     repository_service: RepositoryService | None = None,
     plugin_service: PluginDiscoveryService | None = None,
@@ -344,6 +350,33 @@ def main(
                 stderr,
             )
         _render_configuration(configuration, options.output_format, stdout)
+    elif arguments.command == "state":
+        workspace_service_instance = workspace_service or build_workspace_service()
+        try:
+            workspace = workspace_service_instance.resolve(
+                options.workspace, current_directory or Path.cwd()
+            )
+            state_service_instance = state_service or build_state_service(workspace.root)
+            entries = state_service_instance.inspect()
+        except WorkspaceError as error:
+            return _render_cli_failure(
+                "state show",
+                str(error),
+                "Initialize or select a valid workspace and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
+        except StateError as error:
+            return _render_cli_failure(
+                "state show",
+                str(error),
+                "Reset the identified state file and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
+        _render_state(entries, options.output_format, stdout)
     elif arguments.command == "inventory":
         try:
             if inventory_service is None:
@@ -668,6 +701,29 @@ def _render_configuration(
     print("Provenance:", file=output)
     for field, origin in sorted(configuration.provenance.items()):
         print(f"  {field}: {origin}", file=output)
+
+
+def _render_state(
+    entries: tuple[CacheEntrySummary, ...], output_format: str, output: TextIO | None
+) -> None:
+    payload = [
+        {
+            "invalidation_condition": entry.invalidation_condition,
+            "name": entry.name,
+            "source_identity": entry.source_identity,
+        }
+        for entry in entries
+    ]
+    if output_format == "json":
+        print(json.dumps({"entries": payload, "schema_version": 1}, sort_keys=True), file=output)
+        return
+    if not entries:
+        print("No cache entries recorded.", file=output)
+        return
+    for entry in entries:
+        print(f"Cache entry: {entry.name}", file=output)
+        print(f"Source: {entry.source_identity}", file=output)
+        print(f"Invalidation: {entry.invalidation_condition}", file=output)
 
 
 def _render_inventory(

@@ -8,6 +8,7 @@ import pytest
 
 from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.playbook import PlaybookValidationResult, SyntaxCheckEvidence
+from ansiblectl.application.state import CacheEntrySummary
 from ansiblectl.application.status import Status
 from ansiblectl.cli.main import (
     EXIT_CANCELLED,
@@ -30,7 +31,9 @@ from ansiblectl.domain.inventory import Host, ResolvedInventory
 from ansiblectl.domain.plugins import ProviderDescriptor
 from ansiblectl.domain.policy import EnforcementMode, PolicyFinding, PolicyReport
 from ansiblectl.domain.repository import RepositoryRequest, RepositoryResult
+from ansiblectl.domain.state import CacheEntry
 from ansiblectl.domain.workspace import Workspace
+from ansiblectl.infrastructure.workspace_state import WorkspaceStateStore
 
 
 class FakeStatusService:
@@ -59,6 +62,7 @@ def test_help_lists_global_options_and_status_command(capsys: pytest.CaptureFixt
     assert "--output-format" in captured.out
     assert "status" in captured.out
     assert "config" in captured.out
+    assert "state" in captured.out
     assert "repository" in captured.out
     assert "playbook" in captured.out
     assert "execution" in captured.out
@@ -97,6 +101,52 @@ class FakeConfigurationService:
             {"token": "vault:production-token"},
             {"project_name": "project", "log_level": "environment", "secrets": "project"},
         )
+
+
+class FakeStateService:
+    def inspect(self) -> tuple[CacheEntrySummary, ...]:
+        return (CacheEntrySummary("inventory", "git:main", "revision changes"),)
+
+
+def test_state_show_renders_only_safe_cache_metadata(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "--output-format", "json", "state", "show"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        state_service=FakeStateService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue()) == {
+        "entries": [
+            {
+                "invalidation_condition": "revision changes",
+                "name": "inventory",
+                "source_identity": "git:main",
+            }
+        ],
+        "schema_version": 1,
+    }
+
+
+def test_state_show_omits_cached_values_from_local_store(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    assert main(["workspace", "init", str(workspace)], stdout=StringIO()) == EXIT_SUCCESS
+    WorkspaceStateStore(workspace).write(
+        {"inventory": CacheEntry("git:main", "revision changes", {"token": "secret-value"})}
+    )
+    output = StringIO()
+
+    result = main(
+        ["--workspace", str(workspace), "--output-format", "json", "state", "show"],
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert "secret-value" not in output.getvalue()
+    assert json.loads(output.getvalue())["entries"][0]["name"] == "inventory"
 
 
 def test_config_show_renders_redacted_effective_configuration(tmp_path: Path) -> None:
@@ -332,6 +382,7 @@ def test_repository_sync_json_has_no_progress_decoration(tmp_path: Path) -> None
     [
         (["workspace", "show"], "workspace show"),
         (["config", "show"], "config show"),
+        (["state", "show"], "state show"),
         (["inventory", "show"], "inventory show"),
         (["repository", "inspect", "repo", "--revision", "main"], "repository inspect"),
         (["plugin", "validate", "plugin.yaml"], "plugin validate"),

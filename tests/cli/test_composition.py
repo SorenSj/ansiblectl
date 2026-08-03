@@ -12,11 +12,13 @@ from ansiblectl.application.standard_policies import (
 from ansiblectl.cli.composition import (
     build_configuration_service,
     build_run_service,
+    build_state_service,
     execution_environment,
 )
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.workspace import Workspace
 from ansiblectl.infrastructure.json_logging import EventLogSubscriber, JsonLinesLogSink
+from ansiblectl.infrastructure.workspace_state import WorkspaceStateStore
 from ansiblectl.infrastructure.yaml_configuration import LocalConfigurationSourceProvider
 
 
@@ -69,3 +71,10 @@ def test_configuration_service_receives_only_documented_environment_override(
 
     assert isinstance(service.source_provider, LocalConfigurationSourceProvider)
     assert service.source_provider.environment == {"ANSIBLECTL_LOG_LEVEL": "debug"}
+
+
+def test_state_service_uses_workspace_scoped_store(tmp_path: Path) -> None:
+    service = build_state_service(tmp_path)
+
+    assert isinstance(service.port, WorkspaceStateStore)
+    assert service.inspect() == ()

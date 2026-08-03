@@ -23,3 +23,7 @@ class ConfigurationError(DomainError):
 
 class ExecutionError(DomainError):
     """Raised when an execution request violates its safe contract."""
+
+
+class StateError(DomainError):
+    """Raised when workspace state cannot be inspected or mutated safely."""

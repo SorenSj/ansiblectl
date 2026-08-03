@@ -35,6 +35,13 @@ uv run ansiblectl --workspace ~/automation/example config show
 uv run ansiblectl --workspace ~/automation/example --output-format json config show
 ```
 
+Inspect cache provenance and invalidation metadata without printing cached
+values:
+
+```console
+uv run ansiblectl --workspace ~/automation/example state show
+```
+
 Resolve and inspect the currently configured inventory in human or stable JSON
 form:
 

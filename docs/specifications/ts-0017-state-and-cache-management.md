@@ -31,6 +31,12 @@ The initial workspace store uses `.ansiblectl/state.json`, with
 `schema_version: 1` and named cache entries containing source identity and
 invalidation condition. Writes use temporary-file replacement. Corrupt or
 unsupported state fails safely and instructs the operator to remove that file.
+State paths are resolved inside the selected workspace, and symbolic links are
+rejected before reads or writes.
+
+`state show` exposes cache-entry names, source identities, and invalidation
+conditions in human or schema-versioned JSON output. Stored cache values are
+deliberately omitted because they may contain sensitive provider data.
 
 Execution event history is retained in the workspace's schema-versioned JSONL
 log. `execution prune --keep N` previews removal by default; `--apply` rewrites
@@ -46,6 +52,7 @@ same retention lifecycle.
 - A corrupt cache is discarded or reported without corrupting workspace data.
 - A schema-version mismatch follows documented migration or reset behaviour.
 - Concurrent update tests preserve a valid final record.
+- State inspection never renders stored cache values or follows symbolic links.
 - Execution retention preserves the newest requested records and unrelated public events.
 
 ## Non-goals

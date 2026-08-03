@@ -17,6 +17,7 @@ from ansiblectl.application.standard_policies import (
     ApplyRequiresCleanRepositoryPolicy,
     ApplyRequiresLimitPolicy,
 )
+from ansiblectl.application.state import StateService
 from ansiblectl.application.status import DefaultStatusService, StatusService
 from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.domain.errors import ExecutionError
@@ -35,6 +36,7 @@ from ansiblectl.infrastructure.json_logging import EventLogSubscriber, JsonLines
 from ansiblectl.infrastructure.local_execution import LocalExecutionAdapter
 from ansiblectl.infrastructure.local_workspace_store import LocalWorkspaceStore
 from ansiblectl.infrastructure.plugin_manifests import discover_manifests
+from ansiblectl.infrastructure.workspace_state import WorkspaceStateStore
 from ansiblectl.infrastructure.yaml_configuration import LocalConfigurationSourceProvider
 from ansiblectl.infrastructure.yaml_inventory import YamlInventoryProvider
 
@@ -58,6 +60,12 @@ def build_configuration_service(workspace: Workspace) -> ConfigurationService:
         name: value for name, value in os.environ.items() if name == "ANSIBLECTL_LOG_LEVEL"
     }
     return ConfigurationService(LocalConfigurationSourceProvider(workspace, environment))
+
+
+def build_state_service(workspace_root: Path) -> StateService:
+    """Create safe workspace-state inspection."""
+
+    return StateService(WorkspaceStateStore(workspace_root))
 
 
 def build_repository_service() -> RepositoryService:
