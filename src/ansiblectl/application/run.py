@@ -87,7 +87,16 @@ class RunService:
         selected = select_playbook(workspace_root, playbook_identifier, revision)
         resolved_inventory = self.inventory.resolve()
         report = self.policy.evaluate(
-            EvaluationRequest(f"run.{mode.value}", str(selected.path)), policy_mode
+            EvaluationRequest(
+                f"run.{mode.value}",
+                str(selected.path),
+                {
+                    "limit": targeting.limit,
+                    "tags": targeting.tags,
+                    "skip_tags": targeting.skip_tags,
+                },
+            ),
+            policy_mode,
         )
         if not report.allowed:
             return GovernedExecutionResult(report, None)

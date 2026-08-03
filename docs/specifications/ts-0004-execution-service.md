@@ -67,6 +67,7 @@ evaluated as `run.check`. Execution events and history retain the selected mode.
 - Host and tag targeting is passed as explicit arguments and retained in execution history.
 - An unconfirmed apply request reaches neither policy nor the execution adapter.
 - A confirmed apply request omits `--check` and remains subject to the policy gate.
+- In the default deny mode, apply without an explicit host limit is blocked before materialization.
 
 ## Non-goals
 

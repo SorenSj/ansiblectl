@@ -1,6 +1,7 @@
 """Deterministic policy evaluation and enforcement."""
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Protocol
 
@@ -15,6 +16,7 @@ class EnforcementMode(StrEnum):
 class EvaluationRequest:
     operation: str
     location: str
+    attributes: Mapping[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from ansiblectl.application.standard_policies import ApplyRequiresLimitPolicy
 from ansiblectl.cli.composition import build_run_service
 from ansiblectl.infrastructure.json_logging import EventLogSubscriber, JsonLinesLogSink
 
@@ -14,3 +15,5 @@ def test_run_service_wires_execution_events_to_workspace_log(tmp_path: Path) -> 
     assert isinstance(subscriber, EventLogSubscriber)
     assert isinstance(subscriber.sink, JsonLinesLogSink)
     assert subscriber.sink.path == tmp_path / ".ansiblectl" / "logs" / "events.jsonl"
+    assert len(service.policy.policies) == 1
+    assert isinstance(service.policy.policies[0], ApplyRequiresLimitPolicy)

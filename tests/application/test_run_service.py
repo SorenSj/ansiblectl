@@ -11,6 +11,7 @@ from ansiblectl.application.execution import ExecutionService
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.policy import PolicyService
 from ansiblectl.application.run import RunService
+from ansiblectl.application.standard_policies import ApplyRequiresLimitPolicy
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.execution import (
     ExecutionMode,
@@ -147,6 +148,35 @@ def test_confirmed_apply_omits_check_argument(tmp_path: Path) -> None:
     assert "--check" not in request.argv
     assert request.mode is ExecutionMode.APPLY
     assert policy.requests[0].operation == "run.apply"
+
+
+def test_default_apply_limit_policy_blocks_before_materialization(tmp_path: Path) -> None:
+    playbook = tmp_path / "site.yml"
+    playbook.write_text("---\n", encoding="utf-8")
+    port = RecordingExecutionPort()
+    materialized = False
+
+    @contextmanager
+    def recording_materializer(inventory: object) -> Iterator[Path]:
+        nonlocal materialized
+        materialized = True
+        yield tmp_path / "unused.yml"
+
+    service = RunService(
+        InventoryService([FakeInventoryProvider()]),
+        ExecutionService(port),
+        PolicyService([ApplyRequiresLimitPolicy()]),
+        recording_materializer,
+    )
+
+    result = service.run_apply(
+        tmp_path, Path("site.yml"), "main", {}, 30, EnforcementMode.DENY, True
+    )
+
+    assert result.execution is None
+    assert result.report.findings[0].rule_id == "ANSIBLECTL-APPLY-001"
+    assert materialized is False
+    assert port.request is None
 
 
 class DenyingPolicy:

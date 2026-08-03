@@ -31,11 +31,20 @@ The initial evaluator sorts findings by rule identifier and affected location.
 Its explicit modes are `report`, `warn`, and `deny`; only `deny` with one or
 more findings blocks the governed operation before adapter invocation.
 
+The initial bundled rule `ANSIBLECTL-APPLY-001` applies only to `run.apply`.
+It emits a high-severity finding when the validated execution targeting has no
+explicit host limit, with remediation to retry using `--limit`. The CLI
+composition enables this rule by default. In the default `deny` enforcement
+mode the finding prevents inventory materialization and adapter invocation;
+`report` and `warn` preserve their documented non-blocking semantics.
+
 ## Verification
 
 - The same inputs produce an identical ordered report.
 - A deny rule blocks execution before adapter invocation.
 - Machine-readable policy output validates against its schema.
+- Apply without a host limit produces `ANSIBLECTL-APPLY-001`; check mode does not.
+- The default CLI composition includes the bundled apply-limit rule.
 
 ## Non-goals
 

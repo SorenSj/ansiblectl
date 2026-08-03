@@ -96,9 +96,11 @@ execution; `--check` is not an absolute guarantee that no remote changes occur.
 Policy mode defaults to `deny`; `report` and `warn` retain findings but allow
 execution to continue.
 
-To apply changes, replace `--check` with both `--apply --confirm`. Apply mode is
-evaluated separately by policy and the selected mode is retained in execution
-history. Omitting either apply flag fails before workspace access or execution.
+To apply changes, replace `--check` with `--apply --confirm` and provide an
+explicit `--limit`. Apply mode is evaluated separately by policy and the
+selected mode is retained in execution history. Omitting either apply flag
+fails before workspace access; the default deny policy blocks apply without a
+host limit before inventory materialization or execution.
 
 Captured Ansible output is not echoed directly. Non-empty stdout and stderr are
 stored with owner-only permissions below `.ansiblectl/runs`, and the command
