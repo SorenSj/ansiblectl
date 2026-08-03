@@ -17,7 +17,7 @@ class InventoryError(DomainError):
 class Host:
     name: str
     address: str
-    variables: Mapping[str, str]
+    variables: Mapping[str, object]
     source: str
 
 
