@@ -13,6 +13,7 @@ All notable changes to Ansiblectl are documented here.
   pre-transaction POSIX probe for permissions, advisory locks, atomic replacement, and syncing.
 - Additive `state recover --details` diagnostics with bounded age, opaque identifiers, owner status,
   required action, and stable reason codes without journal paths or content.
+- Stable human, JSON, and YAML rendering for detailed recovery diagnostics.
 - Real subprocess termination coverage across staging, write-ahead commit, target replacement,
   automatic rollback, durable commit, and cleanup transitions.
 - Bounded multiprocess contention coverage for different and shared targets, live-owner preview and

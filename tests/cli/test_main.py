@@ -5,6 +5,7 @@ from io import StringIO
 from pathlib import Path
 
 import pytest
+import yaml
 
 from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.execution_history import ExecutionSummary
@@ -280,6 +281,56 @@ def test_state_recover_details_render_only_safe_diagnostics(tmp_path: Path) -> N
         ],
         "schema_version": 1,
     }
+
+
+def test_state_recover_details_render_stable_yaml(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "--output", "yaml", "state", "recover", "--details"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        state_service=FakeStateService(),  # type: ignore[arg-type]
+        filesystem_recovery_service=FakeFilesystemRecoveryService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert yaml.safe_load(output.getvalue()) == {
+        "diagnostics": [
+            {
+                "action": "rollback",
+                "active_owner": False,
+                "age_seconds": 1.5,
+                "reasons": ["ROLLBACK_REQUIRED"],
+                "schema_version": 1,
+                "state": "committing",
+                "transaction_id": "transaction-1",
+            }
+        ],
+        "schema_version": 1,
+    }
+
+
+def test_state_recover_details_render_actionable_human_output(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "state", "recover", "--details"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        state_service=FakeStateService(),  # type: ignore[arg-type]
+        filesystem_recovery_service=FakeFilesystemRecoveryService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert output.getvalue() == (
+        "Transaction: transaction-1\n"
+        "State: committing\n"
+        "Age: 1.5s\n"
+        "Active owner: no\n"
+        "Action: rollback\n"
+        "Reasons: ROLLBACK_REQUIRED\n"
+    )
 
 
 def test_state_recover_applies_durable_workspace_recovery(tmp_path: Path) -> None:

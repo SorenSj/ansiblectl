@@ -13,6 +13,8 @@ from io import StringIO
 from pathlib import Path
 from typing import TextIO
 
+import yaml
+
 from ansiblectl.application.configuration import ConfigurationService
 from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.execution_history import ExecutionHistoryService, ExecutionSummary
@@ -1373,8 +1375,12 @@ def _render_recovery_diagnostics(
         }
         for diagnostic in diagnostics
     ]
+    payload = {"diagnostics": items, "schema_version": 1}
     if output_format == "json":
-        print(json.dumps({"diagnostics": items, "schema_version": 1}, sort_keys=True), file=output)
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    if output_format == "yaml":
+        yaml.safe_dump(payload, output, sort_keys=True)
         return
     if not diagnostics:
         print("No filesystem transaction diagnostics.", file=output)
