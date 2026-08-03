@@ -57,6 +57,7 @@ class ErrorCode(StrEnum):
     REPOSITORY_REVISION_MISMATCH = "REPOSITORY_REVISION_MISMATCH"
     FILESYSTEM_TRANSACTION_ERROR = "FILESYSTEM_TRANSACTION_ERROR"
     FILESYSTEM_RECOVERY_REQUIRED = "FILESYSTEM_RECOVERY_REQUIRED"
+    FILESYSTEM_CAPABILITY_UNSUPPORTED = "FILESYSTEM_CAPABILITY_UNSUPPORTED"
 
 
 @dataclass(frozen=True)
@@ -159,6 +160,11 @@ ERROR_CODE_REGISTRY: Mapping[str, ErrorDefinition] = MappingProxyType(
             _definition(
                 ErrorCode.FILESYSTEM_RECOVERY_REQUIRED,
                 "filesystem_recovery",
+                ExitCode.RESOURCE_CONFLICT,
+            ),
+            _definition(
+                ErrorCode.FILESYSTEM_CAPABILITY_UNSUPPORTED,
+                "filesystem_capability",
                 ExitCode.RESOURCE_CONFLICT,
             ),
         )
@@ -376,6 +382,13 @@ class FilesystemRecoveryError(InfrastructureError):
     exit_code = ExitCode.RESOURCE_CONFLICT
 
 
+class FilesystemCapabilityError(InfrastructureError):
+    """Raised before mutation when required filesystem guarantees are unavailable."""
+
+    error_code = ErrorCode.FILESYSTEM_CAPABILITY_UNSUPPORTED
+    exit_code = ExitCode.RESOURCE_CONFLICT
+
+
 __all__ = [
     "ERROR_CODE_REGISTRY",
     "AnsiblectlError",
@@ -390,6 +403,7 @@ __all__ = [
     "ExternalToolError",
     "FilesystemRecoveryError",
     "FilesystemTransactionError",
+    "FilesystemCapabilityError",
     "InfrastructureError",
     "InternalOperationalError",
     "InventoryError",

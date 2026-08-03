@@ -4,6 +4,18 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Roadmap and normative v0.3.0 operational-reliability contracts covering subprocess crash tests,
+  multiprocess ownership, filesystem capability checks, safe recovery diagnostics, and supported
+  platforms.
+- Typed workspace filesystem capability reports, stable unsupported-capability errors, and a
+  pre-transaction POSIX probe for permissions, advisory locks, atomic replacement, and syncing.
+- Additive `state recover --details` diagnostics with bounded age, opaque identifiers, owner status,
+  required action, and stable reason codes without journal paths or content.
+- Real subprocess termination coverage across staging, write-ahead commit, target replacement,
+  automatic rollback, durable commit, and cleanup transitions.
+
 ## [0.2.0] - 2026-08-03
 
 ### Added

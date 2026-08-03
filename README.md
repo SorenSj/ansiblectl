@@ -278,3 +278,6 @@ engineering documentation. The initial governing document is
 
 Supporting architecture, decision, specification, and diagram artefacts live
 under [`docs/`](docs/).
+
+Completed, active, and deferred release milestones are tracked in the
+[project roadmap](docs/roadmap/README.md).

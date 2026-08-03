@@ -2,7 +2,11 @@
 
 from dataclasses import dataclass
 
-from ansiblectl.domain.filesystem import FilesystemRecoveryPort, FilesystemRecoveryResult
+from ansiblectl.domain.filesystem import (
+    FilesystemRecoveryPort,
+    FilesystemRecoveryResult,
+    RecoveryDiagnostic,
+)
 
 
 @dataclass(frozen=True)
@@ -16,3 +20,8 @@ class FilesystemRecoveryService:
         if apply and transaction_ids:
             self.port.recover()
         return FilesystemRecoveryResult(transaction_ids, apply)
+
+    def diagnostics(self) -> tuple[RecoveryDiagnostic, ...]:
+        """Return safe diagnostic projections without applying recovery."""
+
+        return self.port.diagnostics()

@@ -41,3 +41,4 @@ New decisions supersede earlier ADRs; accepted ADRs are not silently rewritten.
 | [0034](0034-supply-chain-and-dependency-governance.md) | Supply Chain and Dependency Governance | Accepted |
 | [0035](0035-change-management-and-contribution-workflow.md) | Change Management and Contribution Workflow | Accepted |
 | [0036](0036-transactional-filesystem-operations.md) | Transactional Filesystem Operations | Accepted |
+| [0037](0037-operational-reliability-and-platform-contract.md) | Operational Reliability and Platform Contract | Accepted |

@@ -35,7 +35,12 @@ from ansiblectl.domain.execution import (
     ExecutionStatus,
     ExecutionTargeting,
 )
-from ansiblectl.domain.filesystem import FilesystemRecoveryResult
+from ansiblectl.domain.filesystem import (
+    FilesystemRecoveryResult,
+    RecoveryAction,
+    RecoveryDiagnostic,
+    RecoveryReason,
+)
 from ansiblectl.domain.inventory import Host, ResolvedInventory
 from ansiblectl.domain.plugins import ProviderDescriptor
 from ansiblectl.domain.policy import EnforcementMode, PolicyFinding, PolicyReport
@@ -140,6 +145,18 @@ class FakeFilesystemRecoveryService:
     def recover(self, *, apply: bool = False) -> FilesystemRecoveryResult:
         return FilesystemRecoveryResult(("transaction-1",), apply)
 
+    def diagnostics(self) -> tuple[RecoveryDiagnostic, ...]:
+        return (
+            RecoveryDiagnostic(
+                "transaction-1",
+                "committing",
+                1.5,
+                RecoveryAction.ROLLBACK,
+                (RecoveryReason.ROLLBACK_REQUIRED,),
+                False,
+            ),
+        )
+
 
 def test_state_show_renders_only_safe_cache_metadata(tmp_path: Path) -> None:
     output = StringIO()
@@ -226,6 +243,42 @@ def test_state_recover_previews_pending_transactions(tmp_path: Path) -> None:
         "applied": False,
         "schema_version": 1,
         "transaction_ids": ["transaction-1"],
+    }
+
+
+def test_state_recover_details_render_only_safe_diagnostics(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "state",
+            "recover",
+            "--details",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        state_service=FakeStateService(),  # type: ignore[arg-type]
+        filesystem_recovery_service=FakeFilesystemRecoveryService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue()) == {
+        "diagnostics": [
+            {
+                "action": "rollback",
+                "active_owner": False,
+                "age_seconds": 1.5,
+                "reasons": ["ROLLBACK_REQUIRED"],
+                "schema_version": 1,
+                "state": "committing",
+                "transaction_id": "transaction-1",
+            }
+        ],
+        "schema_version": 1,
     }
 
 
