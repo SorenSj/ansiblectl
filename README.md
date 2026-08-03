@@ -87,11 +87,13 @@ Ansible with an explicit timeout and argument vector:
 ```console
 uv run ansiblectl --workspace ~/automation/example run \
   --playbook playbooks/site.yml --revision main \
-  --inventory inventory/hosts.yml --check --timeout 300
+  --inventory inventory/hosts.yml --check --timeout 300 --policy-mode deny
 ```
 
 Ansible tasks can explicitly disable check mode. Review playbooks before
 execution; `--check` is not an absolute guarantee that no remote changes occur.
+Policy mode defaults to `deny`; `report` and `warn` retain findings but allow
+execution to continue.
 
 ## Project governance
 

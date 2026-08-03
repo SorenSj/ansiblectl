@@ -7,6 +7,7 @@ from ansiblectl import __version__
 from ansiblectl.application.execution import ExecutionService
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.plugins import PluginDiscoveryService
+from ansiblectl.application.policy import PolicyService
 from ansiblectl.application.repository import RepositoryService
 from ansiblectl.application.run import RunService
 from ansiblectl.application.status import DefaultStatusService, StatusService
@@ -50,6 +51,7 @@ def build_run_service(workspace_root: Path, inventory_source: Path | None = None
     return RunService(
         inventory=build_inventory_service(workspace_root, inventory_source),
         execution=ExecutionService(LocalExecutionAdapter()),
+        policy=PolicyService([]),
         materialize_inventory=materialize_inventory,
     )
 

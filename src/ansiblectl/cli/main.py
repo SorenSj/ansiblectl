@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
 
+from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.plugins import PluginDiscoveryService
 from ansiblectl.application.repository import RepositoryService
@@ -25,10 +26,11 @@ from ansiblectl.cli.composition import (
     execution_environment,
 )
 from ansiblectl.domain.errors import ExecutionError, WorkspaceError
-from ansiblectl.domain.execution import ExecutionResult, ExecutionStatus
+from ansiblectl.domain.execution import ExecutionStatus
 from ansiblectl.domain.inventory import InventoryError, ResolvedInventory
 from ansiblectl.domain.playbook import PlaybookError
 from ansiblectl.domain.plugins import PluginManifestError, ProviderDescriptor
+from ansiblectl.domain.policy import EnforcementMode
 from ansiblectl.domain.repository import RepositoryError, RepositoryRequest, RepositoryResult
 from ansiblectl.domain.workspace import Workspace
 
@@ -121,6 +123,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument("--check", action="store_true", required=True, help="Use Ansible check mode.")
     run.add_argument("--timeout", type=float, default=300.0, help="Positive timeout in seconds.")
+    run.add_argument(
+        "--policy-mode",
+        choices=tuple(EnforcementMode),
+        type=EnforcementMode,
+        default=EnforcementMode.DENY,
+        help="Policy enforcement mode (default: deny).",
+    )
     return parser
 
 
@@ -239,12 +248,13 @@ def main(
             run_service_instance = run_service or build_run_service(
                 workspace.root, arguments.inventory
             )
-            execution_result = run_service_instance.run_check(
+            run_result = run_service_instance.run_check(
                 workspace.root,
                 arguments.playbook,
                 arguments.revision,
                 execution_environment(),
                 arguments.timeout,
+                arguments.policy_mode,
             )
         except WorkspaceError as error:
             print(f"Workspace error: {error}", file=stderr)
@@ -252,8 +262,10 @@ def main(
         except (InventoryError, PlaybookError, ExecutionError) as error:
             print(f"Run error: {error}", file=stderr)
             return EXIT_EXPECTED_FAILURE
-        _render_execution(execution_result, options.output_format, stdout)
-        if execution_result.status is not ExecutionStatus.COMPLETED:
+        _render_run_result(run_result, options.output_format, stdout)
+        if run_result.execution is None:
+            return EXIT_EXPECTED_FAILURE
+        if run_result.execution.status is not ExecutionStatus.COMPLETED:
             return EXIT_EXPECTED_FAILURE
     return EXIT_SUCCESS
 
@@ -379,22 +391,43 @@ def _render_plugins(
         print(f"{plugin['identity']} {plugin['version']} ({plugin['source']})", file=output)
 
 
-def _render_execution(result: ExecutionResult, output_format: str, output: TextIO | None) -> None:
-    """Render a classified execution result without raw process output."""
+def _render_run_result(
+    result: GovernedExecutionResult, output_format: str, output: TextIO | None
+) -> None:
+    """Render policy findings and an optional classified execution result."""
 
-    record = {
-        "diagnostic": result.diagnostic,
-        "elapsed_seconds": result.elapsed_seconds,
-        "execution_id": result.execution_id,
-        "exit_code": result.exit_code,
-        "status": result.status.value,
-        "stderr_reference": result.stderr_reference,
-        "stdout_reference": result.stdout_reference,
-    }
+    execution = result.execution
+    record = (
+        None
+        if execution is None
+        else {
+            "diagnostic": execution.diagnostic,
+            "elapsed_seconds": execution.elapsed_seconds,
+            "execution_id": execution.execution_id,
+            "exit_code": execution.exit_code,
+            "status": execution.status.value,
+            "stderr_reference": execution.stderr_reference,
+            "stdout_reference": execution.stdout_reference,
+        }
+    )
     if output_format == "json":
-        print(json.dumps({"execution": record, "schema_version": 1}, sort_keys=True), file=output)
+        print(
+            json.dumps(
+                {
+                    "execution": record,
+                    "policy": result.report.machine_output(),
+                    "schema_version": 1,
+                },
+                sort_keys=True,
+            ),
+            file=output,
+        )
         return
-    print(f"Execution: {result.execution_id}", file=output)
-    print(f"Status: {result.status.value}", file=output)
-    if result.diagnostic:
-        print(f"Diagnostic: {result.diagnostic}", file=output)
+    print(f"Policy: {result.report.mode.value}", file=output)
+    for finding in result.report.findings:
+        print(f"Finding {finding.rule_id}: {finding.message} ({finding.location})", file=output)
+    if execution is not None:
+        print(f"Execution: {execution.execution_id}", file=output)
+        print(f"Status: {execution.status.value}", file=output)
+        if execution.diagnostic:
+            print(f"Diagnostic: {execution.diagnostic}", file=output)
