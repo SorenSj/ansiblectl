@@ -27,6 +27,12 @@ This specification defines the initial public and internal contract for this cap
 
 The secret port resolves SecretReference to protected material for the minimum necessary operation; renderers and event payloads never receive that material.
 
+The initial reference is a provider and key pair, rendered as `provider:key`.
+Protected material has a redacted representation and is returned only from a
+provider call to its immediate operation. Audit records retain the reference
+and outcome only. The in-memory provider is test-only; it is not a production
+secret backend.
+
 ## Verification
 
 - A missing reference produces an actionable provider-aware error.
@@ -36,4 +42,3 @@ The secret port resolves SecretReference to protected material for the minimum n
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
