@@ -15,6 +15,10 @@ All notable changes to Ansiblectl are documented here.
   required action, and stable reason codes without journal paths or content.
 - Real subprocess termination coverage across staging, write-ahead commit, target replacement,
   automatic rollback, durable commit, and cleanup transitions.
+- Bounded multiprocess contention coverage for different and shared targets, live-owner preview and
+  recovery exclusion, and serialized simultaneous recovery.
+- An operator recovery runbook covering safe inspection, automatic recovery, retained corrupt
+  evidence, repeated failures, and supported filesystem limitations.
 
 ## [0.2.0] - 2026-08-03
 

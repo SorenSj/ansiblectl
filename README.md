@@ -281,3 +281,6 @@ under [`docs/`](docs/).
 
 Completed, active, and deferred release milestones are tracked in the
 [project roadmap](docs/roadmap/README.md).
+
+Operational recovery procedures and filesystem limitations are documented in the
+[filesystem recovery runbook](docs/operations/filesystem-recovery.md).
