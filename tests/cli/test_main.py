@@ -9,6 +9,7 @@ import pytest
 from ansiblectl.application.status import Status
 from ansiblectl.cli.main import EXIT_EXPECTED_FAILURE, EXIT_INVALID_INPUT, EXIT_SUCCESS, main
 from ansiblectl.domain.errors import WorkspaceNotFoundError
+from ansiblectl.domain.execution import ExecutionResult, ExecutionStatus
 from ansiblectl.domain.inventory import Host, ResolvedInventory
 from ansiblectl.domain.plugins import ProviderDescriptor
 from ansiblectl.domain.repository import RepositoryRequest, RepositoryResult
@@ -302,3 +303,84 @@ def test_plugin_manifest_path_cannot_escape_workspace(tmp_path: Path) -> None:
     assert result == EXIT_EXPECTED_FAILURE
     assert service.locations == []
     assert "inside the selected workspace" in error.getvalue()
+
+
+class FakeRunService:
+    def run_check(
+        self,
+        workspace_root: Path,
+        playbook_identifier: Path,
+        revision: str,
+        environment: object,
+        timeout_seconds: float,
+    ) -> ExecutionResult:
+        assert workspace_root.is_absolute()
+        assert playbook_identifier == Path("playbooks/site.yml")
+        assert revision == "main"
+        assert timeout_seconds == 30
+        return ExecutionResult("run-1", ExecutionStatus.COMPLETED, 0, 0.1)
+
+
+def test_run_check_renders_injected_execution_result(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "run",
+            "--playbook",
+            "playbooks/site.yml",
+            "--revision",
+            "main",
+            "--check",
+            "--timeout",
+            "30",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        run_service=FakeRunService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue())["execution"]["status"] == "completed"
+
+
+class FailedRunService(FakeRunService):
+    def run_check(
+        self,
+        workspace_root: Path,
+        playbook_identifier: Path,
+        revision: str,
+        environment: object,
+        timeout_seconds: float,
+    ) -> ExecutionResult:
+        return ExecutionResult(
+            "run-2", ExecutionStatus.TIMED_OUT, None, 30.0, diagnostic="Timeout reached."
+        )
+
+
+def test_run_failure_uses_expected_failure_exit_and_safe_diagnostic(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "run",
+            "--playbook",
+            "playbooks/site.yml",
+            "--revision",
+            "main",
+            "--check",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        run_service=FailedRunService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert "timed_out" in output.getvalue()
+    assert "Timeout reached" in output.getvalue()

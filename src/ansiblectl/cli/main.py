@@ -12,17 +12,22 @@ from typing import TextIO
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.plugins import PluginDiscoveryService
 from ansiblectl.application.repository import RepositoryService
+from ansiblectl.application.run import RunService
 from ansiblectl.application.status import StatusService
 from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.cli.composition import (
     build_inventory_service,
     build_plugin_discovery_service,
     build_repository_service,
+    build_run_service,
     build_status_service,
     build_workspace_service,
+    execution_environment,
 )
-from ansiblectl.domain.errors import WorkspaceError
+from ansiblectl.domain.errors import ExecutionError, WorkspaceError
+from ansiblectl.domain.execution import ExecutionResult, ExecutionStatus
 from ansiblectl.domain.inventory import InventoryError, ResolvedInventory
+from ansiblectl.domain.playbook import PlaybookError
 from ansiblectl.domain.plugins import PluginManifestError, ProviderDescriptor
 from ansiblectl.domain.repository import RepositoryError, RepositoryRequest, RepositoryResult
 from ansiblectl.domain.workspace import Workspace
@@ -105,6 +110,17 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Manifest path in the workspace; repeat for multiple plugins.",
     )
+    run = subcommands.add_parser("run", help="Run a validated playbook in Ansible check mode.")
+    run.add_argument("--playbook", type=Path, required=True, help="Playbook path in the workspace.")
+    run.add_argument("--revision", required=True, help="Explicit repository revision.")
+    run.add_argument(
+        "--inventory",
+        type=Path,
+        default=Path("inventory/hosts.yml"),
+        help="Inventory YAML path in the workspace.",
+    )
+    run.add_argument("--check", action="store_true", required=True, help="Use Ansible check mode.")
+    run.add_argument("--timeout", type=float, default=300.0, help="Positive timeout in seconds.")
     return parser
 
 
@@ -116,6 +132,7 @@ def main(
     inventory_service: InventoryService | None = None,
     repository_service: RepositoryService | None = None,
     plugin_service: PluginDiscoveryService | None = None,
+    run_service: RunService | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
     current_directory: Path | None = None,
@@ -213,6 +230,31 @@ def main(
             print(f"Plugin manifest error: {error}", file=stderr)
             return EXIT_EXPECTED_FAILURE
         _render_plugins(descriptors, options.output_format, stdout)
+    elif arguments.command == "run":
+        workspace_service_instance = workspace_service or build_workspace_service()
+        try:
+            workspace = workspace_service_instance.resolve(
+                options.workspace, current_directory or Path.cwd()
+            )
+            run_service_instance = run_service or build_run_service(
+                workspace.root, arguments.inventory
+            )
+            execution_result = run_service_instance.run_check(
+                workspace.root,
+                arguments.playbook,
+                arguments.revision,
+                execution_environment(),
+                arguments.timeout,
+            )
+        except WorkspaceError as error:
+            print(f"Workspace error: {error}", file=stderr)
+            return EXIT_EXPECTED_FAILURE
+        except (InventoryError, PlaybookError, ExecutionError) as error:
+            print(f"Run error: {error}", file=stderr)
+            return EXIT_EXPECTED_FAILURE
+        _render_execution(execution_result, options.output_format, stdout)
+        if execution_result.status is not ExecutionStatus.COMPLETED:
+            return EXIT_EXPECTED_FAILURE
     return EXIT_SUCCESS
 
 
@@ -335,3 +377,24 @@ def _render_plugins(
         return
     for plugin in plugins:
         print(f"{plugin['identity']} {plugin['version']} ({plugin['source']})", file=output)
+
+
+def _render_execution(result: ExecutionResult, output_format: str, output: TextIO | None) -> None:
+    """Render a classified execution result without raw process output."""
+
+    record = {
+        "diagnostic": result.diagnostic,
+        "elapsed_seconds": result.elapsed_seconds,
+        "execution_id": result.execution_id,
+        "exit_code": result.exit_code,
+        "status": result.status.value,
+        "stderr_reference": result.stderr_reference,
+        "stdout_reference": result.stdout_reference,
+    }
+    if output_format == "json":
+        print(json.dumps({"execution": record, "schema_version": 1}, sort_keys=True), file=output)
+        return
+    print(f"Execution: {result.execution_id}", file=output)
+    print(f"Status: {result.status.value}", file=output)
+    if result.diagnostic:
+        print(f"Diagnostic: {result.diagnostic}", file=output)

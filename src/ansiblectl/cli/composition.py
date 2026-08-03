@@ -1,15 +1,20 @@
 """Construct concrete application dependencies at the CLI boundary."""
 
+import os
 from pathlib import Path
 
 from ansiblectl import __version__
+from ansiblectl.application.execution import ExecutionService
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.plugins import PluginDiscoveryService
 from ansiblectl.application.repository import RepositoryService
+from ansiblectl.application.run import RunService
 from ansiblectl.application.status import DefaultStatusService, StatusService
 from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.domain.inventory import InventoryError
+from ansiblectl.infrastructure.generated_inventory import materialize_inventory
 from ansiblectl.infrastructure.git_repository import GitRepositoryAdapter
+from ansiblectl.infrastructure.local_execution import LocalExecutionAdapter
 from ansiblectl.infrastructure.local_workspace_store import LocalWorkspaceStore
 from ansiblectl.infrastructure.plugin_manifests import discover_manifests
 from ansiblectl.infrastructure.yaml_inventory import YamlInventoryProvider
@@ -37,6 +42,23 @@ def build_plugin_discovery_service() -> PluginDiscoveryService:
     """Create safe file-based plugin manifest discovery."""
 
     return PluginDiscoveryService(file_loader=discover_manifests)
+
+
+def build_run_service(workspace_root: Path, inventory_source: Path | None = None) -> RunService:
+    """Create check-mode Ansible execution from concrete local adapters."""
+
+    return RunService(
+        inventory=build_inventory_service(workspace_root, inventory_source),
+        execution=ExecutionService(LocalExecutionAdapter()),
+        materialize_inventory=materialize_inventory,
+    )
+
+
+def execution_environment() -> dict[str, str]:
+    """Return the explicit environment allowlist for local execution."""
+
+    allowed = {"ANSIBLE_CONFIG", "HOME", "LANG", "LC_ALL", "PATH", "SSH_AUTH_SOCK", "USER"}
+    return {name: value for name, value in os.environ.items() if name in allowed}
 
 
 def build_inventory_service(
