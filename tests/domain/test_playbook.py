@@ -6,7 +6,7 @@ import pytest
 
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.execution import ExecutionRequest, ExecutionTargeting
-from ansiblectl.domain.playbook import PlaybookError, select_playbook
+from ansiblectl.domain.playbook import PlaybookError, playbook_digest, select_playbook
 
 
 def test_relative_playbook_resolves_inside_content_root(tmp_path: Path) -> None:
@@ -43,3 +43,25 @@ def test_execution_targeting_rejects_empty_and_nul_values() -> None:
         ExecutionTargeting(tags=("",))
     with pytest.raises(ExecutionError, match="no NUL"):
         ExecutionTargeting(limit="web\x00servers")
+
+
+def test_playbook_digest_identifies_exact_validated_bytes(tmp_path: Path) -> None:
+    path = tmp_path / "site.yml"
+    path.write_bytes(b"---\n- hosts: web\n")
+    selected = select_playbook(tmp_path, Path("site.yml"), "main")
+
+    first = playbook_digest(selected)
+    path.write_bytes(b"---\n- hosts: database\n")
+
+    assert first.startswith("sha256:")
+    assert first != playbook_digest(selected)
+
+
+def test_playbook_digest_rejects_file_that_became_unreadable(tmp_path: Path) -> None:
+    path = tmp_path / "site.yml"
+    path.write_text("---\n- hosts: all\n", encoding="utf-8")
+    selected = select_playbook(tmp_path, Path("site.yml"), "main")
+    path.unlink()
+
+    with pytest.raises(PlaybookError, match="became unreadable"):
+        playbook_digest(selected)

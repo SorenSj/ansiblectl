@@ -115,6 +115,10 @@ The same records include a SHA-256 digest of the canonical inventory supplied
 to Ansible. This proves which inventory representation was used without copying
 host addresses or variables into execution history.
 
+They also include a SHA-256 digest of the exact validated playbook bytes. This
+distinguishes the content actually used by a check-mode run even when the
+playbook has uncommitted changes, without copying its contents into history.
+
 Captured Ansible output is not echoed directly. Non-empty stdout and stderr are
 stored with owner-only permissions below `.ansiblectl/runs`, and the command
 returns their file references for diagnosis.

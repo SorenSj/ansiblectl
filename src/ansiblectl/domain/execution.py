@@ -59,6 +59,7 @@ class ExecutionRequest:
     mode: ExecutionMode = ExecutionMode.CHECK
     resolved_revision: str | None = None
     inventory_digest: str | None = None
+    playbook_digest: str | None = None
 
     def __post_init__(self) -> None:
         if not self.argv or any(not argument for argument in self.argv):
@@ -80,6 +81,7 @@ class ExecutionRequest:
         mode: ExecutionMode = ExecutionMode.CHECK,
         resolved_revision: str | None = None,
         inventory_digest: str | None = None,
+        playbook_digest: str | None = None,
     ) -> ExecutionRequest:
         """Create a request that retains the validated canonical playbook and revision."""
 
@@ -93,6 +95,7 @@ class ExecutionRequest:
             mode=mode,
             resolved_revision=resolved_revision,
             inventory_digest=inventory_digest,
+            playbook_digest=playbook_digest,
         )
 
 
@@ -112,6 +115,7 @@ class ExecutionResult:
     requested_revision: str | None = None
     resolved_revision: str | None = None
     inventory_digest: str | None = None
+    playbook_digest: str | None = None
 
 
 @dataclass(frozen=True)
@@ -131,6 +135,7 @@ class ExecutionRecord:
     requested_revision: str | None = None
     resolved_revision: str | None = None
     inventory_digest: str | None = None
+    playbook_digest: str | None = None
 
 
 @dataclass(frozen=True)

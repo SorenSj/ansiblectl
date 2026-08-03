@@ -55,6 +55,11 @@ Execution metadata also retains the SHA-256 digest of the exact canonical
 inventory representation supplied to the inventory materializer. It does not
 embed raw host variables or addresses in the execution record.
 
+Execution requests, results, events, and history also retain the SHA-256 digest
+of the exact validated playbook file bytes. This identifies dirty check-mode
+content without embedding the playbook. Older records without either digest
+remain readable.
+
 Check-mode executions may carry validated optional targeting: one Ansible host
 limit, task tags, and skipped task tags. The application layer emits these as
 separate argument-vector elements, and completed execution events retain the
@@ -79,6 +84,7 @@ evaluated as `run.check`. Execution events and history retain the selected mode.
 - Run preflight requires the requested Git revision at HEAD; default apply policy also requires a clean worktree.
 - Execution history distinguishes the requested revision from the resolved immutable commit.
 - Execution history identifies the canonical inventory by digest without exposing its contents.
+- Execution history identifies the exact validated playbook bytes by digest without exposing their contents.
 
 ## Non-goals
 

@@ -155,6 +155,7 @@ def _parse_record(data: Any) -> ExecutionRecord | None:
         requested_revision=_optional_string(fields, "requested_revision"),
         resolved_revision=_optional_string(fields, "resolved_revision"),
         inventory_digest=_optional_string(fields, "inventory_digest"),
+        playbook_digest=_optional_string(fields, "playbook_digest"),
     )
 
 

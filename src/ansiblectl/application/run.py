@@ -12,7 +12,7 @@ from ansiblectl.application.repository import RepositoryService
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.execution import ExecutionMode, ExecutionRequest, ExecutionTargeting
 from ansiblectl.domain.inventory import canonical_inventory_digest
-from ansiblectl.domain.playbook import select_playbook
+from ansiblectl.domain.playbook import playbook_digest, select_playbook
 from ansiblectl.domain.policy import EnforcementMode, EvaluationRequest
 from ansiblectl.domain.repository import RepositoryRequest
 
@@ -89,6 +89,7 @@ class RunService:
     ) -> GovernedExecutionResult:
 
         selected = select_playbook(workspace_root, playbook_identifier, revision)
+        selected_playbook_digest = playbook_digest(selected)
         resolved_inventory = self.inventory.resolve()
         canonical_inventory = resolved_inventory.canonical()
         inventory_digest = canonical_inventory_digest(canonical_inventory)
@@ -112,6 +113,7 @@ class RunService:
                         None if repository is None else repository.resolved_revision
                     ),
                     "inventory_digest": inventory_digest,
+                    "playbook_digest": selected_playbook_digest,
                 },
             ),
             policy_mode,
@@ -136,6 +138,7 @@ class RunService:
                 mode,
                 None if repository is None else repository.resolved_revision,
                 inventory_digest,
+                selected_playbook_digest,
             )
             return GovernedExecutionResult(report, self.execution.execute(request))
 

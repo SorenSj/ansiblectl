@@ -565,6 +565,7 @@ class FakeExecutionHistoryService:
         requested_revision="main",
         resolved_revision="abc123",
         inventory_digest="sha256:inventory",
+        playbook_digest="sha256:playbook",
     )
 
     def list(self) -> tuple[ExecutionRecord, ...]:
@@ -602,6 +603,7 @@ def test_execution_list_renders_safe_machine_history(tmp_path: Path) -> None:
     assert payload["executions"][0]["requested_revision"] == "main"
     assert payload["executions"][0]["resolved_revision"] == "abc123"
     assert payload["executions"][0]["inventory_digest"] == "sha256:inventory"
+    assert payload["executions"][0]["playbook_digest"] == "sha256:playbook"
 
 
 def test_execution_show_renders_one_human_record(tmp_path: Path) -> None:

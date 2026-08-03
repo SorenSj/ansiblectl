@@ -22,6 +22,8 @@ This specification defines the initial public and internal contract for this cap
 3. The system MUST verify existence and supported file type before execution.
 4. Additional syntax or lint validation MAY be requested explicitly and MUST report tool provenance.
 5. Selected playbook and revision MUST be recorded in the execution request.
+6. The exact validated playbook file bytes MUST be identified by a SHA-256 digest before execution.
+7. If the selected playbook becomes unreadable before its digest is calculated, execution MUST fail safely.
 
 ## Interfaces and data
 
@@ -32,11 +34,18 @@ are resolved against the declared content root, while absolute identifiers must
 still be contained by it. The resulting reference stores the canonical path and
 explicit repository revision; optional syntax/lint findings may be added later.
 
+The execution request carries the digest as a `sha256:`-prefixed hexadecimal
+value. The digest identifies the precise bytes validated for the run, including
+dirty worktree content permitted in check mode; neither execution history nor
+events copy the raw playbook content.
+
 ## Verification
 
 - A relative path resolves reproducibly within a workspace.
 - Traversal outside a content root is rejected.
 - The execution request contains the canonical selected playbook.
+- Changing any playbook byte changes the recorded digest.
+- A playbook that becomes unreadable after selection is rejected before execution.
 
 ## Non-goals
 

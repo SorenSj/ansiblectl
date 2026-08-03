@@ -49,6 +49,7 @@ class ExecutionService:
                         ),
                         "resolved_revision": request.resolved_revision,
                         "inventory_digest": request.inventory_digest,
+                        "playbook_digest": request.playbook_digest,
                     },
                 )
             )

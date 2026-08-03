@@ -41,12 +41,16 @@ object containing the host limit, selected tags, and skipped tags.
 The payload also identifies execution mode as `check` or `apply`.
 Repository-backed executions include requested and resolved revision fields.
 Execution events include the canonical inventory digest, never raw inventory.
+They also include the exact validated playbook-file digest, never raw playbook
+content. Either digest may be absent when reading events produced by an older
+compatible implementation.
 
 ## Verification
 
 - A subscriber receives the documented payload type.
 - A failing optional subscriber does not change the use-case result.
 - Secret redaction tests cover event payload creation.
+- Execution events identify inventory and playbook inputs by digest without embedding them.
 
 ## Non-goals
 
