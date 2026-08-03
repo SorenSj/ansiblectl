@@ -30,6 +30,12 @@ The release workflow consumes a clean tagged source revision and produces inspec
 After a build, `dist/build-metadata.json` records the Git source revision and
 SHA-256 digest of `uv.lock`; publication credentials are not included.
 
+Release validation requires a dated `CHANGELOG.md` entry matching the package
+version. A pushed `v*` tag must equal `v<package-version>` before CI uploads the
+wheel, source archive, and build metadata as a retained workflow artifact.
+This initial workflow does not publish to a package index and uses no
+publication credentials.
+
 ## Verification
 
 - A clean checkout builds the same package metadata.

@@ -18,6 +18,7 @@ uv run mypy
 uv run pytest
 uv run python -m tools.validate_docs
 uv run python -m tools.check_architecture
+uv run python -m tools.validate_release
 uv build
 ```
 
