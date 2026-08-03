@@ -57,5 +57,8 @@ def test_history_service_filters_exact_operation_and_rejects_empty_filter() -> N
     assert service.list(status=ExecutionStatus.COMPLETED) == (record,)
     assert service.list(status=ExecutionStatus.FAILED) == ()
     assert service.list("playbook.syntax_check", ExecutionStatus.COMPLETED) == (record,)
+    assert service.list(limit=1) == (record,)
+    with pytest.raises(ExecutionError, match="greater than zero"):
+        service.list(limit=0)
     with pytest.raises(ExecutionError, match="non-empty"):
         service.list(" ")

@@ -325,6 +325,9 @@ def build_parser() -> argparse.ArgumentParser:
         type=ExecutionStatus,
         help="Show only records with this classified status.",
     )
+    execution_list.add_argument(
+        "--limit", type=int, help="Return at most this many newest matching records."
+    )
     execution_show = execution_commands.add_parser("show", help="Show one completed execution.")
     execution_show.add_argument("execution_id", help="Exact execution identifier.")
     execution_prune = execution_commands.add_parser(
@@ -764,7 +767,7 @@ def main(
             if arguments.execution_command == "show":
                 records = (history.get(arguments.execution_id),)
             else:
-                records = history.list(arguments.operation, arguments.status)
+                records = history.list(arguments.operation, arguments.status, arguments.limit)
         except WorkspaceError as error:
             return _render_cli_failure(
                 f"execution {arguments.execution_command}",

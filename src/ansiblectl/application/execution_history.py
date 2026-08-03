@@ -19,6 +19,7 @@ class ExecutionHistoryService:
         self,
         operation: str | None = None,
         status: ExecutionStatus | None = None,
+        limit: int | None = None,
     ) -> tuple[ExecutionRecord, ...]:
         records = self.port.list()
         if operation is not None:
@@ -27,6 +28,10 @@ class ExecutionHistoryService:
             records = tuple(record for record in records if record.operation == operation)
         if status is not None:
             records = tuple(record for record in records if record.status is status)
+        if limit is not None:
+            if limit <= 0:
+                raise ExecutionError("Execution result limit must be greater than zero.")
+            records = records[:limit]
         return records
 
     def get(self, execution_id: str) -> ExecutionRecord:

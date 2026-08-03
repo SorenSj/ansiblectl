@@ -138,12 +138,13 @@ Filter mixed history without changing it:
 uv run ansiblectl --workspace ~/automation/example \
   execution list --operation playbook.syntax_check
 uv run ansiblectl --workspace ~/automation/example \
-  execution list --status failed
+  execution list --status failed --limit 10
 ```
 
 The exact operation and classified status filters can be combined to locate,
 for example, only timed-out inventory validations without reading captured
-stdout or stderr.
+stdout or stderr. A positive `--limit` returns only the newest matching records
+without changing retention.
 
 Ansiblectl isolates Ansible's controller-side temporary files below the
 workspace's owner-only `.ansiblectl/tmp` directory instead of relying on
