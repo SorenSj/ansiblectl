@@ -27,6 +27,11 @@ This specification defines the initial public and internal contract for this cap
 
 The event service publishes a typed event to registered SDK subscribers and records safe delivery diagnostics.
 
+The initial public event names are `execution.completed` and
+`workspace.initialized`. Payloads are redacted before subscribers receive them;
+subscriber exceptions are recorded by event name and exception class without
+changing the completed use-case result.
+
 ## Verification
 
 - A subscriber receives the documented payload type.
@@ -36,4 +41,3 @@ The event service publishes a typed event to registered SDK subscribers and reco
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
