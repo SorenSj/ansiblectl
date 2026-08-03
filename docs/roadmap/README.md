@@ -83,7 +83,7 @@ Exit criteria:
 - [x] Artifact digest, manifest agreement, trusted-key, and origin checks occur before code import.
 - [x] Unattended deny-overrides policy is deterministic and never prompts or persists approval.
 - [x] Every stable decision reason has redacted human, JSON, and YAML contract tests.
-- [ ] Existing manifest discovery and interactive permission preflight remain compatible.
+- [x] Existing manifest discovery and interactive permission preflight remain compatible.
 - [ ] The complete quality, build, provenance, and release gates pass.
 
 Explicit non-goals:
