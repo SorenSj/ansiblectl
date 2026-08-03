@@ -15,7 +15,11 @@ from typing import TextIO
 from ansiblectl.application.configuration import ConfigurationService
 from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.execution_history import ExecutionHistoryService
-from ansiblectl.application.inventory import InventoryService
+from ansiblectl.application.inventory import (
+    InventoryService,
+    InventoryValidationResult,
+    InventoryValidationService,
+)
 from ansiblectl.application.playbook import PlaybookValidationResult, PlaybookValidationService
 from ansiblectl.application.plugins import (
     PluginDiscoveryService,
@@ -31,6 +35,7 @@ from ansiblectl.cli.composition import (
     build_configuration_service,
     build_execution_history_service,
     build_inventory_service,
+    build_inventory_validation_service,
     build_playbook_validation_service,
     build_plugin_discovery_service,
     build_repository_service,
@@ -196,6 +201,17 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Inventory YAML path inside the workspace (default: inventory/hosts.yml).",
     )
+    inventory_validate = inventory_commands.add_parser(
+        "validate", help="Validate the generated inventory through Ansible."
+    )
+    inventory_validate.add_argument(
+        "--source",
+        type=Path,
+        help="Inventory YAML path inside the workspace (default: inventory/hosts.yml).",
+    )
+    inventory_validate.add_argument(
+        "--timeout", type=float, default=300.0, help="Positive validation timeout in seconds."
+    )
     repository = subcommands.add_parser("repository", help="Inspect and synchronise repositories.")
     repository_commands = repository.add_subparsers(dest="repository_command", required=True)
     for command, help_text in (
@@ -319,6 +335,7 @@ def main(
     configuration_service: ConfigurationService | None = None,
     state_service: StateService | None = None,
     inventory_service: InventoryService | None = None,
+    inventory_validation_service: InventoryValidationService | None = None,
     repository_service: RepositoryService | None = None,
     plugin_service: PluginDiscoveryService | None = None,
     plugin_permission_service: PluginPermissionService | None = None,
@@ -426,7 +443,21 @@ def main(
             _render_state(entries, options.output_format, stdout)
     elif arguments.command == "inventory":
         try:
-            if inventory_service is None:
+            if arguments.inventory_command == "validate":
+                workspace_service_instance = workspace_service or build_workspace_service()
+                workspace = workspace_service_instance.resolve(
+                    options.workspace, current_directory or Path.cwd()
+                )
+                validation_service = (
+                    inventory_validation_service
+                    or build_inventory_validation_service(workspace.root, arguments.source)
+                )
+                inventory_validation = validation_service.validate(
+                    workspace.root,
+                    execution_environment(workspace.root),
+                    arguments.timeout,
+                )
+            elif inventory_service is None:
                 workspace_service_instance = workspace_service or build_workspace_service()
                 workspace = workspace_service_instance.resolve(
                     options.workspace, current_directory or Path.cwd()
@@ -434,28 +465,34 @@ def main(
                 inventory_service_instance = build_inventory_service(
                     workspace.root, arguments.source
                 )
+                inventory = inventory_service_instance.resolve()
             else:
                 inventory_service_instance = inventory_service
-            inventory = inventory_service_instance.resolve()
+                inventory = inventory_service_instance.resolve()
         except WorkspaceError as error:
             return _render_cli_failure(
-                "inventory show",
+                f"inventory {arguments.inventory_command}",
                 str(error),
                 "Initialize or select a valid workspace and retry.",
                 options.output_format,
                 stdout,
                 stderr,
             )
-        except InventoryError as error:
+        except (ExecutionError, InventoryError) as error:
             return _render_cli_failure(
-                "inventory show",
+                f"inventory {arguments.inventory_command}",
                 str(error),
                 "Correct the inventory source and retry.",
                 options.output_format,
                 stdout,
                 stderr,
             )
-        _render_inventory(inventory, options.output_format, stdout)
+        if arguments.inventory_command == "validate":
+            _render_inventory_validation(inventory_validation, options.output_format, stdout)
+            if inventory_validation.execution.status is not ExecutionStatus.COMPLETED:
+                return EXIT_EXPECTED_FAILURE
+        else:
+            _render_inventory(inventory, options.output_format, stdout)
     elif arguments.command == "repository":
         workspace_service_instance = workspace_service or build_workspace_service()
         repository_service_instance = repository_service or build_repository_service()
@@ -838,6 +875,36 @@ def _render_inventory(
     print(f"Digest: {digest}", file=output)
     for diagnostic in inventory.diagnostics:
         print(f"Diagnostic: {diagnostic}", file=output)
+
+
+def _render_inventory_validation(
+    result: InventoryValidationResult, output_format: str, output: TextIO | None
+) -> None:
+    execution = result.execution
+    payload = {
+        "diagnostic": execution.diagnostic,
+        "digest": result.digest,
+        "elapsed_seconds": execution.elapsed_seconds,
+        "execution_id": execution.execution_id,
+        "exit_code": execution.exit_code,
+        "schema_version": 1,
+        "status": execution.status.value,
+        "stderr_reference": execution.stderr_reference,
+        "stdout_reference": execution.stdout_reference,
+        "validator": "ansible-inventory --list",
+    }
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    print(f"Inventory digest: {result.digest}", file=output)
+    print(f"Validator: {payload['validator']}", file=output)
+    print(f"Status: {execution.status.value}", file=output)
+    if execution.stdout_reference:
+        print(f"Stdout: {execution.stdout_reference}", file=output)
+    if execution.stderr_reference:
+        print(f"Stderr: {execution.stderr_reference}", file=output)
+    if execution.diagnostic:
+        print(f"Diagnostic: {execution.diagnostic}", file=output)
 
 
 def _render_repository(

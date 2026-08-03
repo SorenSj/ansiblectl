@@ -7,7 +7,7 @@ from ansiblectl import __version__
 from ansiblectl.application.configuration import ConfigurationService
 from ansiblectl.application.execution import ExecutionService
 from ansiblectl.application.execution_history import ExecutionHistoryService
-from ansiblectl.application.inventory import InventoryService
+from ansiblectl.application.inventory import InventoryService, InventoryValidationService
 from ansiblectl.application.playbook import PlaybookValidationService
 from ansiblectl.application.plugins import PluginDiscoveryService
 from ansiblectl.application.policy import PolicyService
@@ -162,3 +162,17 @@ def build_inventory_service(
     if not candidate.is_relative_to(root):
         raise InventoryError("Inventory source must remain inside the selected workspace.")
     return InventoryService(providers=[YamlInventoryProvider(candidate)])
+
+
+def build_inventory_validation_service(
+    workspace_root: Path, source: Path | None = None
+) -> InventoryValidationService:
+    """Create native Ansible inventory validation with private execution evidence."""
+
+    event_log = JsonLinesLogSink(workspace_root)
+    events = EventBus([EventLogSubscriber(event_log)])
+    return InventoryValidationService(
+        build_inventory_service(workspace_root, source),
+        ExecutionService(LocalExecutionAdapter(), events),
+        materialize_inventory,
+    )

@@ -42,6 +42,12 @@ not raw inventory data, is retained in execution metadata and public events.
 `schema_version: 1` JSON contract, allowing preflight output to be matched to
 execution history.
 
+The explicit `inventory validate` preflight resolves and materializes the same
+canonical mapping, then invokes `ansible-inventory --list` with a controlled
+timeout and environment. Validator output remains in private captured-output
+files, while the CLI reports safe status, digest, and output references. The
+execution history records the operation as `inventory.validate`.
+
 ## Verification
 
 - Two providers with a declared precedence resolve predictably.
@@ -50,6 +56,7 @@ execution history.
 - Equivalent canonical mappings produce the same digest; content changes produce a different digest.
 - Inventory inspection and execution metadata use the same canonical digest algorithm.
 - Materialized inventory is valid native Ansible YAML and remains private and ephemeral.
+- Explicit Ansible validation retains the canonical digest and private output references.
 
 ## Non-goals
 

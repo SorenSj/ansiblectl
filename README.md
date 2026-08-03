@@ -62,11 +62,15 @@ all:
 uv run ansiblectl --workspace ~/automation/example inventory show
 uv run ansiblectl --workspace ~/automation/example \
   --output-format json inventory show
+uv run ansiblectl --workspace ~/automation/example inventory validate
 ```
 
 The default source is `inventory/hosts.yml` inside the workspace. Select a
 different YAML file inside the same boundary with `inventory show --source`.
 The reported canonical digest can be matched against execution history.
+`inventory validate` materializes that same canonical model privately and runs
+`ansible-inventory --list`; captured inventory output is returned only by file
+reference and the validation is recorded as operation `inventory.validate`.
 
 ## Repository operations
 

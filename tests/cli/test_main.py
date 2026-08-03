@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from ansiblectl.application.execution import GovernedExecutionResult
+from ansiblectl.application.inventory import InventoryValidationResult
 from ansiblectl.application.playbook import PlaybookValidationResult, SyntaxCheckEvidence
 from ansiblectl.application.state import CacheEntrySummary
 from ansiblectl.application.status import Status
@@ -263,6 +264,45 @@ class FakeInventoryService:
         return ResolvedInventory({"web-1": host}, {"web": ("web-1",)}, {"web-1": "fixture"}, ())
 
 
+class FakeInventoryValidationService:
+    def validate(
+        self, workspace_root: Path, environment: object, timeout_seconds: float
+    ) -> InventoryValidationResult:
+        assert workspace_root.is_absolute()
+        assert timeout_seconds == 12.0
+        return InventoryValidationResult(
+            "sha256:inventory",
+            ExecutionResult(
+                "inventory-1",
+                ExecutionStatus.COMPLETED,
+                0,
+                0.25,
+                "runs/inventory/stdout.log",
+                inventory_digest="sha256:inventory",
+                operation="inventory.validate",
+            ),
+        )
+
+
+class FailingInventoryValidationService:
+    def validate(
+        self, workspace_root: Path, environment: object, timeout_seconds: float
+    ) -> InventoryValidationResult:
+        return InventoryValidationResult(
+            "sha256:inventory",
+            ExecutionResult(
+                "inventory-2",
+                ExecutionStatus.FAILED,
+                1,
+                0.5,
+                stderr_reference="runs/inventory/stderr.log",
+                diagnostic="Validator exited with status 1.",
+                inventory_digest="sha256:inventory",
+                operation="inventory.validate",
+            ),
+        )
+
+
 def test_inventory_show_renders_injected_resolved_inventory() -> None:
     output = StringIO()
 
@@ -294,6 +334,57 @@ def test_inventory_show_human_output_includes_canonical_digest() -> None:
 
     assert result == EXIT_SUCCESS
     assert "Digest: sha256:" in output.getvalue()
+
+
+def test_inventory_validate_renders_safe_ansible_evidence(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "inventory",
+            "validate",
+            "--timeout",
+            "12",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        inventory_validation_service=FakeInventoryValidationService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue()) == {
+        "diagnostic": None,
+        "digest": "sha256:inventory",
+        "elapsed_seconds": 0.25,
+        "execution_id": "inventory-1",
+        "exit_code": 0,
+        "schema_version": 1,
+        "status": "completed",
+        "stderr_reference": None,
+        "stdout_reference": "runs/inventory/stdout.log",
+        "validator": "ansible-inventory --list",
+    }
+
+
+def test_inventory_validate_human_failure_returns_expected_exit(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "inventory", "validate"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        inventory_validation_service=FailingInventoryValidationService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert "Validator: ansible-inventory --list" in output.getvalue()
+    assert "Status: failed" in output.getvalue()
+    assert "Stderr: runs/inventory/stderr.log" in output.getvalue()
+    assert "Diagnostic: Validator exited with status 1." in output.getvalue()
 
 
 def test_inventory_show_uses_workspace_yaml_provider(tmp_path: Path) -> None:
