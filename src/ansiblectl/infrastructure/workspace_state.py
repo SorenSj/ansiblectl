@@ -41,7 +41,12 @@ class WorkspaceStateStore:
             raise StateError(
                 "State schema is unsupported. Remove .ansiblectl/state.json to reset it."
             )
-        return {name: CacheEntry(**entry) for name, entry in data["entries"].items()}
+        try:
+            return {name: CacheEntry(**entry) for name, entry in data["entries"].items()}
+        except TypeError as error:
+            raise StateError(
+                "State is corrupt. Remove .ansiblectl/state.json and retry."
+            ) from error
 
     def write(self, entries: dict[str, CacheEntry]) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)

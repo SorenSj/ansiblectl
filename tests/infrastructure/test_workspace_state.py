@@ -20,3 +20,12 @@ def test_corrupt_state_offers_recovery_path(tmp_path: Path) -> None:
     path.write_text("broken")
     with pytest.raises(StateError, match="Remove .ansiblectl/state.json"):
         WorkspaceStateStore(tmp_path).read()
+
+
+def test_unsupported_state_schema_offers_a_reset_path(tmp_path: Path) -> None:
+    path = tmp_path / ".ansiblectl/state.json"
+    path.parent.mkdir()
+    path.write_text('{"schema_version": 999, "entries": {}}')
+
+    with pytest.raises(StateError, match="schema is unsupported"):
+        WorkspaceStateStore(tmp_path).read()
