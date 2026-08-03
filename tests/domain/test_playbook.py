@@ -6,7 +6,12 @@ import pytest
 
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.execution import ExecutionRequest, ExecutionTargeting
-from ansiblectl.domain.playbook import PlaybookError, playbook_digest, select_playbook
+from ansiblectl.domain.playbook import (
+    PlaybookError,
+    PlaybookReference,
+    playbook_digest,
+    select_playbook,
+)
 
 
 def test_relative_playbook_resolves_inside_content_root(tmp_path: Path) -> None:
@@ -36,6 +41,21 @@ def test_execution_request_retains_canonical_playbook_and_revision(tmp_path: Pat
     request = ExecutionRequest.for_playbook(("ansible-playbook", str(path)), tmp_path, {}, selected)
 
     assert request.selected_playbook == selected
+    assert request.playbook_path == "site.yml"
+
+
+def test_execution_request_does_not_expose_playbook_outside_working_directory(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path.parent / "outside.yml"
+    request = ExecutionRequest.for_playbook(
+        ("ansible-playbook", str(outside)),
+        tmp_path,
+        {},
+        PlaybookReference(outside, "main"),
+    )
+
+    assert request.playbook_path is None
 
 
 def test_execution_targeting_rejects_empty_and_nul_values() -> None:

@@ -45,6 +45,9 @@ They also include the exact validated playbook-file digest, never raw playbook
 content. Either digest may be absent when reading events produced by an older
 compatible implementation.
 
+When available, the event pairs the playbook digest with its workspace-relative
+path. It never publishes the absolute workspace path.
+
 ## Verification
 
 - A subscriber receives the documented payload type.

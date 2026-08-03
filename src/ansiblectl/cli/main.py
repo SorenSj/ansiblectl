@@ -488,6 +488,7 @@ def _render_run_result(
             "resolved_revision": execution.resolved_revision,
             "inventory_digest": execution.inventory_digest,
             "playbook_digest": execution.playbook_digest,
+            "playbook_path": execution.playbook_path,
         }
     )
     if output_format == "json":
@@ -518,6 +519,8 @@ def _render_run_result(
             print(f"Inventory digest: {execution.inventory_digest}", file=output)
         if execution.playbook_digest:
             print(f"Playbook digest: {execution.playbook_digest}", file=output)
+        if execution.playbook_path:
+            print(f"Playbook: {execution.playbook_path}", file=output)
         if execution.stdout_reference:
             print(f"Stdout: {execution.stdout_reference}", file=output)
         if execution.stderr_reference:
@@ -552,6 +555,8 @@ def _render_execution_records(
             print(f"Inventory digest: {record.inventory_digest}", file=output)
         if record.playbook_digest:
             print(f"Playbook digest: {record.playbook_digest}", file=output)
+        if record.playbook_path:
+            print(f"Playbook: {record.playbook_path}", file=output)
         if record.stdout_reference:
             print(f"Stdout: {record.stdout_reference}", file=output)
         if record.stderr_reference:
@@ -577,6 +582,7 @@ def _execution_record(record: ExecutionRecord) -> dict[str, object]:
         "resolved_revision": record.resolved_revision,
         "inventory_digest": record.inventory_digest,
         "playbook_digest": record.playbook_digest,
+        "playbook_path": record.playbook_path,
     }
 
 

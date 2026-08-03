@@ -24,6 +24,7 @@ This specification defines the initial public and internal contract for this cap
 5. Selected playbook and revision MUST be recorded in the execution request.
 6. The exact validated playbook file bytes MUST be identified by a SHA-256 digest before execution.
 7. If the selected playbook becomes unreadable before its digest is calculated, execution MUST fail safely.
+8. Persisted metadata MUST identify the selected playbook by a workspace-relative path and MUST NOT expose an absolute workspace path.
 
 ## Interfaces and data
 
@@ -39,6 +40,11 @@ value. The digest identifies the precise bytes validated for the run, including
 dirty worktree content permitted in check mode; neither execution history nor
 events copy the raw playbook content.
 
+Execution results, events, and history pair that digest with the selected
+playbook's POSIX-style path relative to the validated workspace root. If a
+reference cannot be represented within that root, the safe path is omitted.
+Older records without the relative path remain readable.
+
 ## Verification
 
 - A relative path resolves reproducibly within a workspace.
@@ -46,6 +52,7 @@ events copy the raw playbook content.
 - The execution request contains the canonical selected playbook.
 - Changing any playbook byte changes the recorded digest.
 - A playbook that becomes unreadable after selection is rejected before execution.
+- Execution metadata reports `playbooks/site.yml`, not an absolute workspace path.
 
 ## Non-goals
 

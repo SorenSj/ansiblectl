@@ -12,6 +12,7 @@ from ansiblectl.domain.execution import (
     ExecutionStatus,
     ExecutionTargeting,
 )
+from ansiblectl.domain.playbook import PlaybookReference
 from ansiblectl.domain.policy import EnforcementMode, EvaluationRequest, PolicyFinding
 
 
@@ -63,6 +64,7 @@ def test_deny_policy_prevents_execution_port_invocation(tmp_path: Path) -> None:
 
 
 def test_execution_event_is_published_after_a_completed_port_call(tmp_path: Path) -> None:
+    playbook = tmp_path / "playbooks/site.yml"
     request = ExecutionRequest(
         ("ansible-playbook", "site.yml"),
         tmp_path,
@@ -72,6 +74,7 @@ def test_execution_event_is_published_after_a_completed_port_call(tmp_path: Path
         resolved_revision="abc123",
         inventory_digest="sha256:inventory",
         playbook_digest="sha256:playbook",
+        selected_playbook=PlaybookReference(playbook, "main"),
     )
     result = ExecutionResult(request.execution_id, ExecutionStatus.COMPLETED, 0, 0.1)
     delivered: list[Event] = []
@@ -93,10 +96,11 @@ def test_execution_event_is_published_after_a_completed_port_call(tmp_path: Path
                 "diagnostic": None,
                 "targeting": {"limit": "web", "tags": ["deploy"], "skip_tags": ["slow"]},
                 "mode": ExecutionMode.APPLY,
-                "requested_revision": None,
+                "requested_revision": "main",
                 "resolved_revision": "abc123",
                 "inventory_digest": "sha256:inventory",
                 "playbook_digest": "sha256:playbook",
+                "playbook_path": "playbooks/site.yml",
             },
         )
     ]

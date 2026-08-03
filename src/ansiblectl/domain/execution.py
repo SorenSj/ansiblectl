@@ -69,6 +69,17 @@ class ExecutionRequest:
         if self.timeout_seconds is not None and self.timeout_seconds <= 0:
             raise ExecutionError("Execution timeout must be greater than zero.")
 
+    @property
+    def playbook_path(self) -> str | None:
+        """Return a safe workspace-relative playbook path when one was selected."""
+
+        if self.selected_playbook is None:
+            return None
+        try:
+            return self.selected_playbook.path.relative_to(self.working_directory).as_posix()
+        except ValueError:
+            return None
+
     @classmethod
     def for_playbook(
         cls,
@@ -116,6 +127,7 @@ class ExecutionResult:
     resolved_revision: str | None = None
     inventory_digest: str | None = None
     playbook_digest: str | None = None
+    playbook_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -136,6 +148,7 @@ class ExecutionRecord:
     resolved_revision: str | None = None
     inventory_digest: str | None = None
     playbook_digest: str | None = None
+    playbook_path: str | None = None
 
 
 @dataclass(frozen=True)

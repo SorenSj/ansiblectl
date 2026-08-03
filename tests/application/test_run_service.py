@@ -117,6 +117,7 @@ def test_run_prepares_check_mode_request_from_validated_inputs(tmp_path: Path) -
     assert port.request.inventory_digest.startswith("sha256:")
     assert port.request.playbook_digest is not None
     assert port.request.playbook_digest.startswith("sha256:")
+    assert port.request.playbook_path == "playbooks/site.yml"
     assert port.request.selected_playbook is not None
     assert port.request.selected_playbook.revision == "main"
     assert port.inventory == {

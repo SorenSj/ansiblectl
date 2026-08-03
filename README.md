@@ -118,6 +118,8 @@ host addresses or variables into execution history.
 They also include a SHA-256 digest of the exact validated playbook bytes. This
 distinguishes the content actually used by a check-mode run even when the
 playbook has uncommitted changes, without copying its contents into history.
+The digest is shown with the workspace-relative playbook path; absolute local
+workspace paths are not stored in execution history.
 
 Captured Ansible output is not echoed directly. Non-empty stdout and stderr are
 stored with owner-only permissions below `.ansiblectl/runs`, and the command

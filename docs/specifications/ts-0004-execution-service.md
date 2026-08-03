@@ -60,6 +60,10 @@ of the exact validated playbook file bytes. This identifies dirty check-mode
 content without embedding the playbook. Older records without either digest
 remain readable.
 
+The playbook digest is paired with a workspace-relative playbook path in
+results, events, and history. Absolute workspace paths are not persisted, and
+older records without this field remain readable.
+
 Check-mode executions may carry validated optional targeting: one Ansible host
 limit, task tags, and skipped task tags. The application layer emits these as
 separate argument-vector elements, and completed execution events retain the
@@ -85,6 +89,7 @@ evaluated as `run.check`. Execution events and history retain the selected mode.
 - Execution history distinguishes the requested revision from the resolved immutable commit.
 - Execution history identifies the canonical inventory by digest without exposing its contents.
 - Execution history identifies the exact validated playbook bytes by digest without exposing their contents.
+- Execution history identifies the selected playbook without exposing the absolute workspace path.
 
 ## Non-goals
 

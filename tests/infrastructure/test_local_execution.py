@@ -90,6 +90,7 @@ def test_adapter_persists_non_empty_output_as_private_references(
     assert result.resolved_revision == "abc123"
     assert result.inventory_digest == "sha256:inventory"
     assert result.playbook_digest == "sha256:playbook"
+    assert result.playbook_path == "site.yml"
     stdout_path = Path(result.stdout_reference)
     stderr_path = Path(result.stderr_reference)
     assert stdout_path.read_text(encoding="utf-8") == "play recap\n"
