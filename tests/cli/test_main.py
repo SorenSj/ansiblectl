@@ -388,16 +388,25 @@ class FakeRunService:
         timeout_seconds: float,
         policy_mode: EnforcementMode,
         targeting: ExecutionTargeting,
+        verbosity: int,
     ) -> GovernedExecutionResult:
         assert workspace_root.is_absolute()
         assert playbook_identifier == Path("playbooks/site.yml")
         assert revision == "main"
         assert timeout_seconds == 30
         assert policy_mode is EnforcementMode.DENY
+        assert verbosity == 2
         assert targeting == ExecutionTargeting("web:&staging", ("deploy", "config"), ("slow",))
         return GovernedExecutionResult(
             PolicyReport((), policy_mode),
-            ExecutionResult("run-1", ExecutionStatus.COMPLETED, 0, 0.1, targeting=targeting),
+            ExecutionResult(
+                "run-1",
+                ExecutionStatus.COMPLETED,
+                0,
+                0.1,
+                targeting=targeting,
+                verbosity=verbosity,
+            ),
         )
 
     def run_apply(
@@ -410,8 +419,10 @@ class FakeRunService:
         policy_mode: EnforcementMode,
         confirmed: bool,
         targeting: ExecutionTargeting,
+        verbosity: int,
     ) -> GovernedExecutionResult:
         assert confirmed is True
+        assert verbosity == 0
         return GovernedExecutionResult(
             PolicyReport((), policy_mode),
             ExecutionResult(
@@ -421,6 +432,7 @@ class FakeRunService:
                 0.1,
                 targeting=targeting,
                 mode=ExecutionMode.APPLY,
+                verbosity=verbosity,
             ),
         )
 
@@ -434,6 +446,7 @@ def test_run_check_renders_injected_execution_result(tmp_path: Path) -> None:
             str(tmp_path),
             "--output-format",
             "json",
+            "-vv",
             "run",
             "--playbook",
             "playbooks/site.yml",
@@ -457,6 +470,7 @@ def test_run_check_renders_injected_execution_result(tmp_path: Path) -> None:
     assert result == EXIT_SUCCESS
     assert json.loads(output.getvalue())["execution"]["status"] == "completed"
     assert json.loads(output.getvalue())["execution"]["targeting"]["limit"] == "web:&staging"
+    assert json.loads(output.getvalue())["execution"]["verbosity"] == 2
     assert json.loads(output.getvalue())["policy"]["allowed"] is True
 
 
@@ -470,6 +484,7 @@ class FailedRunService(FakeRunService):
         timeout_seconds: float,
         policy_mode: EnforcementMode,
         targeting: ExecutionTargeting,
+        verbosity: int,
     ) -> GovernedExecutionResult:
         return GovernedExecutionResult(
             PolicyReport((), policy_mode),
@@ -521,6 +536,7 @@ class CancelledRunService(FakeRunService):
         timeout_seconds: float,
         policy_mode: EnforcementMode,
         targeting: ExecutionTargeting,
+        verbosity: int,
     ) -> GovernedExecutionResult:
         return GovernedExecutionResult(
             PolicyReport((), policy_mode),
@@ -721,6 +737,7 @@ class DeniedRunService(FakeRunService):
         timeout_seconds: float,
         policy_mode: EnforcementMode,
         targeting: ExecutionTargeting,
+        verbosity: int,
     ) -> GovernedExecutionResult:
         finding = PolicyFinding("RUN-001", "high", "Execution denied", str(playbook_identifier))
         return GovernedExecutionResult(PolicyReport((finding,), policy_mode), None)
@@ -769,6 +786,7 @@ class FakeExecutionHistoryService:
         inventory_digest="sha256:inventory",
         playbook_digest="sha256:playbook",
         playbook_path="playbooks/site.yml",
+        verbosity=3,
     )
 
     def list(self) -> tuple[ExecutionRecord, ...]:
@@ -808,6 +826,7 @@ def test_execution_list_renders_safe_machine_history(tmp_path: Path) -> None:
     assert payload["executions"][0]["inventory_digest"] == "sha256:inventory"
     assert payload["executions"][0]["playbook_digest"] == "sha256:playbook"
     assert payload["executions"][0]["playbook_path"] == "playbooks/site.yml"
+    assert payload["executions"][0]["verbosity"] == 3
 
 
 def test_execution_show_renders_one_human_record(tmp_path: Path) -> None:

@@ -48,6 +48,9 @@ compatible implementation.
 When available, the event pairs the playbook digest with its workspace-relative
 path. It never publishes the absolute workspace path.
 
+Execution events include the non-negative Ansible verbosity count. Consumers
+reading older events default an absent count to zero.
+
 ## Verification
 
 - A subscriber receives the documented payload type.

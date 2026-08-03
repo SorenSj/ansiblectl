@@ -35,6 +35,8 @@ Ansible stdout or stderr content.
 requires the additional explicit `--apply` flag.
 
 Playbook execution requires exactly one of `run --check` or `run --apply`.
+Global verbosity is propagated to Ansible execution as one explicit `-v`,
+`-vv`, or higher argument and is retained in safe execution metadata.
 Apply mode additionally requires `--confirm`; mismatched mode and confirmation
 flags fail as invalid input before workspace or application-service access.
 

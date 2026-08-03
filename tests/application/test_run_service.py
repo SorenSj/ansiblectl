@@ -38,7 +38,7 @@ class RecordingExecutionPort:
 
     def execute(self, request: ExecutionRequest) -> ExecutionResult:
         self.request = request
-        inventory_path = Path(request.argv[2])
+        inventory_path = Path(request.argv[request.argv.index("--inventory") + 1])
         self.inventory = yaml.safe_load(inventory_path.read_text(encoding="utf-8"))
         return ExecutionResult(request.execution_id, ExecutionStatus.COMPLETED, 0, 0.1)
 
@@ -95,14 +95,15 @@ def test_run_prepares_check_mode_request_from_validated_inputs(tmp_path: Path) -
         30,
         EnforcementMode.DENY,
         ExecutionTargeting("web:&staging", ("deploy", "config"), ("slow",)),
+        3,
     )
 
     assert result.execution is not None
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert port.request is not None
-    assert port.request.argv[:2] == ("ansible-playbook", "--inventory")
+    assert port.request.argv[:3] == ("ansible-playbook", "-vvv", "--inventory")
     assert "--check" in port.request.argv
-    assert port.request.argv[3:] == (
+    assert port.request.argv[4:] == (
         "--check",
         "--limit",
         "web:&staging",
@@ -118,12 +119,33 @@ def test_run_prepares_check_mode_request_from_validated_inputs(tmp_path: Path) -
     assert port.request.playbook_digest is not None
     assert port.request.playbook_digest.startswith("sha256:")
     assert port.request.playbook_path == "playbooks/site.yml"
+    assert port.request.verbosity == 3
     assert port.request.selected_playbook is not None
     assert port.request.selected_playbook.revision == "main"
     assert port.inventory == {
         "groups": {"web": ["web-1"]},
         "hosts": {"web-1": {"address": "192.0.2.10", "variables": {"ansible_port": 22}}},
     }
+
+
+def test_run_rejects_negative_verbosity_before_input_resolution(tmp_path: Path) -> None:
+    service = RunService(
+        InventoryService([FakeInventoryProvider()]),
+        ExecutionService(RecordingExecutionPort()),
+        PolicyService([]),
+        fake_materializer,
+    )
+
+    with pytest.raises(ExecutionError, match="verbosity"):
+        service.run_check(
+            tmp_path,
+            Path("missing.yml"),
+            "main",
+            {},
+            30,
+            EnforcementMode.DENY,
+            verbosity=-1,
+        )
 
 
 def test_apply_requires_confirmation_before_execution(tmp_path: Path) -> None:
@@ -175,6 +197,7 @@ def test_confirmed_apply_omits_check_argument(tmp_path: Path) -> None:
     assert policy.requests[0].attributes["resolved_revision"] == "abc"
     assert str(policy.requests[0].attributes["inventory_digest"]).startswith("sha256:")
     assert str(policy.requests[0].attributes["playbook_digest"]).startswith("sha256:")
+    assert policy.requests[0].attributes["verbosity"] == 0
 
 
 def test_default_apply_limit_policy_blocks_before_materialization(tmp_path: Path) -> None:

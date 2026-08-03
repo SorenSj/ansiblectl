@@ -65,6 +65,11 @@ def test_execution_targeting_rejects_empty_and_nul_values() -> None:
         ExecutionTargeting(limit="web\x00servers")
 
 
+def test_execution_request_rejects_negative_verbosity(tmp_path: Path) -> None:
+    with pytest.raises(ExecutionError, match="verbosity"):
+        ExecutionRequest(("ansible-playbook", "site.yml"), tmp_path, {}, verbosity=-1)
+
+
 def test_playbook_digest_identifies_exact_validated_bytes(tmp_path: Path) -> None:
     path = tmp_path / "site.yml"
     path.write_bytes(b"---\n- hosts: web\n")

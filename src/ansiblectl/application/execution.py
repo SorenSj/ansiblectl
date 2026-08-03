@@ -51,6 +51,7 @@ class ExecutionService:
                         "inventory_digest": request.inventory_digest,
                         "playbook_digest": request.playbook_digest,
                         "playbook_path": request.playbook_path,
+                        "verbosity": request.verbosity,
                     },
                 )
             )

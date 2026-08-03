@@ -75,6 +75,7 @@ def test_execution_event_is_published_after_a_completed_port_call(tmp_path: Path
         inventory_digest="sha256:inventory",
         playbook_digest="sha256:playbook",
         selected_playbook=PlaybookReference(playbook, "main"),
+        verbosity=3,
     )
     result = ExecutionResult(request.execution_id, ExecutionStatus.COMPLETED, 0, 0.1)
     delivered: list[Event] = []
@@ -101,6 +102,7 @@ def test_execution_event_is_published_after_a_completed_port_call(tmp_path: Path
                 "inventory_digest": "sha256:inventory",
                 "playbook_digest": "sha256:playbook",
                 "playbook_path": "playbooks/site.yml",
+                "verbosity": 3,
             },
         )
     ]

@@ -36,6 +36,7 @@ class RunService:
         timeout_seconds: float,
         policy_mode: EnforcementMode,
         targeting: ExecutionTargeting | None = None,
+        verbosity: int = 0,
     ) -> GovernedExecutionResult:
         """Validate inputs and execute ansible-playbook with an ephemeral canonical inventory."""
 
@@ -48,6 +49,7 @@ class RunService:
             policy_mode,
             targeting or ExecutionTargeting(),
             ExecutionMode.CHECK,
+            verbosity,
         )
 
     def run_apply(
@@ -60,6 +62,7 @@ class RunService:
         policy_mode: EnforcementMode,
         confirmed: bool,
         targeting: ExecutionTargeting | None = None,
+        verbosity: int = 0,
     ) -> GovernedExecutionResult:
         """Execute an explicitly confirmed, policy-governed Ansible apply."""
 
@@ -74,6 +77,7 @@ class RunService:
             policy_mode,
             targeting or ExecutionTargeting(),
             ExecutionMode.APPLY,
+            verbosity,
         )
 
     def _run(
@@ -86,8 +90,10 @@ class RunService:
         policy_mode: EnforcementMode,
         targeting: ExecutionTargeting,
         mode: ExecutionMode,
+        verbosity: int,
     ) -> GovernedExecutionResult:
 
+        verbosity_arguments = _verbosity_arguments(verbosity)
         selected = select_playbook(workspace_root, playbook_identifier, revision)
         selected_playbook_digest = playbook_digest(selected)
         resolved_inventory = self.inventory.resolve()
@@ -114,6 +120,7 @@ class RunService:
                     ),
                     "inventory_digest": inventory_digest,
                     "playbook_digest": selected_playbook_digest,
+                    "verbosity": verbosity,
                 },
             ),
             policy_mode,
@@ -124,6 +131,7 @@ class RunService:
             request = ExecutionRequest.for_playbook(
                 (
                     "ansible-playbook",
+                    *verbosity_arguments,
                     "--inventory",
                     str(inventory_path),
                     *(("--check",) if mode is ExecutionMode.CHECK else ()),
@@ -139,6 +147,7 @@ class RunService:
                 None if repository is None else repository.resolved_revision,
                 inventory_digest,
                 selected_playbook_digest,
+                verbosity,
             )
             return GovernedExecutionResult(report, self.execution.execute(request))
 
@@ -152,3 +161,9 @@ def _targeting_arguments(targeting: ExecutionTargeting) -> tuple[str, ...]:
     if targeting.skip_tags:
         arguments.extend(("--skip-tags", ",".join(targeting.skip_tags)))
     return tuple(arguments)
+
+
+def _verbosity_arguments(verbosity: int) -> tuple[str, ...]:
+    if verbosity < 0:
+        raise ExecutionError("Execution verbosity must be zero or greater.")
+    return () if verbosity == 0 else (f"-{'v' * verbosity}",)

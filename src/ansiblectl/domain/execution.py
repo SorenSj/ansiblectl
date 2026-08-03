@@ -60,6 +60,7 @@ class ExecutionRequest:
     resolved_revision: str | None = None
     inventory_digest: str | None = None
     playbook_digest: str | None = None
+    verbosity: int = 0
 
     def __post_init__(self) -> None:
         if not self.argv or any(not argument for argument in self.argv):
@@ -68,6 +69,8 @@ class ExecutionRequest:
             raise ExecutionError("Execution working directory must be an absolute validated path.")
         if self.timeout_seconds is not None and self.timeout_seconds <= 0:
             raise ExecutionError("Execution timeout must be greater than zero.")
+        if self.verbosity < 0:
+            raise ExecutionError("Execution verbosity must be zero or greater.")
 
     @property
     def playbook_path(self) -> str | None:
@@ -93,6 +96,7 @@ class ExecutionRequest:
         resolved_revision: str | None = None,
         inventory_digest: str | None = None,
         playbook_digest: str | None = None,
+        verbosity: int = 0,
     ) -> ExecutionRequest:
         """Create a request that retains the validated canonical playbook and revision."""
 
@@ -107,6 +111,7 @@ class ExecutionRequest:
             resolved_revision=resolved_revision,
             inventory_digest=inventory_digest,
             playbook_digest=playbook_digest,
+            verbosity=verbosity,
         )
 
 
@@ -128,6 +133,7 @@ class ExecutionResult:
     inventory_digest: str | None = None
     playbook_digest: str | None = None
     playbook_path: str | None = None
+    verbosity: int = 0
 
 
 @dataclass(frozen=True)
@@ -149,6 +155,7 @@ class ExecutionRecord:
     inventory_digest: str | None = None
     playbook_digest: str | None = None
     playbook_path: str | None = None
+    verbosity: int = 0
 
 
 @dataclass(frozen=True)

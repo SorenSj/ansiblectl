@@ -422,10 +422,15 @@ def main(
             )
             run_result = (
                 run_service_instance.run_apply(
-                    *run_arguments, confirmed=arguments.confirm, targeting=targeting
+                    *run_arguments,
+                    confirmed=arguments.confirm,
+                    targeting=targeting,
+                    verbosity=options.verbosity,
                 )
                 if arguments.apply
-                else run_service_instance.run_check(*run_arguments, targeting=targeting)
+                else run_service_instance.run_check(
+                    *run_arguments, targeting=targeting, verbosity=options.verbosity
+                )
             )
         except WorkspaceError as error:
             return _render_cli_failure(
@@ -637,6 +642,7 @@ def _render_run_result(
             "inventory_digest": execution.inventory_digest,
             "playbook_digest": execution.playbook_digest,
             "playbook_path": execution.playbook_path,
+            "verbosity": execution.verbosity,
         }
     )
     if output_format == "json":
@@ -669,6 +675,8 @@ def _render_run_result(
             print(f"Playbook digest: {execution.playbook_digest}", file=output)
         if execution.playbook_path:
             print(f"Playbook: {execution.playbook_path}", file=output)
+        if execution.verbosity:
+            print(f"Verbosity: {execution.verbosity}", file=output)
         if execution.stdout_reference:
             print(f"Stdout: {execution.stdout_reference}", file=output)
         if execution.stderr_reference:
@@ -705,6 +713,8 @@ def _render_execution_records(
             print(f"Playbook digest: {record.playbook_digest}", file=output)
         if record.playbook_path:
             print(f"Playbook: {record.playbook_path}", file=output)
+        if record.verbosity:
+            print(f"Verbosity: {record.verbosity}", file=output)
         if record.stdout_reference:
             print(f"Stdout: {record.stdout_reference}", file=output)
         if record.stderr_reference:
@@ -731,6 +741,7 @@ def _execution_record(record: ExecutionRecord) -> dict[str, object]:
         "inventory_digest": record.inventory_digest,
         "playbook_digest": record.playbook_digest,
         "playbook_path": record.playbook_path,
+        "verbosity": record.verbosity,
     }
 
 

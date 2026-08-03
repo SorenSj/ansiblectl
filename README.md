@@ -91,6 +91,9 @@ uv run ansiblectl --workspace ~/automation/example run \
   --limit 'web:&staging' --tags deploy,config --skip-tags slow
 ```
 
+Add global `-v`, `-vv`, or higher before `run` to increase Ansible verbosity.
+The numeric level is retained in execution output and history.
+
 Ansible tasks can explicitly disable check mode. Review playbooks before
 execution; `--check` is not an absolute guarantee that no remote changes occur.
 Policy mode defaults to `deny`; `report` and `warn` retain findings but allow

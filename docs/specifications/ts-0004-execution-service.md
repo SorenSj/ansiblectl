@@ -74,6 +74,11 @@ resolution, policy evaluation, inventory materialization, or adapter invocation.
 Confirmed apply requests are evaluated as `run.apply`; check requests are
 evaluated as `run.check`. Execution events and history retain the selected mode.
 
+The non-negative CLI verbosity count is converted to at most one explicit
+Ansible argument (`-v`, `-vv`, and so on), never a shell fragment. Requests,
+results, events, and history retain the numeric count; older records default to
+zero.
+
 ## Verification
 
 - A fake execution port can verify a request without invoking a process.
@@ -90,6 +95,7 @@ evaluated as `run.check`. Execution events and history retain the selected mode.
 - Execution history identifies the canonical inventory by digest without exposing its contents.
 - Execution history identifies the exact validated playbook bytes by digest without exposing their contents.
 - Execution history identifies the selected playbook without exposing the absolute workspace path.
+- Global verbosity reaches Ansible as a separate argument and remains inspectable in execution history.
 
 ## Non-goals
 
