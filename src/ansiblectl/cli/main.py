@@ -70,7 +70,12 @@ def build_parser() -> argparse.ArgumentParser:
     workspace_commands.add_parser("show", help="Show the selected or discovered workspace.")
     inventory = subcommands.add_parser("inventory", help="Resolve and inspect inventory.")
     inventory_commands = inventory.add_subparsers(dest="inventory_command", required=True)
-    inventory_commands.add_parser("show", help="Show the resolved inventory.")
+    inventory_show = inventory_commands.add_parser("show", help="Show the resolved inventory.")
+    inventory_show.add_argument(
+        "--source",
+        type=Path,
+        help="Inventory YAML path inside the workspace (default: inventory/hosts.yml).",
+    )
     return parser
 
 
@@ -109,9 +114,21 @@ def main(
             return EXIT_EXPECTED_FAILURE
         _render_workspace(workspace, options.output_format, stdout)
     elif arguments.command == "inventory":
-        inventory_service_instance = inventory_service or build_inventory_service()
         try:
+            if inventory_service is None:
+                workspace_service_instance = workspace_service or build_workspace_service()
+                workspace = workspace_service_instance.resolve(
+                    options.workspace, current_directory or Path.cwd()
+                )
+                inventory_service_instance = build_inventory_service(
+                    workspace.root, arguments.source
+                )
+            else:
+                inventory_service_instance = inventory_service
             inventory = inventory_service_instance.resolve()
+        except WorkspaceError as error:
+            print(f"Workspace error: {error}", file=stderr)
+            return EXIT_EXPECTED_FAILURE
         except InventoryError as error:
             print(f"Inventory error: {error}", file=stderr)
             return EXIT_EXPECTED_FAILURE

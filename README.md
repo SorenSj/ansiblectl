@@ -30,13 +30,25 @@ This creates only `.ansiblectl/workspace.json` beneath the selected workspace.
 Resolve and inspect the currently configured inventory in human or stable JSON
 form:
 
-```console
-uv run ansiblectl inventory show
-uv run ansiblectl --output-format json inventory show
+```yaml
+# ~/automation/example/inventory/hosts.yml
+all:
+  children:
+    web:
+      hosts:
+        web-1:
+          ansible_host: 192.0.2.10
+          ansible_port: 22
 ```
 
-Until inventory providers are configured, the composition root returns an
-empty, valid inventory.
+```console
+uv run ansiblectl --workspace ~/automation/example inventory show
+uv run ansiblectl --workspace ~/automation/example \
+  --output-format json inventory show
+```
+
+The default source is `inventory/hosts.yml` inside the workspace. Select a
+different YAML file inside the same boundary with `inventory show --source`.
 
 ## Project governance
 

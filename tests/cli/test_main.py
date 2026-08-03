@@ -126,8 +126,36 @@ def test_inventory_show_renders_injected_resolved_inventory() -> None:
     }
 
 
-def test_inventory_show_uses_composition_root() -> None:
+def test_inventory_show_uses_workspace_yaml_provider(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    assert main(["workspace", "init", str(workspace)], stdout=StringIO()) == EXIT_SUCCESS
+    inventory = workspace / "inventory/hosts.yml"
+    inventory.parent.mkdir()
+    inventory.write_text(
+        "all:\n  children:\n    web:\n      hosts:\n        web-1:\n"
+        "          ansible_host: 192.0.2.10\n",
+        encoding="utf-8",
+    )
     output = StringIO()
 
-    assert main(["--output-format", "json", "inventory", "show"], stdout=output) == EXIT_SUCCESS
-    assert json.loads(output.getvalue())["hosts"] == {}
+    result = main(
+        ["--workspace", str(workspace), "--output-format", "json", "inventory", "show"],
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue())["hosts"]["web-1"]["address"] == "192.0.2.10"
+
+
+def test_inventory_source_cannot_escape_workspace(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    assert main(["workspace", "init", str(workspace)], stdout=StringIO()) == EXIT_SUCCESS
+    error = StringIO()
+
+    result = main(
+        ["--workspace", str(workspace), "inventory", "show", "--source", "../outside.yml"],
+        stderr=error,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert "inside the selected workspace" in error.getvalue()
