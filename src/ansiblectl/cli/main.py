@@ -271,8 +271,14 @@ def main(
                 arguments, options, workspace_service_instance, current_directory
             )
         except WorkspaceError as error:
-            print(f"Workspace error: {error}", file=stderr)
-            return EXIT_EXPECTED_FAILURE
+            return _render_cli_failure(
+                f"workspace {arguments.workspace_command}",
+                str(error),
+                "Initialize or select a valid workspace and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
         _render_workspace(workspace, options.output_format, stdout)
     elif arguments.command == "inventory":
         try:
@@ -288,11 +294,23 @@ def main(
                 inventory_service_instance = inventory_service
             inventory = inventory_service_instance.resolve()
         except WorkspaceError as error:
-            print(f"Workspace error: {error}", file=stderr)
-            return EXIT_EXPECTED_FAILURE
+            return _render_cli_failure(
+                "inventory show",
+                str(error),
+                "Initialize or select a valid workspace and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
         except InventoryError as error:
-            print(f"Inventory error: {error}", file=stderr)
-            return EXIT_EXPECTED_FAILURE
+            return _render_cli_failure(
+                "inventory show",
+                str(error),
+                "Correct the inventory source and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
         _render_inventory(inventory, options.output_format, stdout)
     elif arguments.command == "repository":
         workspace_service_instance = workspace_service or build_workspace_service()
@@ -307,20 +325,33 @@ def main(
                 arguments.revision,
             )
             if arguments.repository_command == "sync":
-                print(
-                    f"Synchronising repository {request.repository_path} "
-                    f"to revision {request.revision}.",
-                    file=stderr,
-                )
+                if options.output_format == "human":
+                    print(
+                        f"Synchronising repository {request.repository_path} "
+                        f"to revision {request.revision}.",
+                        file=stderr,
+                    )
                 result = repository_service_instance.sync(request)
             else:
                 result = repository_service_instance.inspect(request)
         except WorkspaceError as error:
-            print(f"Workspace error: {error}", file=stderr)
-            return EXIT_EXPECTED_FAILURE
+            return _render_cli_failure(
+                f"repository {arguments.repository_command}",
+                str(error),
+                "Initialize or select a valid workspace and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
         except RepositoryError as error:
-            print(f"Repository error: {error}", file=stderr)
-            return EXIT_EXPECTED_FAILURE
+            return _render_cli_failure(
+                f"repository {arguments.repository_command}",
+                str(error),
+                "Correct the repository path or revision and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
         _render_repository(result, options.output_format, stdout)
     elif arguments.command == "plugin":
         workspace_service_instance = workspace_service or build_workspace_service()
@@ -337,11 +368,23 @@ def main(
             locations = [_resolve_workspace_path(workspace.root, path) for path in identifiers]
             descriptors = plugin_service_instance.discover_files(locations)
         except WorkspaceError as error:
-            print(f"Workspace error: {error}", file=stderr)
-            return EXIT_EXPECTED_FAILURE
+            return _render_cli_failure(
+                f"plugin {arguments.plugin_command}",
+                str(error),
+                "Initialize or select a valid workspace and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
         except PluginManifestError as error:
-            print(f"Plugin manifest error: {error}", file=stderr)
-            return EXIT_EXPECTED_FAILURE
+            return _render_cli_failure(
+                f"plugin {arguments.plugin_command}",
+                str(error),
+                "Correct the plugin manifest selection and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
         _render_plugins(descriptors, options.output_format, stdout)
     elif arguments.command == "run":
         if arguments.apply != arguments.confirm:
@@ -426,11 +469,23 @@ def main(
             else:
                 records = history.list()
         except WorkspaceError as error:
-            print(f"Workspace error: {error}", file=stderr)
-            return EXIT_EXPECTED_FAILURE
+            return _render_cli_failure(
+                f"execution {arguments.execution_command}",
+                str(error),
+                "Initialize or select a valid workspace and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
         except ExecutionError as error:
-            print(f"Execution history error: {error}", file=stderr)
-            return EXIT_EXPECTED_FAILURE
+            return _render_cli_failure(
+                f"execution {arguments.execution_command}",
+                str(error),
+                "Correct the execution identifier or retention request and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
         _render_execution_records(
             records, arguments.execution_command == "show", options.output_format, stdout
         )

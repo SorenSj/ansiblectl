@@ -247,6 +247,63 @@ def test_repository_sync_reports_target_before_service_call(tmp_path: Path) -> N
     assert "release-1" in error.getvalue()
 
 
+def test_repository_sync_json_has_no_progress_decoration(tmp_path: Path) -> None:
+    service, output, error = FakeRepositoryService(), StringIO(), StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "repository",
+            "sync",
+            "repo",
+            "--revision",
+            "release-1",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        repository_service=service,  # type: ignore[arg-type]
+        stdout=output,
+        stderr=error,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert error.getvalue() == ""
+    assert json.loads(output.getvalue())["revision"] == "release-1"
+
+
+@pytest.mark.parametrize(
+    ("command", "operation"),
+    [
+        (["workspace", "show"], "workspace show"),
+        (["inventory", "show"], "inventory show"),
+        (["repository", "inspect", "repo", "--revision", "main"], "repository inspect"),
+        (["plugin", "validate", "plugin.yaml"], "plugin validate"),
+        (["execution", "list"], "execution list"),
+    ],
+)
+def test_workspace_scoped_failures_are_structured_in_json_mode(
+    tmp_path: Path, command: list[str], operation: str
+) -> None:
+    output, error = StringIO(), StringIO()
+
+    result = main(
+        ["--output-format", "json", *command],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        stdout=output,
+        stderr=error,
+        current_directory=tmp_path,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert error.getvalue() == ""
+    payload = json.loads(output.getvalue())
+    assert payload["kind"] == "operational_failure"
+    assert payload["operation"] == operation
+    assert payload["remediation"] == "Initialize or select a valid workspace and retry."
+
+
 def test_repository_path_cannot_escape_workspace(tmp_path: Path) -> None:
     service, error = FakeRepositoryService(), StringIO()
 

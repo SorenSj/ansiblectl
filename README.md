@@ -137,6 +137,8 @@ are not supplied together.
 Expected run-preparation failures return `1` as a structured
 `operational_failure` in JSON mode and as an actionable stderr message in human
 mode.
+Workspace, inventory, repository, plugin, and execution-history failures follow
+the same contract. Repository sync progress is suppressed in JSON mode.
 
 Completed runs also append a redacted structured record to
 `.ansiblectl/logs/events.jsonl`, correlated by execution identifier.

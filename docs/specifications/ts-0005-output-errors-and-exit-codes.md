@@ -56,6 +56,10 @@ repository, and execution input failures, produce a typed
 `operational_failure` outcome with exit code `1`. JSON is written only to
 stdout; human mode writes an actionable reason and remediation to stderr.
 
+The same operational-failure contract applies to workspace, inventory,
+repository, plugin, and execution-history commands. Successful repository sync
+progress is emitted only in human mode; JSON success has no stderr decoration.
+
 ## Verification
 
 - The same application failure renders consistently in human and machine modes.
