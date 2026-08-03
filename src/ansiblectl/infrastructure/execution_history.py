@@ -16,6 +16,7 @@ from ansiblectl.domain.execution import (
     ExecutionRecord,
     ExecutionRetentionResult,
     ExecutionStatus,
+    ExecutionTargeting,
 )
 from ansiblectl.infrastructure.file_locking import locked
 
@@ -148,7 +149,27 @@ def _parse_record(data: Any) -> ExecutionRecord | None:
         stdout_reference=_optional_string(fields, "stdout_reference"),
         stderr_reference=_optional_string(fields, "stderr_reference"),
         diagnostic=_optional_string(fields, "diagnostic"),
+        targeting=_targeting(fields.get("targeting")),
     )
+
+
+def _targeting(value: object) -> ExecutionTargeting:
+    if value is None:
+        return ExecutionTargeting()
+    if not isinstance(value, dict):
+        raise TypeError
+    return ExecutionTargeting(
+        limit=_optional_string(value, "limit"),
+        tags=_string_tuple(value, "tags"),
+        skip_tags=_string_tuple(value, "skip_tags"),
+    )
+
+
+def _string_tuple(data: dict[str, object], key: str) -> tuple[str, ...]:
+    value = data.get(key, [])
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise TypeError
+    return tuple(value)
 
 
 def _required_string(data: dict[str, object], key: str) -> str:

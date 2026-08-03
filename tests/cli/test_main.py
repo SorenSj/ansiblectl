@@ -15,6 +15,7 @@ from ansiblectl.domain.execution import (
     ExecutionResult,
     ExecutionRetentionResult,
     ExecutionStatus,
+    ExecutionTargeting,
 )
 from ansiblectl.domain.inventory import Host, ResolvedInventory
 from ansiblectl.domain.plugins import ProviderDescriptor
@@ -322,15 +323,17 @@ class FakeRunService:
         environment: object,
         timeout_seconds: float,
         policy_mode: EnforcementMode,
+        targeting: ExecutionTargeting,
     ) -> GovernedExecutionResult:
         assert workspace_root.is_absolute()
         assert playbook_identifier == Path("playbooks/site.yml")
         assert revision == "main"
         assert timeout_seconds == 30
         assert policy_mode is EnforcementMode.DENY
+        assert targeting == ExecutionTargeting("web:&staging", ("deploy", "config"), ("slow",))
         return GovernedExecutionResult(
             PolicyReport((), policy_mode),
-            ExecutionResult("run-1", ExecutionStatus.COMPLETED, 0, 0.1),
+            ExecutionResult("run-1", ExecutionStatus.COMPLETED, 0, 0.1, targeting=targeting),
         )
 
 
@@ -351,6 +354,12 @@ def test_run_check_renders_injected_execution_result(tmp_path: Path) -> None:
             "--check",
             "--timeout",
             "30",
+            "--limit",
+            "web:&staging",
+            "--tags",
+            "deploy,config",
+            "--skip-tags",
+            "slow",
         ],
         workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
         run_service=FakeRunService(),  # type: ignore[arg-type]
@@ -359,6 +368,7 @@ def test_run_check_renders_injected_execution_result(tmp_path: Path) -> None:
 
     assert result == EXIT_SUCCESS
     assert json.loads(output.getvalue())["execution"]["status"] == "completed"
+    assert json.loads(output.getvalue())["execution"]["targeting"]["limit"] == "web:&staging"
     assert json.loads(output.getvalue())["policy"]["allowed"] is True
 
 
@@ -371,6 +381,7 @@ class FailedRunService(FakeRunService):
         environment: object,
         timeout_seconds: float,
         policy_mode: EnforcementMode,
+        targeting: ExecutionTargeting,
     ) -> GovernedExecutionResult:
         return GovernedExecutionResult(
             PolicyReport((), policy_mode),
@@ -412,6 +423,31 @@ def test_run_failure_uses_expected_failure_exit_and_safe_diagnostic(tmp_path: Pa
     assert "Stderr: /private/run/stderr.log" in output.getvalue()
 
 
+def test_run_rejects_empty_targeting_before_service_invocation(tmp_path: Path) -> None:
+    error = StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "run",
+            "--playbook",
+            "playbooks/site.yml",
+            "--revision",
+            "main",
+            "--check",
+            "--tags",
+            "deploy,,config",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        run_service=FakeRunService(),  # type: ignore[arg-type]
+        stderr=error,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert "targeting values" in error.getvalue()
+
+
 class DeniedRunService(FakeRunService):
     def run_check(
         self,
@@ -421,6 +457,7 @@ class DeniedRunService(FakeRunService):
         environment: object,
         timeout_seconds: float,
         policy_mode: EnforcementMode,
+        targeting: ExecutionTargeting,
     ) -> GovernedExecutionResult:
         finding = PolicyFinding("RUN-001", "high", "Execution denied", str(playbook_identifier))
         return GovernedExecutionResult(PolicyReport((finding,), policy_mode), None)
@@ -463,6 +500,7 @@ class FakeExecutionHistoryService:
         0,
         1.25,
         "/workspace/.ansiblectl/runs/stdout.log",
+        targeting=ExecutionTargeting("web", ("deploy",), ("slow",)),
     )
 
     def list(self) -> tuple[ExecutionRecord, ...]:
@@ -492,6 +530,11 @@ def test_execution_list_renders_safe_machine_history(tmp_path: Path) -> None:
     assert result == EXIT_SUCCESS
     assert payload["executions"][0]["execution_id"] == "run-1"
     assert payload["executions"][0]["stdout_reference"].endswith("stdout.log")
+    assert payload["executions"][0]["targeting"] == {
+        "limit": "web",
+        "skip_tags": ["slow"],
+        "tags": ["deploy"],
+    }
 
 
 def test_execution_show_renders_one_human_record(tmp_path: Path) -> None:

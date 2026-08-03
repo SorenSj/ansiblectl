@@ -10,7 +10,12 @@ from ansiblectl.application.execution import ExecutionService
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.policy import PolicyService
 from ansiblectl.application.run import RunService
-from ansiblectl.domain.execution import ExecutionRequest, ExecutionResult, ExecutionStatus
+from ansiblectl.domain.execution import (
+    ExecutionRequest,
+    ExecutionResult,
+    ExecutionStatus,
+    ExecutionTargeting,
+)
 from ansiblectl.domain.inventory import Host, InventoryFragment
 from ansiblectl.domain.policy import EnforcementMode, EvaluationRequest, PolicyFinding
 
@@ -61,6 +66,7 @@ def test_run_prepares_check_mode_request_from_validated_inputs(tmp_path: Path) -
         {"PATH": "/bin"},
         30,
         EnforcementMode.DENY,
+        ExecutionTargeting("web:&staging", ("deploy", "config"), ("slow",)),
     )
 
     assert result.execution is not None
@@ -68,6 +74,17 @@ def test_run_prepares_check_mode_request_from_validated_inputs(tmp_path: Path) -
     assert port.request is not None
     assert port.request.argv[:2] == ("ansible-playbook", "--inventory")
     assert "--check" in port.request.argv
+    assert port.request.argv[3:] == (
+        "--check",
+        "--limit",
+        "web:&staging",
+        "--tags",
+        "deploy,config",
+        "--skip-tags",
+        "slow",
+        str(playbook),
+    )
+    assert port.request.targeting.limit == "web:&staging"
     assert port.request.selected_playbook is not None
     assert port.request.selected_playbook.revision == "main"
     assert port.inventory == {

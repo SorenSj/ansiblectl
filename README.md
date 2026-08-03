@@ -87,7 +87,8 @@ Ansible with an explicit timeout and argument vector:
 ```console
 uv run ansiblectl --workspace ~/automation/example run \
   --playbook playbooks/site.yml --revision main \
-  --inventory inventory/hosts.yml --check --timeout 300 --policy-mode deny
+  --inventory inventory/hosts.yml --check --timeout 300 --policy-mode deny \
+  --limit 'web:&staging' --tags deploy,config --skip-tags slow
 ```
 
 Ansible tasks can explicitly disable check mode. Review playbooks before

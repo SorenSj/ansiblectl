@@ -32,6 +32,7 @@ from ansiblectl.domain.execution import (
     ExecutionRecord,
     ExecutionRetentionResult,
     ExecutionStatus,
+    ExecutionTargeting,
 )
 from ansiblectl.domain.inventory import InventoryError, ResolvedInventory
 from ansiblectl.domain.playbook import PlaybookError
@@ -129,6 +130,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument("--check", action="store_true", required=True, help="Use Ansible check mode.")
     run.add_argument("--timeout", type=float, default=300.0, help="Positive timeout in seconds.")
+    run.add_argument("--limit", help="Ansible host pattern to target.")
+    run.add_argument(
+        "--tags", action="append", default=[], help="Comma-separated task tags; repeatable."
+    )
+    run.add_argument(
+        "--skip-tags", action="append", default=[], help="Comma-separated task tags to skip."
+    )
     run.add_argument(
         "--policy-mode",
         choices=tuple(EnforcementMode),
@@ -269,6 +277,11 @@ def main(
             run_service_instance = run_service or build_run_service(
                 workspace.root, arguments.inventory
             )
+            targeting = ExecutionTargeting(
+                arguments.limit,
+                _tag_values(arguments.tags),
+                _tag_values(arguments.skip_tags),
+            )
             run_result = run_service_instance.run_check(
                 workspace.root,
                 arguments.playbook,
@@ -276,6 +289,7 @@ def main(
                 execution_environment(),
                 arguments.timeout,
                 arguments.policy_mode,
+                targeting,
             )
         except WorkspaceError as error:
             print(f"Workspace error: {error}", file=stderr)
@@ -454,6 +468,7 @@ def _render_run_result(
             "status": execution.status.value,
             "stderr_reference": execution.stderr_reference,
             "stdout_reference": execution.stdout_reference,
+            "targeting": _targeting_record(execution.targeting),
         }
     )
     if output_format == "json":
@@ -481,6 +496,7 @@ def _render_run_result(
             print(f"Stderr: {execution.stderr_reference}", file=output)
         if execution.diagnostic:
             print(f"Diagnostic: {execution.diagnostic}", file=output)
+        _render_targeting(execution.targeting, output)
 
 
 def _render_execution_records(
@@ -505,6 +521,7 @@ def _render_execution_records(
             print(f"Stderr: {record.stderr_reference}", file=output)
         if record.diagnostic:
             print(f"Diagnostic: {record.diagnostic}", file=output)
+        _render_targeting(record.targeting, output)
 
 
 def _execution_record(record: ExecutionRecord) -> dict[str, object]:
@@ -517,7 +534,29 @@ def _execution_record(record: ExecutionRecord) -> dict[str, object]:
         "stderr_reference": record.stderr_reference,
         "stdout_reference": record.stdout_reference,
         "timestamp": record.timestamp,
+        "targeting": _targeting_record(record.targeting),
     }
+
+
+def _tag_values(values: list[str]) -> tuple[str, ...]:
+    return tuple(tag.strip() for value in values for tag in value.split(","))
+
+
+def _targeting_record(targeting: ExecutionTargeting) -> dict[str, object]:
+    return {
+        "limit": targeting.limit,
+        "skip_tags": list(targeting.skip_tags),
+        "tags": list(targeting.tags),
+    }
+
+
+def _render_targeting(targeting: ExecutionTargeting, output: TextIO | None) -> None:
+    if targeting.limit is not None:
+        print(f"Limit: {targeting.limit}", file=output)
+    if targeting.tags:
+        print(f"Tags: {','.join(targeting.tags)}", file=output)
+    if targeting.skip_tags:
+        print(f"Skip tags: {','.join(targeting.skip_tags)}", file=output)
 
 
 def _render_execution_retention(

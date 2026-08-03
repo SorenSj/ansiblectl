@@ -44,6 +44,11 @@ def test_history_lists_only_executions_newest_first(tmp_path: Path) -> None:
                     "stdout_reference": "/workspace/.ansiblectl/runs/output.log",
                     "stderr_reference": None,
                     "diagnostic": "Execution exceeded its configured timeout.",
+                    "targeting": {
+                        "limit": "web",
+                        "tags": ["deploy"],
+                        "skip_tags": ["slow"],
+                    },
                 },
             },
         ],
@@ -54,6 +59,8 @@ def test_history_lists_only_executions_newest_first(tmp_path: Path) -> None:
     assert [record.execution_id for record in records] == ["run-2", "run-1"]
     assert records[0].status is ExecutionStatus.TIMED_OUT
     assert records[0].elapsed_seconds == 30.0
+    assert records[0].targeting.limit == "web"
+    assert records[0].targeting.tags == ("deploy",)
     assert records[1].elapsed_seconds == 0.0
     assert JsonLinesExecutionHistory(tmp_path).get("run-1") == records[1]
 

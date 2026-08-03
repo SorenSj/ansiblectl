@@ -36,6 +36,11 @@ class ExecutionService:
                         "stdout_reference": result.stdout_reference,
                         "stderr_reference": result.stderr_reference,
                         "diagnostic": result.diagnostic,
+                        "targeting": {
+                            "limit": request.targeting.limit,
+                            "tags": list(request.targeting.tags),
+                            "skip_tags": list(request.targeting.skip_tags),
+                        },
                     },
                 )
             )

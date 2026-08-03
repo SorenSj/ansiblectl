@@ -8,7 +8,7 @@ from pathlib import Path
 from ansiblectl.application.execution import ExecutionService, GovernedExecutionResult
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.policy import PolicyService
-from ansiblectl.domain.execution import ExecutionRequest
+from ansiblectl.domain.execution import ExecutionRequest, ExecutionTargeting
 from ansiblectl.domain.playbook import select_playbook
 from ansiblectl.domain.policy import EnforcementMode, EvaluationRequest
 
@@ -30,6 +30,7 @@ class RunService:
         environment: Mapping[str, str],
         timeout_seconds: float,
         policy_mode: EnforcementMode,
+        targeting: ExecutionTargeting | None = None,
     ) -> GovernedExecutionResult:
         """Validate inputs and execute ansible-playbook with an ephemeral canonical inventory."""
 
@@ -40,6 +41,7 @@ class RunService:
         )
         if not report.allowed:
             return GovernedExecutionResult(report, None)
+        selected_targeting = targeting or ExecutionTargeting()
         with self.materialize_inventory(resolved_inventory.canonical()) as inventory_path:
             request = ExecutionRequest.for_playbook(
                 (
@@ -47,11 +49,24 @@ class RunService:
                     "--inventory",
                     str(inventory_path),
                     "--check",
+                    *_targeting_arguments(selected_targeting),
                     str(selected.path),
                 ),
                 workspace_root.resolve(),
                 environment,
                 selected,
                 timeout_seconds,
+                selected_targeting,
             )
             return GovernedExecutionResult(report, self.execution.execute(request))
+
+
+def _targeting_arguments(targeting: ExecutionTargeting) -> tuple[str, ...]:
+    arguments: list[str] = []
+    if targeting.limit is not None:
+        arguments.extend(("--limit", targeting.limit))
+    if targeting.tags:
+        arguments.extend(("--tags", ",".join(targeting.tags)))
+    if targeting.skip_tags:
+        arguments.extend(("--skip-tags", ",".join(targeting.skip_tags)))
+    return tuple(arguments)

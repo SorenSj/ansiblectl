@@ -36,6 +36,9 @@ The `execution.completed` payload contains the execution identifier, status,
 exit code, elapsed time, optional stdout and stderr references, and an optional
 safe diagnostic. It contains no raw process output.
 
+When present, `execution.completed` also carries a structured `targeting`
+object containing the host limit, selected tags, and skipped tags.
+
 ## Verification
 
 - A subscriber receives the documented payload type.

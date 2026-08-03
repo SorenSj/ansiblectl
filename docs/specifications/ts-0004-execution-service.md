@@ -47,6 +47,11 @@ Records contain timestamp, identifier, classified status, exit code, elapsed
 time, safe output references, and a safe diagnostic. History inspection never
 dereferences captured output automatically.
 
+Check-mode executions may carry validated optional targeting: one Ansible host
+limit, task tags, and skipped task tags. The application layer emits these as
+separate argument-vector elements, and completed execution events retain the
+selection for later inspection. Targeting values are never shell commands.
+
 ## Verification
 
 - A fake execution port can verify a request without invoking a process.
@@ -54,6 +59,7 @@ dereferences captured output automatically.
 - Arguments containing spaces or special characters are passed safely without shell interpolation.
 - Captured and partial timeout output is stored with owner-only permissions and returned by reference.
 - Execution history lists records newest first and resolves one exact execution identifier.
+- Host and tag targeting is passed as explicit arguments and retained in execution history.
 
 ## Non-goals
 

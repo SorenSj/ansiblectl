@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from ansiblectl.domain.execution import ExecutionRequest
+from ansiblectl.domain.errors import ExecutionError
+from ansiblectl.domain.execution import ExecutionRequest, ExecutionTargeting
 from ansiblectl.domain.playbook import PlaybookError, select_playbook
 
 
@@ -35,3 +36,10 @@ def test_execution_request_retains_canonical_playbook_and_revision(tmp_path: Pat
     request = ExecutionRequest.for_playbook(("ansible-playbook", str(path)), tmp_path, {}, selected)
 
     assert request.selected_playbook == selected
+
+
+def test_execution_targeting_rejects_empty_and_nul_values() -> None:
+    with pytest.raises(ExecutionError, match="non-empty"):
+        ExecutionTargeting(tags=("",))
+    with pytest.raises(ExecutionError, match="no NUL"):
+        ExecutionTargeting(limit="web\x00servers")
