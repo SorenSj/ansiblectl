@@ -44,3 +44,4 @@ New decisions supersede earlier ADRs; accepted ADRs are not silently rewritten.
 | [0037](0037-operational-reliability-and-platform-contract.md) | Operational Reliability and Platform Contract | Accepted |
 | [0038](0038-signed-plugin-provenance-and-registry-trust.md) | Signed Plugin Provenance and Registry Trust | Accepted |
 | [0039](0039-unattended-plugin-policy.md) | Unattended Plugin Policy | Accepted |
+| [0040](0040-durable-event-outbox.md) | Durable Event Outbox | Accepted |
