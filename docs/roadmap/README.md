@@ -18,7 +18,7 @@ gate.
 - Transactional regular-file writes and deletions with durable journals and reverse rollback.
 - Explicit recovery preview/application, owner locks, write-ahead intent, and retryable recovery.
 
-## Active milestone
+## Most recently completed milestone
 
 ### v0.3.0 — Operational Reliability
 
@@ -51,10 +51,12 @@ Exit criteria:
 - [x] Documentation includes operator recovery procedures and known filesystem limitations.
 - [x] Local quality, build, provenance, and artifact-inspection gates pass from a clean commit.
 - [x] The v0.3.0 package version and dated changelog are prepared after the hosted CI matrix passed.
-- [ ] The immutable v0.3.0 tag and tagged artifact workflow pass after this release commit is merged.
+- [x] The immutable v0.3.0 tag and
+  [tagged artifact workflow](https://github.com/SorenSj/ansiblectl/actions/runs/30861466333) pass
+  from merge commit `ad3813d`.
 
-Readiness evidence was last reviewed on 2026-08-04. Version 0.3.0 remains an unpublished release
-candidate until the tagged artifact workflow passes; no existing release tag is moved or recreated.
+Readiness evidence was last reviewed on 2026-08-04. Version 0.3.0 is released, and its retained
+workflow artifact is named `ansiblectl-v0.3.0`; no existing release tag was moved or recreated.
 
 Explicit non-goals:
 
