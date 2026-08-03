@@ -57,7 +57,9 @@ def build_plugin_discovery_service() -> PluginDiscoveryService:
 def build_playbook_validation_service() -> PlaybookValidationService:
     """Create selection validation with explicit tool provenance."""
 
-    return PlaybookValidationService(validator_version=__version__)
+    return PlaybookValidationService(
+        validator_version=__version__, syntax_port=LocalExecutionAdapter()
+    )
 
 
 def build_run_service(workspace_root: Path, inventory_source: Path | None = None) -> RunService:

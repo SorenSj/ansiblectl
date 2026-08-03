@@ -92,6 +92,16 @@ uv run ansiblectl --workspace ~/automation/example \
 The result includes validator provenance. It is selection validation, not an
 Ansible syntax check.
 
+Request Ansible syntax validation explicitly when needed:
+
+```console
+uv run ansiblectl --workspace ~/automation/example \
+  playbook validate playbooks/site.yml --revision main --syntax-check
+```
+
+Syntax-check output is stored privately and returned by reference rather than
+embedded in terminal or JSON output.
+
 Validate workspace inputs, generate a private canonical inventory, and invoke
 Ansible with an explicit timeout and argument vector:
 

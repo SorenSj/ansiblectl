@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from ansiblectl.application.execution import GovernedExecutionResult
+from ansiblectl.application.playbook import PlaybookValidationResult, SyntaxCheckEvidence
 from ansiblectl.application.status import Status
 from ansiblectl.cli.main import (
     EXIT_CANCELLED,
@@ -437,6 +438,70 @@ def test_playbook_validate_rejects_workspace_escape_as_structured_failure(tmp_pa
     payload = json.loads(output.getvalue())
     assert payload["kind"] == "operational_failure"
     assert payload["operation"] == "playbook validate"
+
+
+class FakeSyntaxValidationService:
+    def validate(
+        self,
+        workspace_root: Path,
+        identifier: Path,
+        revision: str,
+        *,
+        syntax_check: bool,
+        environment: object,
+        timeout_seconds: float,
+    ) -> PlaybookValidationResult:
+        assert syntax_check is True
+        assert timeout_seconds == 15
+        return PlaybookValidationResult(
+            "playbooks/site.yml",
+            revision,
+            "sha256:playbook",
+            (),
+            "ansiblectl.selection",
+            "0.1.0",
+            SyntaxCheckEvidence(
+                ExecutionStatus.FAILED,
+                4,
+                "ansible-playbook --syntax-check",
+                "/private/stdout.log",
+                "/private/stderr.log",
+                None,
+            ),
+        )
+
+
+def test_playbook_syntax_check_returns_classified_failure_and_provenance(tmp_path: Path) -> None:
+    output, error = StringIO(), StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "playbook",
+            "validate",
+            "playbooks/site.yml",
+            "--revision",
+            "main",
+            "--syntax-check",
+            "--timeout",
+            "15",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        playbook_service=FakeSyntaxValidationService(),  # type: ignore[arg-type]
+        stdout=output,
+        stderr=error,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert error.getvalue() == ""
+    syntax = json.loads(output.getvalue())["syntax_check"]
+    assert syntax["status"] == "failed"
+    assert syntax["exit_code"] == 4
+    assert syntax["validator"] == "ansible-playbook --syntax-check"
+    assert syntax["stderr_reference"] == "/private/stderr.log"
 
 
 class FakeRunService:

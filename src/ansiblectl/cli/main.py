@@ -200,6 +200,14 @@ def build_parser() -> argparse.ArgumentParser:
     playbook_validate.add_argument(
         "--revision", required=True, help="Explicit repository revision."
     )
+    playbook_validate.add_argument(
+        "--syntax-check",
+        action="store_true",
+        help="Run ansible-playbook --syntax-check after selection validation.",
+    )
+    playbook_validate.add_argument(
+        "--timeout", type=float, default=300.0, help="Positive syntax-check timeout in seconds."
+    )
     run = subcommands.add_parser("run", help="Run a validated playbook through Ansible.")
     run.add_argument("--playbook", type=Path, required=True, help="Playbook path in the workspace.")
     run.add_argument("--revision", required=True, help="Explicit repository revision.")
@@ -409,7 +417,12 @@ def main(
                 options.workspace, current_directory or Path.cwd()
             )
             validation = playbook_service_instance.validate(
-                workspace.root, arguments.path, arguments.revision
+                workspace.root,
+                arguments.path,
+                arguments.revision,
+                syntax_check=arguments.syntax_check,
+                environment=execution_environment(),
+                timeout_seconds=arguments.timeout,
             )
         except WorkspaceError as error:
             return _render_cli_failure(
@@ -420,7 +433,7 @@ def main(
                 stdout,
                 stderr,
             )
-        except PlaybookError as error:
+        except (PlaybookError, ExecutionError) as error:
             return _render_cli_failure(
                 "playbook validate",
                 str(error),
@@ -430,6 +443,11 @@ def main(
                 stderr,
             )
         _render_playbook_validation(validation, options.output_format, stdout)
+        if (
+            validation.syntax_check is not None
+            and validation.syntax_check.status is not ExecutionStatus.COMPLETED
+        ):
+            return EXIT_EXPECTED_FAILURE
     elif arguments.command == "run":
         if arguments.apply != arguments.confirm:
             return render_outcome(
@@ -676,6 +694,18 @@ def _render_playbook_validation(
         "revision": result.revision,
         "validator": result.validator,
         "validator_version": result.validator_version,
+        "syntax_check": (
+            None
+            if result.syntax_check is None
+            else {
+                "diagnostic": result.syntax_check.diagnostic,
+                "exit_code": result.syntax_check.exit_code,
+                "status": result.syntax_check.status.value,
+                "stderr_reference": result.syntax_check.stderr_reference,
+                "stdout_reference": result.syntax_check.stdout_reference,
+                "validator": result.syntax_check.validator,
+            }
+        ),
     }
     if output_format == "json":
         print(json.dumps(payload, sort_keys=True), file=output)
@@ -684,6 +714,13 @@ def _render_playbook_validation(
     print(f"Revision: {result.revision}", file=output)
     print(f"Digest: {result.digest}", file=output)
     print(f"Validator: {result.validator} {result.validator_version}", file=output)
+    if result.syntax_check is not None:
+        print(f"Syntax check: {result.syntax_check.status.value}", file=output)
+        print(f"Syntax validator: {result.syntax_check.validator}", file=output)
+        if result.syntax_check.stdout_reference:
+            print(f"Stdout: {result.syntax_check.stdout_reference}", file=output)
+        if result.syntax_check.stderr_reference:
+            print(f"Stderr: {result.syntax_check.stderr_reference}", file=output)
 
 
 def _render_run_result(

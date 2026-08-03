@@ -51,6 +51,12 @@ byte digest, findings, and validator name/version. This command does not invoke
 Ansible or claim syntax validation; explicit syntax/lint validation remains a
 separate opt-in capability.
 
+Passing `--syntax-check` explicitly invokes `ansible-playbook --syntax-check`
+through the execution port with shell execution disabled, an allowlisted
+environment, and a positive timeout. The result reports classified status,
+exit code, private output references, and exact validator command provenance;
+raw validator output is not embedded in CLI results.
+
 ## Verification
 
 - A relative path resolves reproducibly within a workspace.
@@ -60,6 +66,7 @@ separate opt-in capability.
 - A playbook that becomes unreadable after selection is rejected before execution.
 - Execution metadata reports `playbooks/site.yml`, not an absolute workspace path.
 - Selection validation reports tool provenance without executing the playbook.
+- Explicit syntax validation reports Ansible provenance and private diagnostic references.
 
 ## Non-goals
 
