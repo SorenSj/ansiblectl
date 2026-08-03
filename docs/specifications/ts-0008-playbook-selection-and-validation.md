@@ -27,6 +27,11 @@ This specification defines the initial public and internal contract for this cap
 
 The selection service returns a typed PlaybookReference containing canonical path, repository revision, and validation findings.
 
+The initial selector accepts `.yml` and `.yaml` files only. Relative identifiers
+are resolved against the declared content root, while absolute identifiers must
+still be contained by it. The resulting reference stores the canonical path and
+explicit repository revision; optional syntax/lint findings may be added later.
+
 ## Verification
 
 - A relative path resolves reproducibly within a workspace.
@@ -36,4 +41,3 @@ The selection service returns a typed PlaybookReference containing canonical pat
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
