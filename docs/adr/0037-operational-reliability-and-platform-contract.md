@@ -34,8 +34,9 @@ The supported transaction platform is POSIX with:
 - reliable detection of symbolic links and cross-device replacement failures.
 
 Python support continues to follow package metadata and CI. Operating-system support is claimed
-only for combinations exercised in CI. Windows is unsupported for transactional persistence until
-a locking adapter, durability contract, and dedicated CI matrix are accepted.
+only for combinations exercised in CI. The v0.3 matrix covers Ubuntu and macOS on Python 3.12,
+3.13, and 3.14. Windows is unsupported for transactional persistence until a locking adapter,
+durability contract, and dedicated CI matrix are accepted.
 
 Before mutation, the infrastructure adapter must either establish the required capability contract
 or fail safely with a stable, actionable error. A successful probe is scoped to the selected

@@ -7,7 +7,10 @@ experimental during the 0.x release series.
 ## Development
 
 The source package uses a `src/` layout. Python 3.12 through 3.14 are
-supported. See [CONTRIBUTING.md](CONTRIBUTING.md) for the required local checks.
+supported on Ubuntu and macOS by the CI matrix. Transactional persistence additionally requires
+the local filesystem capabilities documented in the
+[recovery runbook](docs/operations/filesystem-recovery.md). See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the required local checks.
 
 ```console
 uv sync --all-groups --locked

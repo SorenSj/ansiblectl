@@ -61,3 +61,7 @@ atomic same-filesystem replacement, and file and directory syncing. It rejects u
 capabilities before user-target mutation. Network and userspace filesystems have no durability
 guarantee under this contract. Windows requires a separate locking adapter and is not supported by
 the POSIX implementation.
+
+The declared v0.3 CI matrix covers Ubuntu and macOS with Python 3.12, 3.13, and 3.14. A successful
+CI operating-system run does not override the workspace-scoped capability probe for a particular
+mount.
