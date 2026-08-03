@@ -1,6 +1,8 @@
 """Release artifact inspection tests."""
 
+import io
 import json
+import tarfile
 import zipfile
 from hashlib import sha256
 from pathlib import Path
@@ -22,7 +24,22 @@ def release_fixture(root: Path, revision: str = "a" * 40) -> None:
             "ansiblectl-1.2.3.dist-info/METADATA",
             "Metadata-Version: 2.4\nName: ansiblectl\nVersion: 1.2.3\n",
         )
-    (dist / "ansiblectl-1.2.3.tar.gz").write_bytes(b"source")
+        wheel.writestr("ansiblectl/__init__.py", "")
+        wheel.writestr("ansiblectl/py.typed", "")
+        wheel.writestr("ansiblectl-1.2.3.dist-info/entry_points.txt", "[console_scripts]\n")
+    with tarfile.open(dist / "ansiblectl-1.2.3.tar.gz", "w:gz") as source:
+        for name in (
+            "CHANGELOG.md",
+            "README.md",
+            "pyproject.toml",
+            "uv.lock",
+            "src/ansiblectl/__init__.py",
+            "src/ansiblectl/py.typed",
+        ):
+            content = b"fixture"
+            member = tarfile.TarInfo(f"ansiblectl-1.2.3/{name}")
+            member.size = len(content)
+            source.addfile(member, io.BytesIO(content))
     (dist / "build-metadata.json").write_text(
         json.dumps(
             {
@@ -47,3 +64,29 @@ def test_inspection_rejects_stale_provenance(tmp_path: Path) -> None:
     release_fixture(tmp_path)
     with pytest.raises(ValueError, match="source revision and dependency lock"):
         inspect_artifacts(tmp_path, "b" * 40)
+
+
+def test_inspection_rejects_wheel_without_public_package_surface(tmp_path: Path) -> None:
+    release_fixture(tmp_path)
+    wheel_path = tmp_path / "dist/ansiblectl-1.2.3-py3-none-any.whl"
+    with zipfile.ZipFile(wheel_path, "w") as wheel:
+        wheel.writestr(
+            "ansiblectl-1.2.3.dist-info/METADATA",
+            "Metadata-Version: 2.4\nName: ansiblectl\nVersion: 1.2.3\n",
+        )
+
+    with pytest.raises(ValueError, match="typing marker"):
+        inspect_artifacts(tmp_path, "a" * 40)
+
+
+def test_inspection_rejects_incomplete_source_archive(tmp_path: Path) -> None:
+    release_fixture(tmp_path)
+    source_path = tmp_path / "dist/ansiblectl-1.2.3.tar.gz"
+    with tarfile.open(source_path, "w:gz") as source:
+        content = b"fixture"
+        member = tarfile.TarInfo("ansiblectl-1.2.3/pyproject.toml")
+        member.size = len(content)
+        source.addfile(member, io.BytesIO(content))
+
+    with pytest.raises(ValueError, match="required package or release files"):
+        inspect_artifacts(tmp_path, "a" * 40)

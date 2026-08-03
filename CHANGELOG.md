@@ -24,6 +24,8 @@ All notable changes to Ansiblectl are documented here.
 - An operator recovery runbook covering safe inspection, automatic recovery, retained corrupt
   evidence, repeated failures, and supported filesystem limitations.
 - An explicit Ubuntu and macOS CI support matrix for Python 3.12 through 3.14.
+- Release artifact inspection for exact wheel/sdist names, safe source paths, typed package files,
+  CLI entry points, dependency lock, documentation, and provenance metadata.
 
 ## [0.2.0] - 2026-08-03
 
