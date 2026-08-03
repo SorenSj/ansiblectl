@@ -3,8 +3,9 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from ansiblectl.application.execution import ExecutionService
+from ansiblectl.application.execution import ExecutionService, GovernedExecutionService
 from ansiblectl.domain.execution import ExecutionRequest, ExecutionResult, ExecutionStatus
+from ansiblectl.domain.policy import EnforcementMode, EvaluationRequest, PolicyFinding
 
 
 @dataclass(frozen=True)
@@ -21,3 +22,34 @@ def test_service_submits_request_to_fake_port(tmp_path: Path) -> None:
     result = ExecutionResult(request.execution_id, ExecutionStatus.COMPLETED, 0, 0.1)
 
     assert ExecutionService(FakeExecutionPort(result)).execute(request) == result
+
+
+@dataclass
+class RecordingExecutionPort:
+    result: ExecutionResult
+    calls: int = 0
+
+    def execute(self, request: ExecutionRequest) -> ExecutionResult:
+        self.calls += 1
+        return self.result
+
+
+@dataclass(frozen=True)
+class DenyingPolicy:
+    def evaluate(self, request: EvaluationRequest) -> tuple[PolicyFinding, ...]:
+        return (PolicyFinding("POL-001", "high", "Blocked", request.location),)
+
+
+def test_deny_policy_prevents_execution_port_invocation(tmp_path: Path) -> None:
+    request = ExecutionRequest(("ansible-playbook", "site.yml"), tmp_path, {})
+    port = RecordingExecutionPort(
+        ExecutionResult(request.execution_id, ExecutionStatus.COMPLETED, 0, 0.1)
+    )
+
+    result = GovernedExecutionService(port, [DenyingPolicy()]).execute(
+        request, EvaluationRequest("execute", "site.yml"), EnforcementMode.DENY
+    )
+
+    assert result.execution is None
+    assert result.report.allowed is False
+    assert port.calls == 0
