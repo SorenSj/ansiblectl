@@ -10,7 +10,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Ansiblectl maintainers" }]
-dependencies = ["PyYAML>=6.0.2,<7"]
+dependencies = [
+    "cryptography>=50,<51",
+    "PyYAML>=6.0.2,<7",
+]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Environment :: Console",
