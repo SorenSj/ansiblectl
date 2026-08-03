@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from ansiblectl.application.plugins import PluginDiscoveryService
+from ansiblectl.application.plugins import (
+    PluginDiscoveryService,
+    PluginPermissionReport,
+    PluginPermissionService,
+)
+from ansiblectl.domain.permissions import PermissionDeniedError
 from ansiblectl.domain.plugins import PluginManifestError, ProviderDescriptor
 
 
@@ -55,3 +60,22 @@ def test_directory_discovery_delegates_to_injected_safe_loader(tmp_path: Path) -
 def test_directory_discovery_requires_a_configured_loader(tmp_path: Path) -> None:
     with pytest.raises(PluginManifestError, match="not configured"):
         PluginDiscoveryService().discover_directory(tmp_path)
+
+
+def test_permission_preflight_reports_explicit_grants_and_denials() -> None:
+    descriptor = ProviderDescriptor(
+        "sample", "1.0", "0.1", (), "schema.json", ("network", "secrets"), "source"
+    )
+
+    report = PluginPermissionService().evaluate(descriptor, frozenset({"network"}))
+
+    assert report == PluginPermissionReport(
+        "sample", ("network", "secrets"), ("network",), ("secrets",)
+    )
+
+
+def test_permission_preflight_rejects_unknown_policy_grant() -> None:
+    descriptor = ProviderDescriptor("sample", "1.0", "0.1", (), "schema.json", (), "source")
+
+    with pytest.raises(PermissionDeniedError, match="Unknown policy grant"):
+        PluginPermissionService().evaluate(descriptor, frozenset({"subprocess"}))

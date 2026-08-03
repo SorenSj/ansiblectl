@@ -32,6 +32,10 @@ capability set. It calls plugin initialisation before changing the registry;
 an optional failure records only the plugin identity and exception class. On
 normal shutdown, initialised plugins are shut down in reverse load order.
 
+Manifest discovery and permission preflight remain code-free CLI stages. A
+filesystem code loader is not exposed until an explicit entrypoint and loading
+isolation contract is defined.
+
 ## Verification
 
 - A plugin failing during initialisation registers no command or provider.

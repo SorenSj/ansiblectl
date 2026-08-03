@@ -4,7 +4,41 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from ansiblectl.domain.permissions import (
+    CAPABILITY_PERMISSIONS,
+    PermissionDeniedError,
+    resolve_permissions,
+)
 from ansiblectl.domain.plugins import PluginManifestError, ProviderDescriptor, register_descriptors
+
+
+@dataclass(frozen=True)
+class PluginPermissionReport:
+    """Safe permission preflight for one validated provider descriptor."""
+
+    identity: str
+    requested: tuple[str, ...]
+    granted: tuple[str, ...]
+    denied: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PluginPermissionService:
+    """Resolve explicit policy grants without loading plugin code."""
+
+    def evaluate(
+        self, descriptor: ProviderDescriptor, policy_grants: frozenset[str]
+    ) -> PluginPermissionReport:
+        unknown_grants = policy_grants - set(CAPABILITY_PERMISSIONS)
+        if unknown_grants:
+            raise PermissionDeniedError(f"Unknown policy grant '{sorted(unknown_grants)[0]}'.")
+        decision = resolve_permissions(descriptor.permissions, policy_grants)
+        return PluginPermissionReport(
+            descriptor.identity,
+            tuple(sorted(descriptor.permissions)),
+            tuple(sorted(decision.granted)),
+            tuple(sorted(decision.denied)),
+        )
 
 
 @dataclass(frozen=True)

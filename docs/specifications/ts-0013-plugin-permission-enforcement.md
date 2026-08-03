@@ -31,11 +31,17 @@ The initial policy is default-deny. Privileged capabilities map one-to-one to
 named permissions (`network`, `secrets`, and `filesystem_write`); an unknown or
 ungranted request fails with a safe diagnostic before privileged work starts.
 
+`plugin permissions <manifest>` validates one manifest and reports requested,
+granted, and denied permissions without loading plugin code. Grants are empty
+by default and may be supplied only through repeated explicit `--grant`
+arguments from the documented permission set.
+
 ## Verification
 
 - An ungranted secret capability is unavailable in plugin context.
 - A denied permission produces a clear diagnostic without executing privileged work.
 - Tests cover default-deny and explicit-grant behaviour.
+- Permission preflight is observable without initialising third-party code.
 
 ## Non-goals
 

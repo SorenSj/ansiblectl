@@ -17,7 +17,11 @@ from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.execution_history import ExecutionHistoryService
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.playbook import PlaybookValidationResult, PlaybookValidationService
-from ansiblectl.application.plugins import PluginDiscoveryService
+from ansiblectl.application.plugins import (
+    PluginDiscoveryService,
+    PluginPermissionReport,
+    PluginPermissionService,
+)
 from ansiblectl.application.repository import RepositoryService
 from ansiblectl.application.run import RunService
 from ansiblectl.application.state import CacheEntrySummary, StateService
@@ -47,6 +51,7 @@ from ansiblectl.domain.execution import (
 )
 from ansiblectl.domain.inventory import InventoryError, ResolvedInventory
 from ansiblectl.domain.outcomes import CommandOutcome, OutcomeKind
+from ansiblectl.domain.permissions import CAPABILITY_PERMISSIONS, PermissionDeniedError
 from ansiblectl.domain.playbook import PlaybookError
 from ansiblectl.domain.plugins import PluginManifestError, ProviderDescriptor
 from ansiblectl.domain.policy import EnforcementMode
@@ -219,6 +224,17 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("plugins"),
         help="Manifest directory inside the workspace (default: plugins).",
     )
+    plugin_permissions = plugin_commands.add_parser(
+        "permissions", help="Preview permissions for one validated manifest."
+    )
+    plugin_permissions.add_argument("manifest", type=Path, help="Manifest path in the workspace.")
+    plugin_permissions.add_argument(
+        "--grant",
+        action="append",
+        default=[],
+        choices=tuple(CAPABILITY_PERMISSIONS),
+        help="Explicit policy grant; repeat for multiple permissions.",
+    )
     playbook = subcommands.add_parser("playbook", help="Validate playbook selection.")
     playbook_commands = playbook.add_subparsers(dest="playbook_command", required=True)
     playbook_validate = playbook_commands.add_parser(
@@ -301,6 +317,7 @@ def main(
     inventory_service: InventoryService | None = None,
     repository_service: RepositoryService | None = None,
     plugin_service: PluginDiscoveryService | None = None,
+    plugin_permission_service: PluginPermissionService | None = None,
     playbook_service: PlaybookValidationService | None = None,
     run_service: RunService | None = None,
     execution_history_service: ExecutionHistoryService | None = None,
@@ -486,6 +503,18 @@ def main(
             if arguments.plugin_command == "discover":
                 directory = _resolve_plugin_directory(workspace.root, arguments.directory)
                 descriptors = plugin_service_instance.discover_directory(directory)
+            elif arguments.plugin_command == "permissions":
+                location = _resolve_workspace_path(workspace.root, arguments.manifest)
+                descriptors = plugin_service_instance.discover_files([location])
+                if len(descriptors) != 1:
+                    raise PluginManifestError(
+                        "Permission preflight requires exactly one validated manifest."
+                    )
+                descriptor = next(iter(descriptors.values()))
+                permission_service = plugin_permission_service or PluginPermissionService()
+                permission_report = permission_service.evaluate(
+                    descriptor, frozenset(arguments.grant)
+                )
             else:
                 identifiers = (
                     [arguments.manifest]
@@ -503,7 +532,7 @@ def main(
                 stdout,
                 stderr,
             )
-        except PluginManifestError as error:
+        except (PermissionDeniedError, PluginManifestError) as error:
             return _render_cli_failure(
                 f"plugin {arguments.plugin_command}",
                 str(error),
@@ -512,7 +541,10 @@ def main(
                 stdout,
                 stderr,
             )
-        _render_plugins(descriptors, options.output_format, stdout)
+        if arguments.plugin_command == "permissions":
+            _render_plugin_permissions(permission_report, options.output_format, stdout)
+        else:
+            _render_plugins(descriptors, options.output_format, stdout)
     elif arguments.command == "playbook":
         workspace_service_instance = workspace_service or build_workspace_service()
         try:
@@ -862,6 +894,25 @@ def _render_plugins(
         return
     for plugin in plugins:
         print(f"{plugin['identity']} {plugin['version']} ({plugin['source']})", file=output)
+
+
+def _render_plugin_permissions(
+    report: PluginPermissionReport, output_format: str, output: TextIO | None
+) -> None:
+    payload = {
+        "denied": list(report.denied),
+        "granted": list(report.granted),
+        "identity": report.identity,
+        "requested": list(report.requested),
+        "schema_version": 1,
+    }
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    print(f"Plugin: {report.identity}", file=output)
+    print(f"Requested: {','.join(report.requested) or '<none>'}", file=output)
+    print(f"Granted: {','.join(report.granted) or '<none>'}", file=output)
+    print(f"Denied: {','.join(report.denied) or '<none>'}", file=output)
 
 
 def _render_playbook_validation(

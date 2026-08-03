@@ -96,7 +96,11 @@ uv run ansiblectl --workspace ~/automation/example \
 uv run ansiblectl --workspace ~/automation/example \
   plugin list --manifest plugins/example.yaml --manifest plugins/other.yaml
 uv run ansiblectl --workspace ~/automation/example plugin discover
+uv run ansiblectl --workspace ~/automation/example \
+  plugin permissions plugins/example.yaml --grant network
 ```
+
+Permission preflight is default-deny and does not initialise plugin code.
 
 ## Check-mode execution
 

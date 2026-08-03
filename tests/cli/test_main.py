@@ -557,6 +557,60 @@ def test_plugin_discover_rejects_directory_symlink(tmp_path: Path) -> None:
     assert "must not be a symbolic link" in error.getvalue()
 
 
+def test_plugin_permissions_previews_default_deny_without_loading_code(tmp_path: Path) -> None:
+    service, output = FakePluginDiscoveryService(), StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "plugin",
+            "permissions",
+            "plugins/demo.yaml",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        plugin_service=service,  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert service.locations == [(tmp_path / "plugins/demo.yaml").resolve()]
+    assert json.loads(output.getvalue()) == {
+        "denied": ["network"],
+        "granted": [],
+        "identity": "demo",
+        "requested": ["network"],
+        "schema_version": 1,
+    }
+
+
+def test_plugin_permissions_accepts_only_explicit_grant(tmp_path: Path) -> None:
+    service, output = FakePluginDiscoveryService(), StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "plugin",
+            "permissions",
+            "plugins/demo.yaml",
+            "--grant",
+            "network",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        plugin_service=service,  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue())["granted"] == ["network"]
+    assert json.loads(output.getvalue())["denied"] == []
+
+
 def test_playbook_validate_reports_safe_selection_evidence(tmp_path: Path) -> None:
     playbook = tmp_path / "playbooks/site.yml"
     playbook.parent.mkdir()
