@@ -4,6 +4,8 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-04
+
 ### Added
 
 - Roadmap and normative v0.3.0 operational-reliability contracts covering subprocess crash tests,

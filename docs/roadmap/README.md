@@ -1,8 +1,9 @@
 # Ansiblectl roadmap
 
 This roadmap records intended release milestones without turning exploratory ideas into public
-compatibility promises. Work remains under `[Unreleased]`, and the package version remains at the
-latest published release until a milestone satisfies its exit criteria.
+compatibility promises. Release preparation may set the next package version only after its
+implementation and hosted-CI gates pass; publication still requires the immutable tagged-release
+gate.
 
 ## Completed milestones
 
@@ -45,14 +46,15 @@ Exit criteria:
 - [x] Real subprocess termination tests demonstrate recovery at every durable journal transition.
 - [x] Concurrent recovery cannot mutate transactions owned by live processes.
 - [x] All new diagnostics pass redaction and stable human, JSON, and YAML rendering tests.
-- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
+  [PR #2](https://github.com/SorenSj/ansiblectl/pull/2).
 - [x] Documentation includes operator recovery procedures and known filesystem limitations.
 - [x] Local quality, build, provenance, and artifact-inspection gates pass from a clean commit.
-- [ ] The v0.3.0 version, dated changelog, immutable tag, and tagged artifact workflow pass after the
-  hosted CI matrix is green.
+- [x] The v0.3.0 package version and dated changelog are prepared after the hosted CI matrix passed.
+- [ ] The immutable v0.3.0 tag and tagged artifact workflow pass after this release commit is merged.
 
-Readiness evidence was last reviewed on 2026-08-04. The package remains at v0.2.0 while either
-hosted-CI or tagged-release criteria are open; no existing release tag is moved or recreated.
+Readiness evidence was last reviewed on 2026-08-04. Version 0.3.0 remains an unpublished release
+candidate until the tagged artifact workflow passes; no existing release tag is moved or recreated.
 
 Explicit non-goals:
 
