@@ -67,6 +67,18 @@ uv run ansiblectl --workspace ~/automation/example \
   repository sync repository --revision release-1
 ```
 
+## Plugin manifests
+
+Validate one provider manifest or list several validated descriptors without
+loading plugin code:
+
+```console
+uv run ansiblectl --workspace ~/automation/example \
+  plugin validate plugins/example.yaml
+uv run ansiblectl --workspace ~/automation/example \
+  plugin list --manifest plugins/example.yaml --manifest plugins/other.yaml
+```
+
 ## Project governance
 
 The repository is the authoritative source for Ansiblectl's normative

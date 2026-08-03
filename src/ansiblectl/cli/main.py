@@ -10,17 +10,20 @@ from pathlib import Path
 from typing import TextIO
 
 from ansiblectl.application.inventory import InventoryService
+from ansiblectl.application.plugins import PluginDiscoveryService
 from ansiblectl.application.repository import RepositoryService
 from ansiblectl.application.status import StatusService
 from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.cli.composition import (
     build_inventory_service,
+    build_plugin_discovery_service,
     build_repository_service,
     build_status_service,
     build_workspace_service,
 )
 from ansiblectl.domain.errors import WorkspaceError
 from ansiblectl.domain.inventory import InventoryError, ResolvedInventory
+from ansiblectl.domain.plugins import PluginManifestError, ProviderDescriptor
 from ansiblectl.domain.repository import RepositoryError, RepositoryRequest, RepositoryResult
 from ansiblectl.domain.workspace import Workspace
 
@@ -90,6 +93,18 @@ def build_parser() -> argparse.ArgumentParser:
         repository_command.add_argument(
             "--revision", required=True, help="Explicit Git revision for this operation."
         )
+    plugin = subcommands.add_parser("plugin", help="Validate and list plugin manifests.")
+    plugin_commands = plugin.add_subparsers(dest="plugin_command", required=True)
+    plugin_validate = plugin_commands.add_parser("validate", help="Validate one manifest.")
+    plugin_validate.add_argument("manifest", type=Path, help="Manifest path in the workspace.")
+    plugin_list = plugin_commands.add_parser("list", help="List validated manifests.")
+    plugin_list.add_argument(
+        "--manifest",
+        type=Path,
+        action="append",
+        required=True,
+        help="Manifest path in the workspace; repeat for multiple plugins.",
+    )
     return parser
 
 
@@ -100,6 +115,7 @@ def main(
     workspace_service: WorkspaceService | None = None,
     inventory_service: InventoryService | None = None,
     repository_service: RepositoryService | None = None,
+    plugin_service: PluginDiscoveryService | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
     current_directory: Path | None = None,
@@ -176,6 +192,27 @@ def main(
             print(f"Repository error: {error}", file=stderr)
             return EXIT_EXPECTED_FAILURE
         _render_repository(result, options.output_format, stdout)
+    elif arguments.command == "plugin":
+        workspace_service_instance = workspace_service or build_workspace_service()
+        plugin_service_instance = plugin_service or build_plugin_discovery_service()
+        try:
+            workspace = workspace_service_instance.resolve(
+                options.workspace, current_directory or Path.cwd()
+            )
+            identifiers = (
+                [arguments.manifest]
+                if arguments.plugin_command == "validate"
+                else arguments.manifest
+            )
+            locations = [_resolve_workspace_path(workspace.root, path) for path in identifiers]
+            descriptors = plugin_service_instance.discover_files(locations)
+        except WorkspaceError as error:
+            print(f"Workspace error: {error}", file=stderr)
+            return EXIT_EXPECTED_FAILURE
+        except PluginManifestError as error:
+            print(f"Plugin manifest error: {error}", file=stderr)
+            return EXIT_EXPECTED_FAILURE
+        _render_plugins(descriptors, options.output_format, stdout)
     return EXIT_SUCCESS
 
 
@@ -264,3 +301,37 @@ def _render_repository(
     print(f"Repository: {repository.repository_path}", file=output)
     print(f"Revision: {repository.revision}", file=output)
     print(f"Dirty: {'yes' if repository.dirty else 'no'}", file=output)
+
+
+def _resolve_workspace_path(workspace_root: Path, identifier: Path) -> Path:
+    root = workspace_root.resolve()
+    candidate = (
+        (root / identifier).resolve() if not identifier.is_absolute() else identifier.resolve()
+    )
+    if not candidate.is_relative_to(root):
+        raise PluginManifestError("Plugin manifest must remain inside the selected workspace.")
+    return candidate
+
+
+def _render_plugins(
+    descriptors: dict[str, ProviderDescriptor], output_format: str, output: TextIO | None
+) -> None:
+    """Render validated descriptors without loading plugin code."""
+
+    plugins = [
+        {
+            "capabilities": list(descriptor.capabilities),
+            "configuration_schema": descriptor.configuration_schema,
+            "identity": descriptor.identity,
+            "permissions": list(descriptor.permissions),
+            "sdk_compatibility": descriptor.sdk_compatibility,
+            "source": descriptor.source,
+            "version": descriptor.version,
+        }
+        for _, descriptor in sorted(descriptors.items())
+    ]
+    if output_format == "json":
+        print(json.dumps({"plugins": plugins, "schema_version": 1}, sort_keys=True), file=output)
+        return
+    for plugin in plugins:
+        print(f"{plugin['identity']} {plugin['version']} ({plugin['source']})", file=output)

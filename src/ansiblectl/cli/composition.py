@@ -4,12 +4,14 @@ from pathlib import Path
 
 from ansiblectl import __version__
 from ansiblectl.application.inventory import InventoryService
+from ansiblectl.application.plugins import PluginDiscoveryService
 from ansiblectl.application.repository import RepositoryService
 from ansiblectl.application.status import DefaultStatusService, StatusService
 from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.domain.inventory import InventoryError
 from ansiblectl.infrastructure.git_repository import GitRepositoryAdapter
 from ansiblectl.infrastructure.local_workspace_store import LocalWorkspaceStore
+from ansiblectl.infrastructure.plugin_manifests import discover_manifests
 from ansiblectl.infrastructure.yaml_inventory import YamlInventoryProvider
 
 
@@ -29,6 +31,12 @@ def build_repository_service() -> RepositoryService:
     """Create repository operations with the local Git adapter."""
 
     return RepositoryService(port=GitRepositoryAdapter())
+
+
+def build_plugin_discovery_service() -> PluginDiscoveryService:
+    """Create safe file-based plugin manifest discovery."""
+
+    return PluginDiscoveryService(file_loader=discover_manifests)
 
 
 def build_inventory_service(

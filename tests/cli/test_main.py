@@ -10,6 +10,7 @@ from ansiblectl.application.status import Status
 from ansiblectl.cli.main import EXIT_EXPECTED_FAILURE, EXIT_INVALID_INPUT, EXIT_SUCCESS, main
 from ansiblectl.domain.errors import WorkspaceNotFoundError
 from ansiblectl.domain.inventory import Host, ResolvedInventory
+from ansiblectl.domain.plugins import ProviderDescriptor
 from ansiblectl.domain.repository import RepositoryRequest, RepositoryResult
 from ansiblectl.domain.workspace import Workspace
 
@@ -249,4 +250,55 @@ def test_repository_path_cannot_escape_workspace(tmp_path: Path) -> None:
 
     assert result == EXIT_EXPECTED_FAILURE
     assert service.calls == []
+    assert "inside the selected workspace" in error.getvalue()
+
+
+class FakePluginDiscoveryService:
+    def __init__(self) -> None:
+        self.locations: list[Path] = []
+
+    def discover_files(self, locations: list[Path]) -> dict[str, ProviderDescriptor]:
+        self.locations = locations
+        return {
+            "demo": ProviderDescriptor(
+                "demo", "1.0", "0.1", ("provider",), "schema.json", ("network",), str(locations[0])
+            )
+        }
+
+
+def test_plugin_validate_renders_descriptor_without_loading_code(tmp_path: Path) -> None:
+    service, output = FakePluginDiscoveryService(), StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "plugin",
+            "validate",
+            "plugins/demo.yaml",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        plugin_service=service,  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert service.locations == [(tmp_path / "plugins/demo.yaml").resolve()]
+    assert json.loads(output.getvalue())["plugins"][0]["identity"] == "demo"
+
+
+def test_plugin_manifest_path_cannot_escape_workspace(tmp_path: Path) -> None:
+    service, error = FakePluginDiscoveryService(), StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "plugin", "validate", "../outside.yaml"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        plugin_service=service,  # type: ignore[arg-type]
+        stderr=error,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert service.locations == []
     assert "inside the selected workspace" in error.getvalue()
