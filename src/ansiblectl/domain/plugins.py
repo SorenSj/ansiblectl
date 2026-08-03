@@ -3,13 +3,15 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from ansiblectl.domain.errors import DomainError
+from ansiblectl.domain.errors import ErrorCode, PluginError
 
 SDK_VERSION = "0.1"
 
 
-class PluginManifestError(DomainError):
+class PluginManifestError(PluginError):
     """Raised for safe source-aware manifest diagnostics."""
+
+    error_code = ErrorCode.PLUGIN_MANIFEST_INVALID
 
 
 @dataclass(frozen=True)

@@ -4,6 +4,7 @@ import json
 from typing import TextIO
 
 from ansiblectl.domain.outcomes import CommandOutcome, OutcomeKind
+from ansiblectl.domain.redaction import redact
 
 EXIT_CODES = {
     OutcomeKind.SUCCESS: 0,
@@ -12,7 +13,6 @@ EXIT_CODES = {
     OutcomeKind.CANCELLED: 3,
     OutcomeKind.UNEXPECTED_FAILURE: 70,
 }
-_SENSITIVE_FIELDS = {"secret", "token", "password", "credential", "key"}
 
 
 def render_outcome(
@@ -31,23 +31,12 @@ def render_outcome(
 def _payload(outcome: CommandOutcome) -> dict[str, object]:
     payload: dict[str, object] = {"kind": outcome.kind, "operation": outcome.operation}
     if outcome.data is not None:
-        payload["data"] = _redact(outcome.data)
+        payload["data"] = redact(outcome.data)
     if outcome.reason is not None:
         payload["reason"] = outcome.reason
     if outcome.remediation is not None:
         payload["remediation"] = outcome.remediation
     return payload
-
-
-def _redact(value: object) -> object:
-    if isinstance(value, dict):
-        return {
-            name: "<redacted>" if name.lower() in _SENSITIVE_FIELDS else _redact(item)
-            for name, item in value.items()
-        }
-    if isinstance(value, list):
-        return [_redact(item) for item in value]
-    return value
 
 
 def _human_failure(outcome: CommandOutcome) -> str:

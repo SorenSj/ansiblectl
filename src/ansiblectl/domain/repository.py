@@ -6,19 +6,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from ansiblectl.domain.errors import DomainError
-
-
-class RepositoryError(DomainError):
-    """Base error for safe, actionable repository failures."""
+from ansiblectl.domain.errors import ErrorCode
+from ansiblectl.domain.errors import RepositoryError as RepositoryError
 
 
 class DirtyWorktreeError(RepositoryError):
     """Raised when an operation would overwrite uncommitted user work."""
 
+    error_code = ErrorCode.REPOSITORY_DIRTY_WORKTREE
+
 
 class RevisionMismatchError(RepositoryError):
     """Raised when the requested revision is not the checked-out content."""
+
+    error_code = ErrorCode.REPOSITORY_REVISION_MISMATCH
 
 
 @dataclass(frozen=True)

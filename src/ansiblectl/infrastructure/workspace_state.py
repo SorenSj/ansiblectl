@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from pathlib import Path
 
+from ansiblectl.domain.errors import FilesystemTransactionError
 from ansiblectl.domain.errors import StateError as StateError
 from ansiblectl.domain.state import CacheEntry as CacheEntry
 from ansiblectl.domain.state import StateInvalidationResult
 from ansiblectl.infrastructure.file_locking import locked
+from ansiblectl.infrastructure.transactional_filesystem import TransactionalFilesystem
 
 SCHEMA_VERSION = 1
 
@@ -28,7 +28,7 @@ class WorkspaceStateStore:
         try:
             with locked(self._lock_path, exclusive=False):
                 return self._read_entries()
-        except OSError as error:
+        except (OSError, FilesystemTransactionError) as error:
             raise StateError(
                 "State could not be read safely. Check workspace permissions."
             ) from error
@@ -65,7 +65,7 @@ class WorkspaceStateStore:
         try:
             with locked(self._lock_path, exclusive=True):
                 self._write_entries(entries)
-        except OSError as error:
+        except (OSError, FilesystemTransactionError) as error:
             raise StateError(
                 "State could not be written safely. Check workspace permissions."
             ) from error
@@ -100,16 +100,10 @@ class WorkspaceStateStore:
                 for name, entry in entries.items()
             },
         }
-        descriptor, name = tempfile.mkstemp(prefix=".state-", dir=self._path.parent)
-        temporary = Path(name)
-        try:
-            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-                json.dump(data, stream, sort_keys=True)
-                stream.flush()
-                os.fsync(stream.fileno())
-            temporary.replace(self._path)
-        finally:
-            temporary.unlink(missing_ok=True)
+        content = (json.dumps(data, sort_keys=True) + "\n").encode()
+        transaction = TransactionalFilesystem(self._workspace_root).begin()
+        transaction.stage_write(self._path, content)
+        transaction.commit()
 
     def _prepare_parent(self) -> None:
         self._validate_boundary()

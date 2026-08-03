@@ -7,6 +7,7 @@ from ansiblectl import __version__
 from ansiblectl.application.configuration import ConfigurationService
 from ansiblectl.application.execution import ExecutionService
 from ansiblectl.application.execution_history import ExecutionHistoryService
+from ansiblectl.application.filesystem import FilesystemRecoveryService
 from ansiblectl.application.inventory import InventoryService, InventoryValidationService
 from ansiblectl.application.playbook import PlaybookValidationService
 from ansiblectl.application.plugins import PluginDiscoveryService
@@ -39,6 +40,7 @@ from ansiblectl.infrastructure.plugin_manifests import (
     discover_manifest_directory,
     discover_manifests,
 )
+from ansiblectl.infrastructure.transactional_filesystem import TransactionalFilesystem
 from ansiblectl.infrastructure.workspace_state import WorkspaceStateStore
 from ansiblectl.infrastructure.yaml_configuration import LocalConfigurationSourceProvider
 from ansiblectl.infrastructure.yaml_inventory import YamlInventoryProvider
@@ -69,6 +71,12 @@ def build_state_service(workspace_root: Path) -> StateService:
     """Create safe workspace-state inspection."""
 
     return StateService(WorkspaceStateStore(workspace_root))
+
+
+def build_filesystem_recovery_service(workspace_root: Path) -> FilesystemRecoveryService:
+    """Create explicit recovery for interrupted workspace transactions."""
+
+    return FilesystemRecoveryService(TransactionalFilesystem(workspace_root))
 
 
 def build_repository_service() -> RepositoryService:

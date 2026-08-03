@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
-from collections.abc import Sequence
-from contextlib import redirect_stderr
+from collections.abc import Mapping, Sequence
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
@@ -15,6 +16,7 @@ from typing import TextIO
 from ansiblectl.application.configuration import ConfigurationService
 from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.execution_history import ExecutionHistoryService, ExecutionSummary
+from ansiblectl.application.filesystem import FilesystemRecoveryService
 from ansiblectl.application.inventory import (
     InventoryService,
     InventoryValidationResult,
@@ -31,9 +33,11 @@ from ansiblectl.application.run import RunPreflightResult, RunService
 from ansiblectl.application.state import CacheEntrySummary, StateService
 from ansiblectl.application.status import StatusService
 from ansiblectl.application.workspace import WorkspaceService
+from ansiblectl.cli.boundary import render_exception
 from ansiblectl.cli.composition import (
     build_configuration_service,
     build_execution_history_service,
+    build_filesystem_recovery_service,
     build_inventory_service,
     build_inventory_validation_service,
     build_playbook_validation_service,
@@ -46,8 +50,22 @@ from ansiblectl.cli.composition import (
     execution_environment,
 )
 from ansiblectl.cli.outcomes import render_outcome
+from ansiblectl.cli.rendering import render_success
 from ansiblectl.domain.configuration import EffectiveConfiguration
-from ansiblectl.domain.errors import ConfigurationError, ExecutionError, StateError, WorkspaceError
+from ansiblectl.domain.context import CommandContext, create_command_context
+from ansiblectl.domain.errors import (
+    AnsiblectlError,
+    ConfigurationError,
+    ExecutionError,
+    ExternalToolError,
+    FilesystemRecoveryError,
+    InternalOperationalError,
+    PluginError,
+    StateError,
+    UsageError,
+    ValidationError,
+    WorkspaceError,
+)
 from ansiblectl.domain.execution import (
     ExecutionMode,
     ExecutionRecord,
@@ -55,6 +73,7 @@ from ansiblectl.domain.execution import (
     ExecutionStatus,
     ExecutionTargeting,
 )
+from ansiblectl.domain.filesystem import FilesystemRecoveryResult
 from ansiblectl.domain.inventory import (
     InventoryError,
     ResolvedInventory,
@@ -66,6 +85,7 @@ from ansiblectl.domain.playbook import PlaybookError
 from ansiblectl.domain.plugins import PluginManifestError, ProviderDescriptor
 from ansiblectl.domain.policy import EnforcementMode
 from ansiblectl.domain.repository import RepositoryError, RepositoryRequest, RepositoryResult
+from ansiblectl.domain.results import CommandResult, CommandWarning
 from ansiblectl.domain.state import StateInvalidationResult
 from ansiblectl.domain.workspace import Workspace
 
@@ -73,7 +93,19 @@ EXIT_SUCCESS = 0
 EXIT_EXPECTED_FAILURE = 1
 EXIT_INVALID_INPUT = 2
 EXIT_CANCELLED = 3
-EXIT_UNEXPECTED_FAILURE = 70
+EXIT_UNEXPECTED_FAILURE = 1
+_COMMANDS: dict[str, frozenset[str]] = {
+    "config": frozenset({"show"}),
+    "execution": frozenset({"list", "prune", "show", "summary"}),
+    "inventory": frozenset({"show", "validate"}),
+    "playbook": frozenset({"validate"}),
+    "plugin": frozenset({"discover", "list", "permissions", "validate"}),
+    "repository": frozenset({"inspect", "sync"}),
+    "run": frozenset(),
+    "state": frozenset({"invalidate", "recover", "show"}),
+    "status": frozenset(),
+    "workspace": frozenset({"init", "show"}),
+}
 
 
 def cli(
@@ -86,57 +118,298 @@ def cli(
 
     arguments = tuple(sys.argv[1:] if argv is None else argv)
     output_format = _requested_output_format(arguments)
+    execution_arguments = _legacy_output_arguments(arguments, output_format)
+    context = create_command_context(
+        _requested_command_name(arguments),
+        debug=_requested_debug(arguments),
+        output_format=output_format,
+        interactive="--non-interactive" not in arguments,
+    )
     actual_stdout = sys.stdout if stdout is None else stdout
     actual_stderr = sys.stderr if stderr is None else stderr
-    buffered_stdout = StringIO() if output_format == "json" else None
-    command_stdout = actual_stdout if buffered_stdout is None else buffered_stdout
-    diagnostics = StringIO()
-    try:
-        with redirect_stderr(diagnostics):
-            result = main(arguments, stdout=command_stdout, stderr=diagnostics)
-    except SystemExit as error:
-        if error.code == EXIT_INVALID_INPUT and output_format == "json":
-            return render_outcome(
-                CommandOutcome(
-                    OutcomeKind.VALIDATION_FAILURE,
-                    "ansiblectl",
-                    reason="Invalid command arguments.",
-                    remediation="Run ansiblectl --help.",
-                ),
-                output_format,
-                actual_stdout,
-                actual_stderr,
-            )
-        actual_stderr.write(diagnostics.getvalue())
-        raise
-    except Exception:
-        outcome = CommandOutcome(
-            OutcomeKind.UNEXPECTED_FAILURE,
-            "ansiblectl",
-            reason="Unexpected internal failure.",
-            remediation="Retry with increased verbosity and report the failure.",
-        )
-        return render_outcome(
-            outcome,
-            output_format,
+    invalid_output_source = _invalid_output_source(arguments)
+    if invalid_output_source is not None:
+        return render_exception(
+            context,
+            UsageError(
+                "Invalid output format.",
+                hint="Choose one of: text, json, or yaml.",
+                context={"source": invalid_output_source},
+            ),
             actual_stdout,
             actual_stderr,
         )
-    actual_stderr.write(diagnostics.getvalue())
-    if buffered_stdout is not None:
+    buffered_stdout = StringIO()
+    command_stdout = buffered_stdout
+    diagnostics = StringIO()
+    try:
+        with redirect_stderr(diagnostics), redirect_stdout(command_stdout):
+            result = main(
+                execution_arguments,
+                stdout=command_stdout,
+                stderr=diagnostics,
+                propagate_errors=True,
+            )
+    except SystemExit as error:
+        if error.code is None or error.code == EXIT_SUCCESS:
+            if output_format in {"json", "yaml"}:
+                return render_success(
+                    context,
+                    CommandResult(data={"help": buffered_stdout.getvalue()}),
+                    actual_stdout,
+                    actual_stderr,
+                )
+            actual_stdout.write(buffered_stdout.getvalue())
+            actual_stderr.write(diagnostics.getvalue())
+            return EXIT_SUCCESS
+        if error.code == EXIT_INVALID_INPUT and output_format in {"json", "yaml"}:
+            return render_exception(
+                context,
+                UsageError(
+                    "Invalid command arguments.",
+                    hint="Run ansiblectl --help.",
+                    cause=error,
+                ),
+                actual_stdout,
+                actual_stderr,
+            )
+        if error.code == EXIT_INVALID_INPUT:
+            actual_stderr.write(diagnostics.getvalue())
+            raise
+        return render_exception(
+            context,
+            InternalOperationalError(
+                "An unexpected internal error occurred.",
+                hint="Run the command again with --debug and report the operation ID.",
+                cause=error,
+            ),
+            actual_stdout,
+            actual_stderr,
+        )
+    except KeyboardInterrupt as error:
+        return render_exception(context, error, actual_stdout, actual_stderr)
+    except Exception as error:
+        return render_exception(context, error, actual_stdout, actual_stderr)
+    if output_format == "text" and result == EXIT_CANCELLED:
+        return render_exception(context, KeyboardInterrupt(), actual_stdout, actual_stderr)
+    if output_format == "text":
         actual_stdout.write(buffered_stdout.getvalue())
-    return result
+        actual_stderr.write(diagnostics.getvalue())
+        return result
+    try:
+        return _render_buffered_result(
+            context,
+            result,
+            buffered_stdout.getvalue(),
+            actual_stdout,
+            actual_stderr,
+        )
+    except KeyboardInterrupt as error:
+        return render_exception(context, error, actual_stdout, actual_stderr)
+    except Exception as error:
+        return render_exception(context, error, actual_stdout, actual_stderr)
 
 
 def _requested_output_format(arguments: Sequence[str]) -> str:
     """Read only the global format switch without repeating full argument parsing."""
 
     for index, argument in enumerate(arguments):
+        if argument == "--output" and index + 1 < len(arguments):
+            return (
+                arguments[index + 1] if arguments[index + 1] in {"text", "json", "yaml"} else "text"
+            )
+        if argument.startswith("--output="):
+            value = argument.partition("=")[2]
+            return value if value in {"text", "json", "yaml"} else "text"
+    for index, argument in enumerate(arguments):
         if argument == "--output-format" and index + 1 < len(arguments):
-            return "json" if arguments[index + 1] == "json" else "human"
+            return "json" if arguments[index + 1] == "json" else "text"
         if argument == "--output-format=json":
             return "json"
-    return "human"
+    environment_value = os.environ.get("ANSIBLECTL_OUTPUT", "").strip().lower()
+    return environment_value if environment_value in {"text", "json", "yaml"} else "text"
+
+
+def _requested_command_name(arguments: Sequence[str]) -> str:
+    """Return public command identity without retaining option or positional values."""
+
+    skip_next = False
+    for index, argument in enumerate(arguments):
+        if skip_next:
+            skip_next = False
+            continue
+        if argument in {"--output", "--output-format", "--workspace"}:
+            skip_next = True
+            continue
+        if argument.startswith("-"):
+            continue
+        subcommands = _COMMANDS.get(argument)
+        if subcommands is None:
+            continue
+        if subcommands and index + 1 < len(arguments) and arguments[index + 1] in subcommands:
+            return f"{argument} {arguments[index + 1]}"
+        return argument
+    return "ansiblectl"
+
+
+def _invalid_output_source(arguments: Sequence[str]) -> str | None:
+    """Identify an invalid Phase 1 output source without retaining its value."""
+
+    for index, argument in enumerate(arguments):
+        if argument == "--output":
+            if index + 1 >= len(arguments):
+                return "command_line"
+            return None if arguments[index + 1] in {"text", "json", "yaml"} else "command_line"
+        if argument.startswith("--output="):
+            value = argument.partition("=")[2]
+            return None if value in {"text", "json", "yaml"} else "command_line"
+    for argument in arguments:
+        if argument == "--output-format" or argument.startswith("--output-format="):
+            return None
+    environment_value = os.environ.get("ANSIBLECTL_OUTPUT", "").strip().lower()
+    if environment_value and environment_value not in {"text", "json", "yaml"}:
+        return "environment"
+    return None
+
+
+def _legacy_output_arguments(arguments: tuple[str, ...], output_format: str) -> tuple[str, ...]:
+    """Translate the Phase 1 output option to the legacy command renderer during migration."""
+
+    translated: list[str] = []
+    skip_next = False
+    has_legacy_option = False
+    has_phase_option = any(
+        argument == "--output" or argument.startswith("--output=") for argument in arguments
+    )
+    for argument in arguments:
+        if skip_next:
+            skip_next = False
+            continue
+        if argument == "--output":
+            skip_next = True
+            continue
+        if argument.startswith("--output="):
+            continue
+        if argument == "--output-format":
+            if has_phase_option:
+                skip_next = True
+                continue
+            has_legacy_option = True
+        elif argument.startswith("--output-format="):
+            if has_phase_option:
+                continue
+            has_legacy_option = True
+        translated.append(argument)
+    if output_format in {"json", "yaml"} and not has_legacy_option:
+        return ("--output-format", "json", *translated)
+    return tuple(translated)
+
+
+def _render_buffered_result(
+    context: CommandContext,
+    exit_code: int,
+    rendered: str,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    """Adapt one legacy JSON document to a versioned Phase 1 envelope."""
+
+    if exit_code == EXIT_CANCELLED:
+        return render_exception(context, KeyboardInterrupt(), stdout, stderr)
+    if exit_code == EXIT_SUCCESS:
+        data = json.loads(rendered)
+        return render_success(
+            context,
+            CommandResult(
+                data=data,
+                changed=_legacy_result_changed(context.command_name, data),
+                warnings=_legacy_result_warnings(context.command_name, data),
+            ),
+            stdout,
+            stderr,
+        )
+
+    payload = json.loads(rendered)
+    reason = payload.get("reason") or "The command could not be completed."
+    remediation = payload.get("remediation")
+    kind = payload.get("kind")
+    if kind == OutcomeKind.VALIDATION_FAILURE:
+        error: BaseException = ValidationError(
+            str(reason), hint=str(remediation) if remediation else None
+        )
+    elif kind == OutcomeKind.CANCELLED:
+        error = KeyboardInterrupt()
+    else:
+        error = _legacy_error_for_command(
+            context.command_name,
+            str(reason),
+            str(remediation) if remediation else None,
+        )
+    return render_exception(context, error, stdout, stderr)
+
+
+def _legacy_result_changed(command_name: str, payload: object) -> bool:
+    """Infer mutation only from explicit structured legacy result fields."""
+
+    if not isinstance(payload, Mapping):
+        return False
+    if payload.get("changed") is True:
+        return True
+    if command_name == "state invalidate":
+        return payload.get("applied") is True and payload.get("existed") is True
+    if command_name == "state recover":
+        recovered = payload.get("transaction_ids")
+        return payload.get("applied") is True and isinstance(recovered, list) and bool(recovered)
+    if command_name == "execution prune":
+        removed = payload.get("removed_execution_ids")
+        return payload.get("applied") is True and isinstance(removed, list) and bool(removed)
+    return False
+
+
+def _legacy_result_warnings(command_name: str, payload: object) -> tuple[CommandWarning, ...]:
+    """Lift explicit non-fatal legacy findings without parsing rendered text."""
+
+    if not isinstance(payload, Mapping):
+        return ()
+    warning_fields = {
+        "inventory show": ("diagnostics", "INVENTORY_DIAGNOSTIC"),
+        "playbook validate": ("findings", "PLAYBOOK_FINDING"),
+    }
+    definition = warning_fields.get(command_name)
+    if definition is None:
+        return ()
+    field, code = definition
+    values = payload.get(field)
+    if not isinstance(values, list):
+        return ()
+    return tuple(
+        CommandWarning(code, value) for value in values if isinstance(value, str) and value.strip()
+    )
+
+
+def _legacy_error_for_command(command_name: str, message: str, hint: str | None) -> AnsiblectlError:
+    """Map a legacy failure to its broad typed subsystem without parsing error text."""
+
+    subsystem = command_name.partition(" ")[0]
+    error_types: dict[str, type[AnsiblectlError]] = {
+        "config": ConfigurationError,
+        "execution": ExecutionError,
+        "inventory": InventoryError,
+        "playbook": PlaybookError,
+        "plugin": PluginError,
+        "repository": RepositoryError,
+        "run": ExecutionError,
+        "state": StateError,
+        "workspace": WorkspaceError,
+    }
+    return error_types.get(subsystem, AnsiblectlError)(message, hint=hint)
+
+
+def _requested_debug(arguments: Sequence[str]) -> bool:
+    """Resolve debug mode before full argument parsing reaches the command boundary."""
+
+    environment_value = os.environ.get("ANSIBLECTL_DEBUG", "").strip().lower()
+    return "--debug" in arguments or environment_value in {"1", "true", "yes", "on"}
 
 
 @dataclass(frozen=True)
@@ -147,6 +420,7 @@ class CliOptions:
     verbosity: int
     output_format: str
     non_interactive: bool
+    debug: bool
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -160,10 +434,21 @@ def build_parser() -> argparse.ArgumentParser:
         "-v", "--verbose", action="count", default=0, help="Increase diagnostic detail."
     )
     parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Include safe exception diagnostics when a command fails.",
+    )
+    parser.add_argument(
+        "--output",
+        choices=("text", "json", "yaml"),
+        dest="phase_output_format",
+        help="Render the public result as text, JSON, or YAML.",
+    )
+    parser.add_argument(
         "--output-format",
         choices=("human", "json"),
         default="human",
-        help="Render command results for people or automation.",
+        help="Deprecated compatibility alias for human or JSON output.",
     )
     parser.add_argument(
         "--non-interactive",
@@ -193,6 +478,12 @@ def build_parser() -> argparse.ArgumentParser:
     state_invalidate.add_argument("name", help="Exact cache-entry name.")
     state_invalidate.add_argument(
         "--apply", action="store_true", help="Apply invalidation; otherwise only preview it."
+    )
+    state_recover = state_commands.add_parser(
+        "recover", help="Preview or recover interrupted filesystem transactions."
+    )
+    state_recover.add_argument(
+        "--apply", action="store_true", help="Apply recovery; otherwise only preview it."
     )
     inventory = subcommands.add_parser("inventory", help="Resolve and inspect inventory.")
     inventory_commands = inventory.add_subparsers(dest="inventory_command", required=True)
@@ -374,6 +665,7 @@ def main(
     workspace_service: WorkspaceService | None = None,
     configuration_service: ConfigurationService | None = None,
     state_service: StateService | None = None,
+    filesystem_recovery_service: FilesystemRecoveryService | None = None,
     inventory_service: InventoryService | None = None,
     inventory_validation_service: InventoryValidationService | None = None,
     repository_service: RepositoryService | None = None,
@@ -385,16 +677,21 @@ def main(
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
     current_directory: Path | None = None,
+    propagate_errors: bool = False,
 ) -> int:
     """Run a command and return its documented process exit code."""
 
     parser = build_parser()
     arguments = parser.parse_args(argv)
+    output_format = arguments.output_format
+    if arguments.phase_output_format is not None:
+        output_format = "human" if arguments.phase_output_format == "text" else "json"
     options = CliOptions(
         workspace=arguments.workspace,
         verbosity=arguments.verbose,
-        output_format=arguments.output_format,
+        output_format=output_format,
         non_interactive=arguments.non_interactive,
+        debug=arguments.debug,
     )
     if arguments.command == "status":
         status_service_instance = status_service or build_status_service()
@@ -407,6 +704,8 @@ def main(
                 arguments, options, workspace_service_instance, current_directory
             )
         except WorkspaceError as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 f"workspace {arguments.workspace_command}",
                 str(error),
@@ -427,6 +726,8 @@ def main(
             )
             configuration = configuration_service_instance.resolve()
         except WorkspaceError as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 "config show",
                 str(error),
@@ -436,6 +737,8 @@ def main(
                 stderr,
             )
         except ConfigurationError as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 "config show",
                 str(error),
@@ -457,9 +760,16 @@ def main(
                 invalidation = state_service_instance.invalidate(
                     arguments.name, apply=arguments.apply
                 )
+            elif arguments.state_command == "recover":
+                recovery_service = filesystem_recovery_service or build_filesystem_recovery_service(
+                    workspace.root
+                )
+                recovery = recovery_service.recover(apply=arguments.apply)
             else:
                 entries = state_service_instance.inspect()
         except WorkspaceError as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 state_operation,
                 str(error),
@@ -469,6 +779,8 @@ def main(
                 stderr,
             )
         except StateError as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 state_operation,
                 str(error),
@@ -477,8 +789,21 @@ def main(
                 stdout,
                 stderr,
             )
+        except FilesystemRecoveryError as error:
+            if propagate_errors:
+                raise
+            return _render_cli_failure(
+                state_operation,
+                str(error),
+                "Inspect the retained transaction journal and retry recovery.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
         if arguments.state_command == "invalidate":
             _render_state_invalidation(invalidation, options.output_format, stdout)
+        elif arguments.state_command == "recover":
+            _render_filesystem_recovery(recovery, options.output_format, stdout)
         else:
             _render_state(entries, options.output_format, stdout)
     elif arguments.command == "inventory":
@@ -510,6 +835,8 @@ def main(
                 inventory_service_instance = inventory_service
                 inventory = inventory_service_instance.resolve()
         except WorkspaceError as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 f"inventory {arguments.inventory_command}",
                 str(error),
@@ -519,6 +846,8 @@ def main(
                 stderr,
             )
         except (ExecutionError, InventoryError) as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 f"inventory {arguments.inventory_command}",
                 str(error),
@@ -528,6 +857,15 @@ def main(
                 stderr,
             )
         if arguments.inventory_command == "validate":
+            if (
+                propagate_errors
+                and inventory_validation.execution.status is not ExecutionStatus.COMPLETED
+            ):
+                raise ExternalToolError(
+                    "Inventory validation did not complete successfully.",
+                    hint="Review the referenced validator diagnostics and correct the inventory.",
+                    context={"status": inventory_validation.execution.status.value},
+                )
             _render_inventory_validation(inventory_validation, options.output_format, stdout)
             if inventory_validation.execution.status is not ExecutionStatus.COMPLETED:
                 return EXIT_EXPECTED_FAILURE
@@ -556,6 +894,8 @@ def main(
             else:
                 result = repository_service_instance.inspect(request)
         except WorkspaceError as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 f"repository {arguments.repository_command}",
                 str(error),
@@ -565,6 +905,8 @@ def main(
                 stderr,
             )
         except RepositoryError as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 f"repository {arguments.repository_command}",
                 str(error),
@@ -605,6 +947,8 @@ def main(
                 locations = [_resolve_workspace_path(workspace.root, path) for path in identifiers]
                 descriptors = plugin_service_instance.discover_files(locations)
         except WorkspaceError as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 f"plugin {arguments.plugin_command}",
                 str(error),
@@ -614,6 +958,8 @@ def main(
                 stderr,
             )
         except (PermissionDeniedError, PluginManifestError) as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 f"plugin {arguments.plugin_command}",
                 str(error),
@@ -644,6 +990,8 @@ def main(
                 timeout_seconds=arguments.timeout,
             )
         except WorkspaceError as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 "playbook validate",
                 str(error),
@@ -653,6 +1001,8 @@ def main(
                 stderr,
             )
         except (PlaybookError, ExecutionError) as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 "playbook validate",
                 str(error),
@@ -661,14 +1011,26 @@ def main(
                 stdout,
                 stderr,
             )
-        _render_playbook_validation(validation, options.output_format, stdout)
         if (
             validation.syntax_check is not None
             and validation.syntax_check.status is not ExecutionStatus.COMPLETED
         ):
+            if propagate_errors:
+                raise ExternalToolError(
+                    "Playbook syntax validation did not complete successfully.",
+                    hint="Review the referenced validator diagnostics and correct the playbook.",
+                    context={"status": validation.syntax_check.status.value},
+                )
+            _render_playbook_validation(validation, options.output_format, stdout)
             return EXIT_EXPECTED_FAILURE
+        _render_playbook_validation(validation, options.output_format, stdout)
     elif arguments.command == "run":
         if arguments.confirm and not arguments.apply:
+            if propagate_errors:
+                raise ValidationError(
+                    "--confirm requires --apply.",
+                    hint="Remove --confirm or select --apply.",
+                )
             return render_outcome(
                 CommandOutcome(
                     OutcomeKind.VALIDATION_FAILURE,
@@ -681,6 +1043,11 @@ def main(
                 sys.stderr if stderr is None else stderr,
             )
         if arguments.apply and not arguments.preflight and not arguments.confirm:
+            if propagate_errors:
+                raise ValidationError(
+                    "Apply execution requires --confirm.",
+                    hint="Add --confirm, or use --preflight without executing.",
+                )
             return render_outcome(
                 CommandOutcome(
                     OutcomeKind.VALIDATION_FAILURE,
@@ -742,6 +1109,8 @@ def main(
                     )
                 )
         except WorkspaceError as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 "run",
                 str(error),
@@ -757,6 +1126,8 @@ def main(
             ExecutionError,
             RepositoryError,
         ) as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 "run",
                 str(error),
@@ -766,10 +1137,34 @@ def main(
                 stderr,
             )
         if arguments.preflight:
+            if propagate_errors and not preflight_result.report.allowed:
+                raise PermissionDeniedError(
+                    "Run preflight was denied by policy.",
+                    hint="Resolve the reported policy findings and retry.",
+                )
             _render_run_preflight(preflight_result, options.output_format, stdout)
             if not preflight_result.report.allowed:
                 return EXIT_EXPECTED_FAILURE
             return EXIT_SUCCESS
+        if propagate_errors and run_result.execution is None:
+            raise PermissionDeniedError(
+                "Run execution was denied by policy.",
+                hint="Resolve the reported policy findings and retry.",
+            )
+        if (
+            propagate_errors
+            and run_result.execution is not None
+            and run_result.execution.status
+            not in {ExecutionStatus.COMPLETED, ExecutionStatus.CANCELLED}
+        ):
+            raise ExternalToolError(
+                "Ansible execution did not complete successfully.",
+                hint="Review the referenced execution diagnostics and retry.",
+                context={
+                    "status": run_result.execution.status.value,
+                    "exit_code": run_result.execution.exit_code,
+                },
+            )
         _render_run_result(run_result, options.output_format, stdout)
         if run_result.execution is None:
             return EXIT_EXPECTED_FAILURE
@@ -807,6 +1202,8 @@ def main(
                     arguments.limit,
                 )
         except WorkspaceError as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 f"execution {arguments.execution_command}",
                 str(error),
@@ -816,6 +1213,8 @@ def main(
                 stderr,
             )
         except ExecutionError as error:
+            if propagate_errors:
+                raise
             return _render_cli_failure(
                 f"execution {arguments.execution_command}",
                 str(error),
@@ -928,6 +1327,23 @@ def _render_state_invalidation(
     presence = "found" if result.existed else "not found"
     print(f"{action}: cache entry '{result.name}' {presence}.", file=output)
     print(f"Remaining entries: {result.remaining_count}", file=output)
+
+
+def _render_filesystem_recovery(
+    result: FilesystemRecoveryResult, output_format: str, output: TextIO | None
+) -> None:
+    payload = {
+        "applied": result.applied,
+        "schema_version": 1,
+        "transaction_ids": list(result.transaction_ids),
+    }
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    action = "Recovered" if result.applied else "Pending"
+    print(f"{action} filesystem transactions: {len(result.transaction_ids)}", file=output)
+    for transaction_id in result.transaction_ids:
+        print(f"  {transaction_id}", file=output)
 
 
 def _render_inventory(

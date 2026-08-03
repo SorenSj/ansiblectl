@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import tempfile
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ansiblectl.domain.errors import ExecutionError
+from ansiblectl.domain.errors import ExecutionError, FilesystemTransactionError
 from ansiblectl.domain.execution import (
     ExecutionMode,
     ExecutionRecord,
@@ -20,6 +18,7 @@ from ansiblectl.domain.execution import (
     ExecutionTargeting,
 )
 from ansiblectl.infrastructure.file_locking import locked
+from ansiblectl.infrastructure.transactional_filesystem import TransactionalFilesystem
 
 
 @dataclass(frozen=True)
@@ -74,13 +73,21 @@ class JsonLinesExecutionHistory:
                 remove_count = max(0, len(executions) - keep)
                 removed = executions[:remove_count]
                 removed_indices = {index for index, _ in removed}
-                _atomic_write(
+                _transactional_write(
+                    self.workspace_root.resolve(),
                     path,
                     [entry for index, entry in enumerate(entries) if index not in removed_indices],
                 )
                 for _, record in removed:
                     self._remove_output_directory(record.execution_id)
-        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
+        except (
+            OSError,
+            FilesystemTransactionError,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            ValueError,
+        ) as error:
             raise ExecutionError(
                 "Execution retention failed safely. Inspect workspace permissions and history."
             ) from error
@@ -118,19 +125,13 @@ def _read_entries(path: Path) -> list[dict[str, object]]:
     return entries
 
 
-def _atomic_write(path: Path, entries: list[dict[str, object]]) -> None:
-    descriptor, name = tempfile.mkstemp(prefix=".events-", dir=path.parent)
-    temporary = Path(name)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-            for entry in entries:
-                stream.write(json.dumps(entry, sort_keys=True) + "\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        temporary.replace(path)
-        path.chmod(0o600)
-    finally:
-        temporary.unlink(missing_ok=True)
+def _transactional_write(
+    workspace_root: Path, path: Path, entries: list[dict[str, object]]
+) -> None:
+    content = "".join(json.dumps(entry, sort_keys=True) + "\n" for entry in entries).encode()
+    transaction = TransactionalFilesystem(workspace_root).begin()
+    transaction.stage_write(path, content, mode=0o600)
+    transaction.commit()
 
 
 def _parse_record(data: Any) -> ExecutionRecord | None:

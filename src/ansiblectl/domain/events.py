@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
+from ansiblectl.domain.redaction import redact
+
 PUBLIC_EVENTS = {"execution.completed", "workspace.initialized"}
-_SENSITIVE = {"secret", "token", "password", "credential", "key"}
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,9 @@ class Event:
             raise ValueError(f"Undocumented event '{self.name}'.")
 
     def safe_payload(self) -> dict[str, object]:
-        return _redact(self.payload)
+        safe_payload = redact(self.payload)
+        assert isinstance(safe_payload, dict)
+        return safe_payload
 
 
 Subscriber = Callable[[Event], None]
@@ -39,19 +42,3 @@ class EventBus:
                 self.diagnostics.append(
                     f"Subscriber failed for {event.name}: {error.__class__.__name__}."
                 )
-
-
-def _redact(value: object) -> dict[str, object]:
-    assert isinstance(value, Mapping)
-    return {
-        key: "<redacted>" if key.lower() in _SENSITIVE else _redact_item(item)
-        for key, item in value.items()
-    }
-
-
-def _redact_item(value: object) -> object:
-    if isinstance(value, Mapping):
-        return _redact(value)
-    if isinstance(value, list):
-        return [_redact_item(item) for item in value]
-    return value

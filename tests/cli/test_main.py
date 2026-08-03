@@ -21,7 +21,12 @@ from ansiblectl.cli.main import (
     main,
 )
 from ansiblectl.domain.configuration import EffectiveConfiguration
-from ansiblectl.domain.errors import ExecutionError, WorkspaceNotFoundError
+from ansiblectl.domain.errors import (
+    ExecutionError,
+    ExternalToolError,
+    PermissionDeniedError,
+    WorkspaceNotFoundError,
+)
 from ansiblectl.domain.execution import (
     ExecutionMode,
     ExecutionRecord,
@@ -30,12 +35,14 @@ from ansiblectl.domain.execution import (
     ExecutionStatus,
     ExecutionTargeting,
 )
+from ansiblectl.domain.filesystem import FilesystemRecoveryResult
 from ansiblectl.domain.inventory import Host, ResolvedInventory
 from ansiblectl.domain.plugins import ProviderDescriptor
 from ansiblectl.domain.policy import EnforcementMode, PolicyFinding, PolicyReport
 from ansiblectl.domain.repository import RepositoryRequest, RepositoryResult
 from ansiblectl.domain.state import CacheEntry, StateInvalidationResult
 from ansiblectl.domain.workspace import Workspace
+from ansiblectl.infrastructure.transactional_filesystem import TransactionalFilesystem
 from ansiblectl.infrastructure.workspace_state import WorkspaceStateStore
 
 
@@ -62,13 +69,28 @@ def test_help_lists_global_options_and_status_command(capsys: pytest.CaptureFixt
     captured = capsys.readouterr()
     assert raised.value.code == EXIT_SUCCESS
     assert "--workspace" in captured.out
+    assert "--output {text,json,yaml}" in captured.out
     assert "--output-format" in captured.out
+    assert "Deprecated compatibility alias" in captured.out
     assert "status" in captured.out
     assert "config" in captured.out
     assert "state" in captured.out
     assert "repository" in captured.out
     assert "playbook" in captured.out
     assert "execution" in captured.out
+
+
+def test_direct_main_accepts_phase_output_spelling_for_compatibility() -> None:
+    output = StringIO()
+
+    result = main(
+        ["--output", "json", "status"],
+        status_service=FakeStatusService(),
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue())["message"] == "Fake service is ready."
 
 
 def test_invalid_argument_uses_documented_invalid_input_exit_code(
@@ -112,6 +134,11 @@ class FakeStateService:
 
     def invalidate(self, name: str, *, apply: bool = False) -> StateInvalidationResult:
         return StateInvalidationResult(name, True, apply, 0)
+
+
+class FakeFilesystemRecoveryService:
+    def recover(self, *, apply: bool = False) -> FilesystemRecoveryResult:
+        return FilesystemRecoveryResult(("transaction-1",), apply)
 
 
 def test_state_show_renders_only_safe_cache_metadata(tmp_path: Path) -> None:
@@ -181,6 +208,56 @@ def test_state_invalidate_is_preview_only_without_apply(tmp_path: Path) -> None:
         "remaining_count": 0,
         "schema_version": 1,
     }
+
+
+def test_state_recover_previews_pending_transactions(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "--output-format", "json", "state", "recover"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        state_service=FakeStateService(),  # type: ignore[arg-type]
+        filesystem_recovery_service=FakeFilesystemRecoveryService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue()) == {
+        "applied": False,
+        "schema_version": 1,
+        "transaction_ids": ["transaction-1"],
+    }
+
+
+def test_state_recover_applies_durable_workspace_recovery(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    assert main(["workspace", "init", str(workspace)], stdout=StringIO()) == EXIT_SUCCESS
+    transaction = TransactionalFilesystem(workspace).begin()
+    transaction.stage_write(Path("pending.txt"), b"not-committed")
+    transaction._release_active()
+    output = StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(workspace),
+            "--output-format",
+            "json",
+            "state",
+            "recover",
+            "--apply",
+        ],
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue()) == {
+        "applied": True,
+        "schema_version": 1,
+        "transaction_ids": [transaction.transaction_id],
+    }
+    assert not (workspace / "pending.txt").exists()
+    assert TransactionalFilesystem(workspace).pending() == ()
 
 
 def test_config_show_renders_redacted_effective_configuration(tmp_path: Path) -> None:
@@ -1632,3 +1709,105 @@ def test_execution_prune_applies_only_with_explicit_flag(tmp_path: Path) -> None
     assert result == EXIT_SUCCESS
     assert "Applied: retain 0 execution(s)" in output.getvalue()
     assert "Execution: run-1" in output.getvalue()
+
+
+def test_installed_path_raises_typed_inventory_validator_failure(tmp_path: Path) -> None:
+    output = StringIO()
+
+    with pytest.raises(ExternalToolError, match="Inventory validation"):
+        main(
+            ["--workspace", str(tmp_path), "inventory", "validate"],
+            workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+            inventory_validation_service=FailingInventoryValidationService(),  # type: ignore[arg-type]
+            stdout=output,
+            propagate_errors=True,
+        )
+
+    assert output.getvalue() == ""
+
+
+def test_installed_path_raises_typed_syntax_validator_failure(tmp_path: Path) -> None:
+    output = StringIO()
+
+    with pytest.raises(ExternalToolError, match="syntax validation"):
+        main(
+            [
+                "--workspace",
+                str(tmp_path),
+                "playbook",
+                "validate",
+                "playbooks/site.yml",
+                "--revision",
+                "main",
+                "--syntax-check",
+                "--timeout",
+                "15",
+            ],
+            workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+            playbook_service=FakeSyntaxValidationService(),  # type: ignore[arg-type]
+            stdout=output,
+            propagate_errors=True,
+        )
+
+    assert output.getvalue() == ""
+
+
+@pytest.mark.parametrize(
+    ("service", "preflight", "message"),
+    [
+        (DeniedPreflightRunService(), True, "preflight was denied"),
+        (DeniedRunService(), False, "execution was denied"),
+    ],
+)
+def test_installed_path_raises_typed_policy_denial(
+    tmp_path: Path, service: object, preflight: bool, message: str
+) -> None:
+    output = StringIO()
+    arguments = [
+        "--workspace",
+        str(tmp_path),
+        "run",
+        "--playbook",
+        "playbooks/site.yml",
+        "--revision",
+        "main",
+        "--check",
+    ]
+    if preflight:
+        arguments.append("--preflight")
+
+    with pytest.raises(PermissionDeniedError, match=message):
+        main(
+            arguments,
+            workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+            run_service=service,  # type: ignore[arg-type]
+            stdout=output,
+            propagate_errors=True,
+        )
+
+    assert output.getvalue() == ""
+
+
+def test_installed_path_raises_typed_ansible_execution_failure(tmp_path: Path) -> None:
+    output = StringIO()
+
+    with pytest.raises(ExternalToolError, match="Ansible execution") as raised:
+        main(
+            [
+                "--workspace",
+                str(tmp_path),
+                "run",
+                "--playbook",
+                "playbooks/site.yml",
+                "--revision",
+                "main",
+                "--check",
+            ],
+            workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+            run_service=FailedRunService(),  # type: ignore[arg-type]
+            stdout=output,
+            propagate_errors=True,
+        )
+
+    assert output.getvalue() == ""
+    assert raised.value.context == {"status": "timed_out", "exit_code": None}

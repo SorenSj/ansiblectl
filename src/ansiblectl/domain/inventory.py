@@ -8,11 +8,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
-from ansiblectl.domain.errors import DomainError
-
-
-class InventoryError(DomainError):
-    """Raised when an inventory source cannot produce valid hosts or groups."""
+from ansiblectl.domain.errors import InventoryError as InventoryError
 
 
 @dataclass(frozen=True)

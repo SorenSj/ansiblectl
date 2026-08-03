@@ -2,12 +2,7 @@
 
 from dataclasses import dataclass
 
-from ansiblectl.domain.errors import DomainError
-
-
-class PermissionDeniedError(DomainError):
-    """Raised before privileged plugin work can start."""
-
+from ansiblectl.domain.errors import PermissionDeniedError as PermissionDeniedError
 
 CAPABILITY_PERMISSIONS = {
     "network": "network",
