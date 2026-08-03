@@ -125,6 +125,9 @@ Captured Ansible output is not echoed directly. Non-empty stdout and stderr are
 stored with owner-only permissions below `.ansiblectl/runs`, and the command
 returns their file references for diagnosis.
 
+Completed runs return exit code `0`, failed or timed-out runs return `1`, and a
+classified cancellation returns `3` in both human and JSON output modes.
+
 Completed runs also append a redacted structured record to
 `.ansiblectl/logs/events.jsonl`, correlated by execution identifier.
 

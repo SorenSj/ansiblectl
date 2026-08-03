@@ -33,6 +33,10 @@ failure `1`, validation failure `2`, cancellation `3`, and unexpected failure
 `70`. Fields named `secret`, `token`, `password`, `credential`, or `key` are
 rendered as `<redacted>`.
 
+The `run` command maps a classified `cancelled` execution to exit code `3` in
+both human and machine-readable output modes. Failed and timed-out executions
+remain expected operational failures with exit code `1`.
+
 ## Verification
 
 - The same application failure renders consistently in human and machine modes.

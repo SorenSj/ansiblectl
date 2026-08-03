@@ -8,7 +8,13 @@ import pytest
 
 from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.status import Status
-from ansiblectl.cli.main import EXIT_EXPECTED_FAILURE, EXIT_INVALID_INPUT, EXIT_SUCCESS, main
+from ansiblectl.cli.main import (
+    EXIT_CANCELLED,
+    EXIT_EXPECTED_FAILURE,
+    EXIT_INVALID_INPUT,
+    EXIT_SUCCESS,
+    main,
+)
 from ansiblectl.domain.errors import ExecutionError, WorkspaceNotFoundError
 from ansiblectl.domain.execution import (
     ExecutionMode,
@@ -446,6 +452,48 @@ def test_run_failure_uses_expected_failure_exit_and_safe_diagnostic(tmp_path: Pa
     assert "Timeout reached" in output.getvalue()
     assert "Stdout: /private/run/stdout.log" in output.getvalue()
     assert "Stderr: /private/run/stderr.log" in output.getvalue()
+
+
+class CancelledRunService(FakeRunService):
+    def run_check(
+        self,
+        workspace_root: Path,
+        playbook_identifier: Path,
+        revision: str,
+        environment: object,
+        timeout_seconds: float,
+        policy_mode: EnforcementMode,
+        targeting: ExecutionTargeting,
+    ) -> GovernedExecutionResult:
+        return GovernedExecutionResult(
+            PolicyReport((), policy_mode),
+            ExecutionResult("run-cancelled", ExecutionStatus.CANCELLED, None, 0.1),
+        )
+
+
+def test_cancelled_run_uses_documented_exit_code_and_json_status(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "run",
+            "--playbook",
+            "playbooks/site.yml",
+            "--revision",
+            "main",
+            "--check",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        run_service=CancelledRunService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_CANCELLED
+    assert json.loads(output.getvalue())["execution"]["status"] == "cancelled"
 
 
 def test_run_rejects_empty_targeting_before_service_invocation(tmp_path: Path) -> None:

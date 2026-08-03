@@ -44,6 +44,7 @@ from ansiblectl.domain.workspace import Workspace
 EXIT_SUCCESS = 0
 EXIT_EXPECTED_FAILURE = 1
 EXIT_INVALID_INPUT = 2
+EXIT_CANCELLED = 3
 
 
 @dataclass(frozen=True)
@@ -314,6 +315,8 @@ def main(
         _render_run_result(run_result, options.output_format, stdout)
         if run_result.execution is None:
             return EXIT_EXPECTED_FAILURE
+        if run_result.execution.status is ExecutionStatus.CANCELLED:
+            return EXIT_CANCELLED
         if run_result.execution.status is not ExecutionStatus.COMPLETED:
             return EXIT_EXPECTED_FAILURE
     elif arguments.command == "execution":
