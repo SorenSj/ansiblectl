@@ -129,6 +129,9 @@ Completed runs return exit code `0`, failed or timed-out runs return `1`, and a
 classified cancellation returns `3` in both human and JSON output modes.
 Unexpected internal failures are redacted at the installed CLI boundary and
 return `70`; Python exception details are not printed to normal command output.
+Invalid arguments return `2`. In JSON mode they produce one redacted structured
+document instead of argparse usage text, so supplied argument values are not
+echoed into automation logs.
 
 Completed runs also append a redacted structured record to
 `.ansiblectl/logs/events.jsonl`, correlated by execution identifier.

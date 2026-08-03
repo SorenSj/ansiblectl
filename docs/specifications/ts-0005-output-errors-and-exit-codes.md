@@ -39,8 +39,13 @@ remain expected operational failures with exit code `1`.
 
 The installed console entry point maps otherwise unhandled `Exception`
 failures to a generic redacted outcome and exit code `70`. JSON mode remains a
-single structured document. `KeyboardInterrupt` and argparse's input-exit
-behaviour are not intercepted by this boundary.
+single structured document. `KeyboardInterrupt` is not intercepted by this
+boundary.
+
+When JSON output is selected, argparse validation failures are replaced with
+one redacted `validation_failure` document on stdout and exit code `2`; raw
+argument diagnostics are discarded so argument values cannot leak. Human mode
+retains argparse's usage and diagnostic text on stderr.
 
 ## Verification
 

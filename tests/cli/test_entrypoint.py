@@ -5,7 +5,7 @@ from io import StringIO
 
 import pytest
 
-from ansiblectl.cli.main import EXIT_UNEXPECTED_FAILURE, cli
+from ansiblectl.cli.main import EXIT_INVALID_INPUT, EXIT_UNEXPECTED_FAILURE, cli
 
 
 @pytest.mark.parametrize(
@@ -55,3 +55,34 @@ def test_entrypoint_does_not_intercept_keyboard_interrupt(
 
     with pytest.raises(KeyboardInterrupt):
         cli(["status"], stdout=StringIO(), stderr=StringIO())
+
+
+def test_entrypoint_renders_invalid_json_arguments_as_one_safe_document() -> None:
+    stdout, stderr = StringIO(), StringIO()
+
+    result = cli(
+        ["--output-format", "json", "--password=do-not-echo"],
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert result == EXIT_INVALID_INPUT
+    assert stderr.getvalue() == ""
+    assert "do-not-echo" not in stdout.getvalue()
+    assert json.loads(stdout.getvalue()) == {
+        "kind": "validation_failure",
+        "operation": "ansiblectl",
+        "reason": "Invalid command arguments.",
+        "remediation": "Run ansiblectl --help.",
+    }
+
+
+def test_entrypoint_preserves_human_argparse_diagnostic() -> None:
+    stdout, stderr = StringIO(), StringIO()
+
+    with pytest.raises(SystemExit) as raised:
+        cli(["status", "--unknown"], stdout=stdout, stderr=stderr)
+
+    assert raised.value.code == EXIT_INVALID_INPUT
+    assert stdout.getvalue() == ""
+    assert "unrecognized arguments: --unknown" in stderr.getvalue()

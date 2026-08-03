@@ -6,7 +6,9 @@ import argparse
 import json
 import sys
 from collections.abc import Sequence
+from contextlib import redirect_stderr
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 from typing import TextIO
 
@@ -60,8 +62,30 @@ def cli(
     """Run the installed CLI behind a safe unexpected-failure boundary."""
 
     arguments = tuple(sys.argv[1:] if argv is None else argv)
+    output_format = _requested_output_format(arguments)
+    actual_stdout = sys.stdout if stdout is None else stdout
+    actual_stderr = sys.stderr if stderr is None else stderr
+    buffered_stdout = StringIO() if output_format == "json" else None
+    command_stdout = actual_stdout if buffered_stdout is None else buffered_stdout
+    diagnostics = StringIO()
     try:
-        return main(arguments, stdout=stdout, stderr=stderr)
+        with redirect_stderr(diagnostics):
+            result = main(arguments, stdout=command_stdout, stderr=diagnostics)
+    except SystemExit as error:
+        if error.code == EXIT_INVALID_INPUT and output_format == "json":
+            return render_outcome(
+                CommandOutcome(
+                    OutcomeKind.VALIDATION_FAILURE,
+                    "ansiblectl",
+                    reason="Invalid command arguments.",
+                    remediation="Run ansiblectl --help.",
+                ),
+                output_format,
+                actual_stdout,
+                actual_stderr,
+            )
+        actual_stderr.write(diagnostics.getvalue())
+        raise
     except Exception:
         outcome = CommandOutcome(
             OutcomeKind.UNEXPECTED_FAILURE,
@@ -71,10 +95,14 @@ def cli(
         )
         return render_outcome(
             outcome,
-            _requested_output_format(arguments),
-            stdout or sys.stdout,
-            stderr or sys.stderr,
+            output_format,
+            actual_stdout,
+            actual_stderr,
         )
+    actual_stderr.write(diagnostics.getvalue())
+    if buffered_stdout is not None:
+        actual_stdout.write(buffered_stdout.getvalue())
+    return result
 
 
 def _requested_output_format(arguments: Sequence[str]) -> str:
