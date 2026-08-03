@@ -95,8 +95,10 @@ metadata. Older records default the field to `false`.
 Every execution carries a non-empty operation identifier. Normal runs use
 `run`; explicit syntax checks use `playbook.syntax_check`. The operation is
 retained in results, events, and history, and older records default to `run`.
-`execution list --operation <identifier>` applies an exact read-only filter
-after records are safely parsed; it does not alter retention ordering or data.
+`execution list --operation <identifier>` and `--status <classification>` apply
+composable exact read-only filters after records are safely parsed; they do not
+alter retention ordering or data. Status values use the existing `completed`,
+`failed`, `timed_out`, and `cancelled` classifications.
 
 Local Ansible processes receive a controlled `ANSIBLE_LOCAL_TEMP` below the
 validated workspace's private `.ansiblectl/tmp` directory. The directory uses
@@ -130,6 +132,7 @@ configuration therefore cannot produce execution side effects.
 - Diff mode reaches Ansible as a separate argument without embedding diff content in metadata.
 - Execution history distinguishes playbook runs from syntax-check operations.
 - Execution history can be filtered by one exact non-empty operation identifier.
+- Execution history can be filtered by classified status and combined with operation filtering.
 - Ansible local temporary files remain inside the private workspace boundary.
 - Invalid effective configuration stops a run before other inputs or adapters are touched.
 

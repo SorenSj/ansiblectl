@@ -1403,8 +1403,14 @@ class FakeExecutionHistoryService:
         operation="playbook.syntax_check",
     )
 
-    def list(self, operation: str | None = None) -> tuple[ExecutionRecord, ...]:
-        return (self.record,) if operation in {None, self.record.operation} else ()
+    def list(
+        self,
+        operation: str | None = None,
+        status: ExecutionStatus | None = None,
+    ) -> tuple[ExecutionRecord, ...]:
+        operation_matches = operation in {None, self.record.operation}
+        status_matches = status in {None, self.record.status}
+        return (self.record,) if operation_matches and status_matches else ()
 
     def get(self, execution_id: str) -> ExecutionRecord:
         if execution_id != self.record.execution_id:
@@ -1466,6 +1472,31 @@ def test_execution_list_filters_by_exact_operation(tmp_path: Path) -> None:
 
     assert result == EXIT_SUCCESS
     assert json.loads(output.getvalue())["executions"] == []
+
+
+def test_execution_list_combines_operation_and_status_filters(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "execution",
+            "list",
+            "--operation",
+            "playbook.syntax_check",
+            "--status",
+            "completed",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        execution_history_service=FakeExecutionHistoryService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue())["executions"][0]["execution_id"] == "run-1"
 
 
 def test_execution_show_renders_one_human_record(tmp_path: Path) -> None:

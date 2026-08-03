@@ -319,6 +319,12 @@ def build_parser() -> argparse.ArgumentParser:
     execution_list.add_argument(
         "--operation", help="Show only records with this exact operation identifier."
     )
+    execution_list.add_argument(
+        "--status",
+        choices=tuple(ExecutionStatus),
+        type=ExecutionStatus,
+        help="Show only records with this classified status.",
+    )
     execution_show = execution_commands.add_parser("show", help="Show one completed execution.")
     execution_show.add_argument("execution_id", help="Exact execution identifier.")
     execution_prune = execution_commands.add_parser(
@@ -758,7 +764,7 @@ def main(
             if arguments.execution_command == "show":
                 records = (history.get(arguments.execution_id),)
             else:
-                records = history.list(arguments.operation)
+                records = history.list(arguments.operation, arguments.status)
         except WorkspaceError as error:
             return _render_cli_failure(
                 f"execution {arguments.execution_command}",
