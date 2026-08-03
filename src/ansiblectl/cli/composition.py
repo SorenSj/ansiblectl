@@ -4,9 +4,11 @@ from pathlib import Path
 
 from ansiblectl import __version__
 from ansiblectl.application.inventory import InventoryService
+from ansiblectl.application.repository import RepositoryService
 from ansiblectl.application.status import DefaultStatusService, StatusService
 from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.domain.inventory import InventoryError
+from ansiblectl.infrastructure.git_repository import GitRepositoryAdapter
 from ansiblectl.infrastructure.local_workspace_store import LocalWorkspaceStore
 from ansiblectl.infrastructure.yaml_inventory import YamlInventoryProvider
 
@@ -21,6 +23,12 @@ def build_workspace_service() -> WorkspaceService:
     """Create the local workspace use cases for a CLI invocation."""
 
     return WorkspaceService(store=LocalWorkspaceStore())
+
+
+def build_repository_service() -> RepositoryService:
+    """Create repository operations with the local Git adapter."""
+
+    return RepositoryService(port=GitRepositoryAdapter())
 
 
 def build_inventory_service(

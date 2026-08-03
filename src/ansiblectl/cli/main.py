@@ -10,15 +10,18 @@ from pathlib import Path
 from typing import TextIO
 
 from ansiblectl.application.inventory import InventoryService
+from ansiblectl.application.repository import RepositoryService
 from ansiblectl.application.status import StatusService
 from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.cli.composition import (
     build_inventory_service,
+    build_repository_service,
     build_status_service,
     build_workspace_service,
 )
 from ansiblectl.domain.errors import WorkspaceError
 from ansiblectl.domain.inventory import InventoryError, ResolvedInventory
+from ansiblectl.domain.repository import RepositoryError, RepositoryRequest, RepositoryResult
 from ansiblectl.domain.workspace import Workspace
 
 EXIT_SUCCESS = 0
@@ -76,6 +79,17 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Inventory YAML path inside the workspace (default: inventory/hosts.yml).",
     )
+    repository = subcommands.add_parser("repository", help="Inspect and synchronise repositories.")
+    repository_commands = repository.add_subparsers(dest="repository_command", required=True)
+    for command, help_text in (
+        ("inspect", "Inspect repository state."),
+        ("sync", "Synchronise a clean repository to a revision."),
+    ):
+        repository_command = repository_commands.add_parser(command, help=help_text)
+        repository_command.add_argument("path", type=Path, help="Repository path in the workspace.")
+        repository_command.add_argument(
+            "--revision", required=True, help="Explicit Git revision for this operation."
+        )
     return parser
 
 
@@ -85,6 +99,7 @@ def main(
     status_service: StatusService | None = None,
     workspace_service: WorkspaceService | None = None,
     inventory_service: InventoryService | None = None,
+    repository_service: RepositoryService | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
     current_directory: Path | None = None,
@@ -133,6 +148,34 @@ def main(
             print(f"Inventory error: {error}", file=stderr)
             return EXIT_EXPECTED_FAILURE
         _render_inventory(inventory, options.output_format, stdout)
+    elif arguments.command == "repository":
+        workspace_service_instance = workspace_service or build_workspace_service()
+        repository_service_instance = repository_service or build_repository_service()
+        try:
+            workspace = workspace_service_instance.resolve(
+                options.workspace, current_directory or Path.cwd()
+            )
+            request = RepositoryRequest(
+                workspace.root,
+                (workspace.root / arguments.path).resolve(),
+                arguments.revision,
+            )
+            if arguments.repository_command == "sync":
+                print(
+                    f"Synchronising repository {request.repository_path} "
+                    f"to revision {request.revision}.",
+                    file=stderr,
+                )
+                result = repository_service_instance.sync(request)
+            else:
+                result = repository_service_instance.inspect(request)
+        except WorkspaceError as error:
+            print(f"Workspace error: {error}", file=stderr)
+            return EXIT_EXPECTED_FAILURE
+        except RepositoryError as error:
+            print(f"Repository error: {error}", file=stderr)
+            return EXIT_EXPECTED_FAILURE
+        _render_repository(result, options.output_format, stdout)
     return EXIT_SUCCESS
 
 
@@ -198,3 +241,26 @@ def _render_inventory(
     print(f"Groups: {len(inventory.groups)}", file=output)
     for diagnostic in inventory.diagnostics:
         print(f"Diagnostic: {diagnostic}", file=output)
+
+
+def _render_repository(
+    repository: RepositoryResult, output_format: str, output: TextIO | None
+) -> None:
+    """Render repository state at the CLI boundary."""
+
+    if output_format == "json":
+        print(
+            json.dumps(
+                {
+                    "dirty": repository.dirty,
+                    "repository_path": str(repository.repository_path),
+                    "revision": repository.revision,
+                },
+                sort_keys=True,
+            ),
+            file=output,
+        )
+        return
+    print(f"Repository: {repository.repository_path}", file=output)
+    print(f"Revision: {repository.revision}", file=output)
+    print(f"Dirty: {'yes' if repository.dirty else 'no'}", file=output)

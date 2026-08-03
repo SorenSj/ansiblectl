@@ -10,6 +10,7 @@ from ansiblectl.application.status import Status
 from ansiblectl.cli.main import EXIT_EXPECTED_FAILURE, EXIT_INVALID_INPUT, EXIT_SUCCESS, main
 from ansiblectl.domain.errors import WorkspaceNotFoundError
 from ansiblectl.domain.inventory import Host, ResolvedInventory
+from ansiblectl.domain.repository import RepositoryRequest, RepositoryResult
 from ansiblectl.domain.workspace import Workspace
 
 
@@ -38,6 +39,7 @@ def test_help_lists_global_options_and_status_command(capsys: pytest.CaptureFixt
     assert "--workspace" in captured.out
     assert "--output-format" in captured.out
     assert "status" in captured.out
+    assert "repository" in captured.out
 
 
 def test_invalid_argument_uses_documented_invalid_input_exit_code(
@@ -158,4 +160,93 @@ def test_inventory_source_cannot_escape_workspace(tmp_path: Path) -> None:
     )
 
     assert result == EXIT_EXPECTED_FAILURE
+    assert "inside the selected workspace" in error.getvalue()
+
+
+class FakeRepositoryService:
+    def __init__(self, dirty: bool = False) -> None:
+        self.dirty = dirty
+        self.calls: list[tuple[str, RepositoryRequest]] = []
+
+    def inspect(self, request: RepositoryRequest) -> RepositoryResult:
+        self.calls.append(("inspect", request))
+        return RepositoryResult(request.repository_path, request.revision, self.dirty)
+
+    def sync(self, request: RepositoryRequest) -> RepositoryResult:
+        self.calls.append(("sync", request))
+        return RepositoryResult(request.repository_path, request.revision, False)
+
+
+def test_repository_inspect_builds_workspace_scoped_request(tmp_path: Path) -> None:
+    service, output = FakeRepositoryService(dirty=True), StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "repository",
+            "inspect",
+            "repo",
+            "--revision",
+            "main",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        repository_service=service,  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert service.calls[0][1] == RepositoryRequest(
+        tmp_path.resolve(), (tmp_path / "repo").resolve(), "main"
+    )
+    assert json.loads(output.getvalue())["dirty"] is True
+
+
+def test_repository_sync_reports_target_before_service_call(tmp_path: Path) -> None:
+    service, output, error = FakeRepositoryService(), StringIO(), StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "repository",
+            "sync",
+            "repo",
+            "--revision",
+            "release-1",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        repository_service=service,  # type: ignore[arg-type]
+        stdout=output,
+        stderr=error,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert service.calls[0][0] == "sync"
+    assert "repo" in error.getvalue()
+    assert "release-1" in error.getvalue()
+
+
+def test_repository_path_cannot_escape_workspace(tmp_path: Path) -> None:
+    service, error = FakeRepositoryService(), StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "repository",
+            "inspect",
+            "../outside",
+            "--revision",
+            "main",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        repository_service=service,  # type: ignore[arg-type]
+        stderr=error,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert service.calls == []
     assert "inside the selected workspace" in error.getvalue()

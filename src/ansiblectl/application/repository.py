@@ -14,6 +14,9 @@ from ansiblectl.domain.repository import (
 class RepositoryService:
     port: RepositoryPort
 
+    def inspect(self, request: RepositoryRequest) -> RepositoryResult:
+        return self.port.inspect(request)
+
     def inspect_for_sync(self, request: RepositoryRequest) -> RepositoryResult:
         return require_clean_worktree(self.port.inspect(request))
 

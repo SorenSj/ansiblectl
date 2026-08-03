@@ -50,6 +50,23 @@ uv run ansiblectl --workspace ~/automation/example \
 The default source is `inventory/hosts.yml` inside the workspace. Select a
 different YAML file inside the same boundary with `inventory show --source`.
 
+## Repository operations
+
+Inspect a repository inside the selected workspace at an explicit revision:
+
+```console
+uv run ansiblectl --workspace ~/automation/example \
+  repository inspect repository --revision main
+```
+
+Synchronisation reports its target before fetching and checking out the
+revision. It refuses to modify a dirty worktree:
+
+```console
+uv run ansiblectl --workspace ~/automation/example \
+  repository sync repository --revision release-1
+```
+
 ## Project governance
 
 The repository is the authoritative source for Ansiblectl's normative
