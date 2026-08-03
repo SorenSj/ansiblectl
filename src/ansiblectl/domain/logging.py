@@ -29,7 +29,13 @@ class LogEvent:
 
 
 class LogSink(Protocol):
-    def emit(self, event: LogEvent) -> None: ...
+    def emit(self, record: Mapping[str, object]) -> None: ...
+
+
+def emit(sink: LogSink, event: LogEvent) -> None:
+    """Deliver a redacted record, never raw event fields, to a configured sink."""
+
+    sink.emit(event.redacted())
 
 
 def _redact(value: object) -> object:
