@@ -152,6 +152,9 @@ used that exact resolved inventory representation.
 Likewise, copy the digest from `playbook validate` or `run --preflight` into
 `execution list --playbook-digest sha256:...` to match the exact validated
 playbook bytes.
+The immutable commit reported by `repository inspect` or `run --preflight` can
+be matched with `execution list --resolved-revision <object-id>`; branch and tag
+labels are intentionally not used for this filter.
 
 Ansiblectl isolates Ansible's controller-side temporary files below the
 workspace's owner-only `.ansiblectl/tmp` directory instead of relying on

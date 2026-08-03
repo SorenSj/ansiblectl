@@ -88,6 +88,20 @@ def test_history_service_filters_exact_operation_and_rejects_empty_filter() -> N
     assert playbook_service.list(playbook_digest="sha256:" + "d" * 64) == ()
     with pytest.raises(ExecutionError, match="Playbook digest.*lowercase sha256"):
         service.list(playbook_digest="SHA256:" + "C" * 64)
+    revision = "1" * 40
+    revision_record = ExecutionRecord(
+        "timestamp",
+        "run-4",
+        ExecutionStatus.COMPLETED,
+        0,
+        0.1,
+        resolved_revision=revision,
+    )
+    revision_service = ExecutionHistoryService(FakeHistoryPort(revision_record))
+    assert revision_service.list(resolved_revision=revision) == (revision_record,)
+    assert revision_service.list(resolved_revision="2" * 40) == ()
+    with pytest.raises(ExecutionError, match="lowercase Git object"):
+        service.list(resolved_revision="main")
     assert service.list(limit=1) == (record,)
     with pytest.raises(ExecutionError, match="greater than zero"):
         service.list(limit=0)

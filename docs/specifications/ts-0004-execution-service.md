@@ -108,6 +108,8 @@ and matches it exactly against safe execution metadata before the result limit
 is applied.
 `--playbook-digest` applies the same validation and exact matching to the
 validated playbook-byte digest.
+`--resolved-revision` accepts a canonical lowercase Git SHA-1 or SHA-256 object
+identifier and matches immutable execution attribution exactly.
 
 Local Ansible processes receive a controlled `ANSIBLE_LOCAL_TEMP` below the
 validated workspace's private `.ansiblectl/tmp` directory. The directory uses
@@ -146,6 +148,7 @@ configuration therefore cannot produce execution side effects.
 - Execution-history results can be bounded by a positive newest-first limit after filtering.
 - Execution history can be filtered by one validated exact canonical inventory digest.
 - Execution history can be filtered by one validated exact playbook-byte digest.
+- Execution history can be filtered by one validated immutable resolved revision.
 - Ansible local temporary files remain inside the private workspace boundary.
 - Invalid effective configuration stops a run before other inputs or adapters are touched.
 

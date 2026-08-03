@@ -48,6 +48,10 @@ After checkout, the application inspects the repository again and requires the
 resolved requested commit to equal `HEAD`. CLI results include both immutable
 commit identifiers; a mismatch is an actionable failed sync.
 
+The immutable commit identity can be supplied to
+`execution list --resolved-revision` as an exact, read-only history filter;
+requested branch and tag labels are not substituted for this attribution.
+
 ## Verification
 
 - A fake repository port validates application orchestration.
@@ -55,6 +59,7 @@ commit identifiers; a mismatch is an actionable failed sync.
 - Credentials are absent from rendered command diagnostics.
 - Revision mismatch prevents execution and recommends repository synchronisation.
 - Synchronisation verifies and reports the immutable post-checkout commit.
+- A resolved immutable revision selects matching execution-history records exactly.
 
 ## Non-goals
 

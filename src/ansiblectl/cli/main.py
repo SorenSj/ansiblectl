@@ -340,6 +340,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Show only records with this exact validated playbook digest.",
     )
     execution_list.add_argument(
+        "--resolved-revision",
+        help="Show only records attributed to this immutable Git object identifier.",
+    )
+    execution_list.add_argument(
         "--limit", type=int, help="Return at most this many newest matching records."
     )
     execution_show = execution_commands.add_parser("show", help="Show one completed execution.")
@@ -787,6 +791,7 @@ def main(
                     arguments.mode,
                     arguments.inventory_digest,
                     arguments.playbook_digest,
+                    arguments.resolved_revision,
                     arguments.limit,
                 )
         except WorkspaceError as error:

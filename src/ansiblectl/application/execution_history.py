@@ -23,6 +23,7 @@ class ExecutionHistoryService:
         mode: ExecutionMode | None = None,
         inventory_digest: str | None = None,
         playbook_digest: str | None = None,
+        resolved_revision: str | None = None,
         limit: int | None = None,
     ) -> tuple[ExecutionRecord, ...]:
         records = self.port.list()
@@ -45,6 +46,14 @@ class ExecutionHistoryService:
                 raise ExecutionError("Playbook digest filter must be a lowercase sha256: value.")
             records = tuple(
                 record for record in records if record.playbook_digest == playbook_digest
+            )
+        if resolved_revision is not None:
+            if not _is_canonical_git_object_id(resolved_revision):
+                raise ExecutionError(
+                    "Resolved revision filter must be a lowercase Git object identifier."
+                )
+            records = tuple(
+                record for record in records if record.resolved_revision == resolved_revision
             )
         if limit is not None:
             if limit <= 0:
@@ -73,3 +82,7 @@ def _is_canonical_sha256(value: str) -> bool:
         and len(digest) == 64
         and all(character in "0123456789abcdef" for character in digest)
     )
+
+
+def _is_canonical_git_object_id(value: str) -> bool:
+    return len(value) in {40, 64} and all(character in "0123456789abcdef" for character in value)
