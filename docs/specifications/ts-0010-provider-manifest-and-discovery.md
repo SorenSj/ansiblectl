@@ -27,6 +27,11 @@ This specification defines the initial public and internal contract for this cap
 
 The runtime accepts manifests from configured locations and returns validated ProviderDescriptor records before plugin initialisation.
 
+The initial manifest requires `identity`, `version`, `sdk_compatibility`,
+`capabilities`, `configuration_schema`, and `permissions`. SDK compatibility is
+currently exact (`0.1`). All manifests are parsed before descriptors are
+registered, so a malformed or duplicate descriptor leaves no partial registry.
+
 ## Verification
 
 - Malformed manifests fail before code import.
@@ -36,4 +41,3 @@ The runtime accepts manifests from configured locations and returns validated Pr
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
