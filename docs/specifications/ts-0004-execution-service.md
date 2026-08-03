@@ -90,6 +90,11 @@ retained in results, events, and history, and older records default to `run`.
 `execution list --operation <identifier>` applies an exact read-only filter
 after records are safely parsed; it does not alter retention ordering or data.
 
+Local Ansible processes receive a controlled `ANSIBLE_LOCAL_TEMP` below the
+validated workspace's private `.ansiblectl/tmp` directory. The directory uses
+owner-only permissions, external environment overrides are ignored, and
+symlink escape is rejected before process invocation.
+
 ## Verification
 
 - A fake execution port can verify a request without invoking a process.
@@ -110,6 +115,7 @@ after records are safely parsed; it does not alter retention ordering or data.
 - Diff mode reaches Ansible as a separate argument without embedding diff content in metadata.
 - Execution history distinguishes playbook runs from syntax-check operations.
 - Execution history can be filtered by one exact non-empty operation identifier.
+- Ansible local temporary files remain inside the private workspace boundary.
 
 ## Non-goals
 

@@ -18,6 +18,7 @@ from ansiblectl.application.standard_policies import (
 )
 from ansiblectl.application.status import DefaultStatusService, StatusService
 from ansiblectl.application.workspace import WorkspaceService
+from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.events import EventBus
 from ansiblectl.domain.inventory import InventoryError
 from ansiblectl.infrastructure.execution_history import JsonLinesExecutionHistory
@@ -85,11 +86,27 @@ def build_execution_history_service(workspace_root: Path) -> ExecutionHistorySer
     return ExecutionHistoryService(JsonLinesExecutionHistory(workspace_root))
 
 
-def execution_environment() -> dict[str, str]:
+def execution_environment(workspace_root: Path) -> dict[str, str]:
     """Return the explicit environment allowlist for local execution."""
 
     allowed = {"ANSIBLE_CONFIG", "HOME", "LANG", "LC_ALL", "PATH", "SSH_AUTH_SOCK", "USER"}
-    return {name: value for name, value in os.environ.items() if name in allowed}
+    environment = {name: value for name, value in os.environ.items() if name in allowed}
+    root = workspace_root.resolve()
+    private_root = root / ".ansiblectl"
+    try:
+        private_root.mkdir(mode=0o700, exist_ok=True)
+        if not private_root.resolve().is_relative_to(root):
+            raise ExecutionError("Ansiblectl runtime paths must remain inside the workspace.")
+        local_temp = private_root / "tmp"
+        local_temp.mkdir(mode=0o700, exist_ok=True)
+        if not local_temp.resolve().is_relative_to(root):
+            raise ExecutionError("Ansible local temp must remain inside the workspace.")
+        private_root.chmod(0o700)
+        local_temp.chmod(0o700)
+    except OSError as error:
+        raise ExecutionError("Ansible local temp could not be prepared safely.") from error
+    environment["ANSIBLE_LOCAL_TEMP"] = str(local_temp.resolve())
+    return environment
 
 
 def build_inventory_service(

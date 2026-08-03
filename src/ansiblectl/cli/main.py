@@ -428,7 +428,7 @@ def main(
                 arguments.path,
                 arguments.revision,
                 syntax_check=arguments.syntax_check,
-                environment=execution_environment(),
+                environment=execution_environment(workspace.root),
                 timeout_seconds=arguments.timeout,
             )
         except WorkspaceError as error:
@@ -485,7 +485,7 @@ def main(
                 workspace.root,
                 arguments.playbook,
                 arguments.revision,
-                execution_environment(),
+                execution_environment(workspace.root),
                 arguments.timeout,
                 arguments.policy_mode,
             )

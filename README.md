@@ -110,6 +110,10 @@ uv run ansiblectl --workspace ~/automation/example \
   execution list --operation playbook.syntax_check
 ```
 
+Ansiblectl isolates Ansible's controller-side temporary files below the
+workspace's owner-only `.ansiblectl/tmp` directory instead of relying on
+`~/.ansible/tmp`.
+
 Validate workspace inputs, generate a private canonical inventory, and invoke
 Ansible with an explicit timeout and argument vector:
 
