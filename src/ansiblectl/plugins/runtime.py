@@ -3,16 +3,13 @@
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from ansiblectl.domain.permissions import PermissionDeniedError, resolve_permissions
 from ansiblectl.domain.plugins import ProviderDescriptor
-
-
-@dataclass(frozen=True)
-class PluginContext:
-    granted_capabilities: frozenset[str]
+from ansiblectl.sdk.context import SDKContext
 
 
 class Plugin(Protocol):
-    def initialize(self, context: PluginContext) -> tuple[str, ...]: ...
+    def initialize(self, context: SDKContext) -> tuple[str, ...]: ...
 
     def shutdown(self) -> None: ...
 
@@ -24,10 +21,21 @@ class PluginRuntime:
     _initialized: list[Plugin] = field(default_factory=list)
 
     def load(
-        self, descriptor: ProviderDescriptor, plugin: Plugin, granted_capabilities: frozenset[str]
+        self, descriptor: ProviderDescriptor, plugin: Plugin, policy_grants: frozenset[str]
     ) -> bool:
         try:
-            capabilities = plugin.initialize(PluginContext(granted_capabilities))
+            decision = resolve_permissions(descriptor.permissions, policy_grants)
+        except PermissionDeniedError as error:
+            self.diagnostics.append(
+                f"Optional plugin '{descriptor.identity}' failed: {error.__class__.__name__}."
+            )
+            return False
+        for permission in sorted(decision.denied):
+            self.diagnostics.append(
+                f"Plugin '{descriptor.identity}' denied permission '{permission}' by policy."
+            )
+        try:
+            capabilities = plugin.initialize(SDKContext(decision.granted))
         except Exception as error:
             self.diagnostics.append(
                 f"Optional plugin '{descriptor.identity}' failed: {error.__class__.__name__}."
