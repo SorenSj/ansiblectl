@@ -275,10 +275,25 @@ def test_inventory_show_renders_injected_resolved_inventory() -> None:
     assert result == EXIT_SUCCESS
     assert json.loads(output.getvalue()) == {
         "diagnostics": [],
+        "digest": "sha256:e0d4471a9995a11e29a087dae9a3cd24941a874c36de085b6b83e9781e31f353",
         "groups": {"web": ["web-1"]},
         "hosts": {"web-1": {"address": "192.0.2.10", "variables": {"role": "web"}}},
         "provenance": {"web-1": "fixture"},
+        "schema_version": 1,
     }
+
+
+def test_inventory_show_human_output_includes_canonical_digest() -> None:
+    output = StringIO()
+
+    result = main(
+        ["inventory", "show"],
+        inventory_service=FakeInventoryService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert "Digest: sha256:" in output.getvalue()
 
 
 def test_inventory_show_uses_workspace_yaml_provider(tmp_path: Path) -> None:

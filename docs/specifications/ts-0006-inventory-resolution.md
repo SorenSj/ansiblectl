@@ -30,13 +30,17 @@ The inventory service returns a typed ResolvedInventory with hosts, groups, vari
 The initial merge policy is low-to-high provider precedence: a later host with
 the same name replaces the earlier definition and records a diagnostic naming
 both sources. Groups may reference only resolved hosts. The generated adapter
-representation has sorted `hosts` with address and variables, plus sorted
-`groups` with host-name lists; providers themselves are never passed to an
-execution adapter.
+input has sorted `hosts` with address and variables, plus sorted `groups` with
+host-name lists; providers themselves are never passed to an execution adapter.
+The materializer transforms that mapping into native Ansible YAML under
+`all.hosts` and `all.children` without changing the canonical digest input.
 
 The exact canonical mapping passed to the materializer is serialized as sorted,
 compact UTF-8 JSON and identified by a `sha256:`-prefixed digest. The digest,
 not raw inventory data, is retained in execution metadata and public events.
+`inventory show` reports the same digest in human output and in its
+`schema_version: 1` JSON contract, allowing preflight output to be matched to
+execution history.
 
 ## Verification
 
@@ -44,6 +48,8 @@ not raw inventory data, is retained in execution metadata and public events.
 - An invalid host definition fails before execution.
 - A fake provider can be used in application tests.
 - Equivalent canonical mappings produce the same digest; content changes produce a different digest.
+- Inventory inspection and execution metadata use the same canonical digest algorithm.
+- Materialized inventory is valid native Ansible YAML and remains private and ephemeral.
 
 ## Non-goals
 

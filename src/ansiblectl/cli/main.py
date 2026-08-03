@@ -49,7 +49,11 @@ from ansiblectl.domain.execution import (
     ExecutionStatus,
     ExecutionTargeting,
 )
-from ansiblectl.domain.inventory import InventoryError, ResolvedInventory
+from ansiblectl.domain.inventory import (
+    InventoryError,
+    ResolvedInventory,
+    canonical_inventory_digest,
+)
 from ansiblectl.domain.outcomes import CommandOutcome, OutcomeKind
 from ansiblectl.domain.permissions import CAPABILITY_PERMISSIONS, PermissionDeniedError
 from ansiblectl.domain.playbook import PlaybookError
@@ -812,13 +816,17 @@ def _render_inventory(
 ) -> None:
     """Render the stable inventory result only at the CLI boundary."""
 
+    canonical = inventory.canonical()
+    digest = canonical_inventory_digest(canonical)
     if output_format == "json":
         print(
             json.dumps(
                 {
-                    **inventory.canonical(),
+                    **canonical,
                     "diagnostics": list(inventory.diagnostics),
+                    "digest": digest,
                     "provenance": dict(sorted(inventory.provenance.items())),
+                    "schema_version": 1,
                 },
                 sort_keys=True,
             ),
@@ -827,6 +835,7 @@ def _render_inventory(
         return
     print(f"Hosts: {len(inventory.hosts)}", file=output)
     print(f"Groups: {len(inventory.groups)}", file=output)
+    print(f"Digest: {digest}", file=output)
     for diagnostic in inventory.diagnostics:
         print(f"Diagnostic: {diagnostic}", file=output)
 

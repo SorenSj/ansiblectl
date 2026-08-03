@@ -66,6 +66,7 @@ uv run ansiblectl --workspace ~/automation/example \
 
 The default source is `inventory/hosts.yml` inside the workspace. Select a
 different YAML file inside the same boundary with `inventory show --source`.
+The reported canonical digest can be matched against execution history.
 
 ## Repository operations
 
