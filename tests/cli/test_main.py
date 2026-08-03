@@ -925,6 +925,7 @@ class FakeExecutionHistoryService:
         playbook_path="playbooks/site.yml",
         verbosity=3,
         diff=True,
+        operation="playbook.syntax_check",
     )
 
     def list(self) -> tuple[ExecutionRecord, ...]:
@@ -966,6 +967,7 @@ def test_execution_list_renders_safe_machine_history(tmp_path: Path) -> None:
     assert payload["executions"][0]["playbook_path"] == "playbooks/site.yml"
     assert payload["executions"][0]["verbosity"] == 3
     assert payload["executions"][0]["diff"] is True
+    assert payload["executions"][0]["operation"] == "playbook.syntax_check"
 
 
 def test_execution_show_renders_one_human_record(tmp_path: Path) -> None:

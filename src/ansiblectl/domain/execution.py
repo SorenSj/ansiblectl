@@ -62,6 +62,7 @@ class ExecutionRequest:
     playbook_digest: str | None = None
     verbosity: int = 0
     diff: bool = False
+    operation: str = "run"
 
     def __post_init__(self) -> None:
         if not self.argv or any(not argument for argument in self.argv):
@@ -72,6 +73,8 @@ class ExecutionRequest:
             raise ExecutionError("Execution timeout must be greater than zero.")
         if self.verbosity < 0:
             raise ExecutionError("Execution verbosity must be zero or greater.")
+        if not self.operation.strip():
+            raise ExecutionError("Execution operation must be non-empty.")
 
     @property
     def playbook_path(self) -> str | None:
@@ -99,6 +102,7 @@ class ExecutionRequest:
         playbook_digest: str | None = None,
         verbosity: int = 0,
         diff: bool = False,
+        operation: str = "run",
     ) -> ExecutionRequest:
         """Create a request that retains the validated canonical playbook and revision."""
 
@@ -115,6 +119,7 @@ class ExecutionRequest:
             playbook_digest=playbook_digest,
             verbosity=verbosity,
             diff=diff,
+            operation=operation,
         )
 
 
@@ -138,6 +143,7 @@ class ExecutionResult:
     playbook_path: str | None = None
     verbosity: int = 0
     diff: bool = False
+    operation: str = "run"
 
 
 @dataclass(frozen=True)
@@ -161,6 +167,7 @@ class ExecutionRecord:
     playbook_path: str | None = None
     verbosity: int = 0
     diff: bool = False
+    operation: str = "run"
 
 
 @dataclass(frozen=True)

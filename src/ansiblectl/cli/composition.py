@@ -54,11 +54,14 @@ def build_plugin_discovery_service() -> PluginDiscoveryService:
     return PluginDiscoveryService(file_loader=discover_manifests)
 
 
-def build_playbook_validation_service() -> PlaybookValidationService:
+def build_playbook_validation_service(workspace_root: Path) -> PlaybookValidationService:
     """Create selection validation with explicit tool provenance."""
 
+    event_log = JsonLinesLogSink(workspace_root)
+    events = EventBus([EventLogSubscriber(event_log)])
     return PlaybookValidationService(
-        validator_version=__version__, syntax_port=LocalExecutionAdapter()
+        validator_version=__version__,
+        syntax_port=ExecutionService(LocalExecutionAdapter(), events),
     )
 
 

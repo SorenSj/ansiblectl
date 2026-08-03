@@ -411,10 +411,12 @@ def main(
         _render_plugins(descriptors, options.output_format, stdout)
     elif arguments.command == "playbook":
         workspace_service_instance = workspace_service or build_workspace_service()
-        playbook_service_instance = playbook_service or build_playbook_validation_service()
         try:
             workspace = workspace_service_instance.resolve(
                 options.workspace, current_directory or Path.cwd()
+            )
+            playbook_service_instance = playbook_service or build_playbook_validation_service(
+                workspace.root
             )
             validation = playbook_service_instance.validate(
                 workspace.root,
@@ -749,6 +751,7 @@ def _render_run_result(
             "playbook_path": execution.playbook_path,
             "verbosity": execution.verbosity,
             "diff": execution.diff,
+            "operation": execution.operation,
         }
     )
     if output_format == "json":
@@ -785,6 +788,7 @@ def _render_run_result(
             print(f"Verbosity: {execution.verbosity}", file=output)
         if execution.diff:
             print("Diff: enabled", file=output)
+        print(f"Operation: {execution.operation}", file=output)
         if execution.stdout_reference:
             print(f"Stdout: {execution.stdout_reference}", file=output)
         if execution.stderr_reference:
@@ -825,6 +829,7 @@ def _render_execution_records(
             print(f"Verbosity: {record.verbosity}", file=output)
         if record.diff:
             print("Diff: enabled", file=output)
+        print(f"Operation: {record.operation}", file=output)
         if record.stdout_reference:
             print(f"Stdout: {record.stdout_reference}", file=output)
         if record.stderr_reference:
@@ -853,6 +858,7 @@ def _execution_record(record: ExecutionRecord) -> dict[str, object]:
         "playbook_path": record.playbook_path,
         "verbosity": record.verbosity,
         "diff": record.diff,
+        "operation": record.operation,
     }
 
 

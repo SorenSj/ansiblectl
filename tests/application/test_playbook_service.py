@@ -63,6 +63,7 @@ def test_explicit_syntax_check_uses_safe_ansible_argument_vector(tmp_path: Path)
     assert port.request.argv == ("ansible-playbook", "--syntax-check", str(playbook))
     assert port.request.environment == {"PATH": "/bin"}
     assert port.request.timeout_seconds == 10
+    assert port.request.operation == "playbook.syntax_check"
     assert result.syntax_check is not None
     assert result.syntax_check.status is ExecutionStatus.COMPLETED
     assert result.syntax_check.validator == "ansible-playbook --syntax-check"

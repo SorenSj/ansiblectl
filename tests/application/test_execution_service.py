@@ -105,6 +105,7 @@ def test_execution_event_is_published_after_a_completed_port_call(tmp_path: Path
                 "playbook_path": "playbooks/site.yml",
                 "verbosity": 3,
                 "diff": True,
+                "operation": "run",
             },
         )
     ]

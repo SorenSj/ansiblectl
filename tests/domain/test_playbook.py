@@ -70,6 +70,11 @@ def test_execution_request_rejects_negative_verbosity(tmp_path: Path) -> None:
         ExecutionRequest(("ansible-playbook", "site.yml"), tmp_path, {}, verbosity=-1)
 
 
+def test_execution_request_rejects_empty_operation(tmp_path: Path) -> None:
+    with pytest.raises(ExecutionError, match="operation"):
+        ExecutionRequest(("ansible-playbook", "site.yml"), tmp_path, {}, operation=" ")
+
+
 def test_playbook_digest_identifies_exact_validated_bytes(tmp_path: Path) -> None:
     path = tmp_path / "site.yml"
     path.write_bytes(b"---\n- hosts: web\n")

@@ -52,6 +52,8 @@ Execution events include the non-negative Ansible verbosity count. Consumers
 reading older events default an absent count to zero.
 They also identify whether diff mode was enabled, but never include captured
 diff content.
+Execution events include the operation identifier so consumers can distinguish
+normal `run` activity from `playbook.syntax_check` validation.
 
 ## Verification
 

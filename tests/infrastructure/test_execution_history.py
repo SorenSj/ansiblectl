@@ -52,6 +52,7 @@ def test_history_lists_only_executions_newest_first(tmp_path: Path) -> None:
                     "playbook_path": "playbooks/site.yml",
                     "verbosity": 3,
                     "diff": True,
+                    "operation": "playbook.syntax_check",
                     "targeting": {
                         "limit": "web",
                         "tags": ["deploy"],
@@ -77,6 +78,7 @@ def test_history_lists_only_executions_newest_first(tmp_path: Path) -> None:
     assert records[0].playbook_path == "playbooks/site.yml"
     assert records[0].verbosity == 3
     assert records[0].diff is True
+    assert records[0].operation == "playbook.syntax_check"
     assert records[1].mode.value == "check"
     assert records[1].resolved_revision is None
     assert records[1].inventory_digest is None
@@ -84,6 +86,7 @@ def test_history_lists_only_executions_newest_first(tmp_path: Path) -> None:
     assert records[1].playbook_path is None
     assert records[1].verbosity == 0
     assert records[1].diff is False
+    assert records[1].operation == "run"
     assert records[1].elapsed_seconds == 0.0
     assert JsonLinesExecutionHistory(tmp_path).get("run-1") == records[1]
 

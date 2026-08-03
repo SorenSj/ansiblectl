@@ -84,6 +84,10 @@ retained as boolean metadata in requests, results, events, and history. Diff
 content follows the private captured-output policy and is never embedded in
 metadata. Older records default the field to `false`.
 
+Every execution carries a non-empty operation identifier. Normal runs use
+`run`; explicit syntax checks use `playbook.syntax_check`. The operation is
+retained in results, events, and history, and older records default to `run`.
+
 ## Verification
 
 - A fake execution port can verify a request without invoking a process.
@@ -102,6 +106,7 @@ metadata. Older records default the field to `false`.
 - Execution history identifies the selected playbook without exposing the absolute workspace path.
 - Global verbosity reaches Ansible as a separate argument and remains inspectable in execution history.
 - Diff mode reaches Ansible as a separate argument without embedding diff content in metadata.
+- Execution history distinguishes playbook runs from syntax-check operations.
 
 ## Non-goals
 

@@ -63,6 +63,7 @@ class PlaybookValidationService:
                     environment or {},
                     selected,
                     timeout_seconds,
+                    operation="playbook.syntax_check",
                 )
             )
             syntax_evidence = SyntaxCheckEvidence(

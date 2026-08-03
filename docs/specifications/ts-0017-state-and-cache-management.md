@@ -37,6 +37,9 @@ log. `execution prune --keep N` previews removal by default; `--apply` rewrites
 the log atomically while holding the same advisory lock used by event writers.
 Only output directories derived from removed execution identifiers are cleaned,
 and unknown files are never recursively deleted.
+Syntax-check executions are published to the same history with operation
+`playbook.syntax_check`, so their private output directories participate in the
+same retention lifecycle.
 
 ## Verification
 

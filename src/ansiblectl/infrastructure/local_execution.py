@@ -41,6 +41,7 @@ class LocalExecutionAdapter:
                 playbook_path=request.playbook_path,
                 verbosity=request.verbosity,
                 diff=request.diff,
+                operation=request.operation,
             )
         try:
             completed = subprocess.run(
@@ -74,6 +75,7 @@ class LocalExecutionAdapter:
                 request.playbook_path,
                 request.verbosity,
                 request.diff,
+                request.operation,
             )
         except OSError as error:
             return ExecutionResult(
@@ -91,6 +93,7 @@ class LocalExecutionAdapter:
                 playbook_path=request.playbook_path,
                 verbosity=request.verbosity,
                 diff=request.diff,
+                operation=request.operation,
             )
         status = ExecutionStatus.COMPLETED if completed.returncode == 0 else ExecutionStatus.FAILED
         stdout_reference, stderr_reference, diagnostic = _persist_outputs(
@@ -113,6 +116,7 @@ class LocalExecutionAdapter:
             request.playbook_path,
             request.verbosity,
             request.diff,
+            request.operation,
         )
 
 
