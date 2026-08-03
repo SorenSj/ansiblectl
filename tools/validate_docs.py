@@ -29,8 +29,53 @@ def find_violations(repository_root: Path) -> list[Finding]:
     docs_root = repository_root / "docs"
     findings = _validate_metadata(docs_root, repository_root)
     findings.extend(_validate_links(docs_root, repository_root))
+    findings.extend(_validate_schemas(docs_root / "schemas", repository_root))
     findings.extend(_validate_index(docs_root / "adr", "README.md", repository_root))
     findings.extend(_validate_index(docs_root / "specifications", "README.md", repository_root))
+    findings.extend(_validate_readme_contract(repository_root))
+    return findings
+
+
+def _validate_readme_contract(repository_root: Path) -> list[Finding]:
+    """Reject user-facing examples that advertise superseded Phase 1 behaviour."""
+
+    readme = repository_root / "README.md"
+    if not readme.is_file():
+        return []
+    text = readme.read_text(encoding="utf-8")
+    stale_contracts = {
+        "--output-format json": "Use the Phase 1 '--output json' spelling in examples.",
+        "cancellation returns `3`": "Document cancellation with exit code 130.",
+        "return `70`": "Document unexpected internal failures with exit code 1.",
+    }
+    return [
+        Finding("README.md", "phase1-cli-contract", message)
+        for stale_text, message in stale_contracts.items()
+        if stale_text in text
+    ]
+
+
+def _validate_schemas(schema_root: Path, repository_root: Path) -> list[Finding]:
+    findings: list[Finding] = []
+    if not schema_root.is_dir():
+        return findings
+    for path in sorted(schema_root.glob("*.schema.json")):
+        relative_path = str(path.relative_to(repository_root))
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            findings.append(
+                Finding(relative_path, "json-schema", "Provide a valid JSON schema document.")
+            )
+            continue
+        if not isinstance(document, dict) or document.get("$schema") != (
+            "https://json-schema.org/draft/2020-12/schema"
+        ):
+            findings.append(
+                Finding(relative_path, "json-schema", "Declare JSON Schema draft 2020-12.")
+            )
+        if not isinstance(document, dict) or not isinstance(document.get("title"), str):
+            findings.append(Finding(relative_path, "json-schema", "Declare a schema title."))
     return findings
 
 

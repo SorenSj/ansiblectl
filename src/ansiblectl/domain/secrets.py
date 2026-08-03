@@ -5,15 +5,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from ansiblectl.domain.errors import DomainError
+from ansiblectl.domain.errors import ErrorCode, SecretsError
 
 
-class SecretError(DomainError):
+class SecretError(SecretsError):
     """Base class for provider-aware secret retrieval failures."""
 
 
 class SecretNotFoundError(SecretError):
     """Raised when a provider cannot resolve a requested key."""
+
+    error_code = ErrorCode.SECRET_NOT_FOUND
 
 
 @dataclass(frozen=True)

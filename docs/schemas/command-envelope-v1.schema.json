@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ansiblectl.dev/schemas/command-envelope-v1.schema.json",
+  "title": "Ansiblectl command envelope v1",
+  "oneOf": [
+    {"$ref": "#/$defs/successEnvelope"},
+    {"$ref": "#/$defs/errorEnvelope"}
+  ],
+  "$defs": {
+    "baseEnvelope": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "status",
+        "operation_id",
+        "command",
+        "changed",
+        "warnings",
+        "metadata"
+      ],
+      "properties": {
+        "schema_version": {"const": "1"},
+        "status": {"enum": ["success", "error"]},
+        "operation_id": {
+          "type": "string",
+          "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+        },
+        "command": {"type": "string", "minLength": 1},
+        "changed": {"type": "boolean"},
+        "warnings": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/warning"}
+        },
+        "metadata": {"type": "object"}
+      }
+    },
+    "successEnvelope": {
+      "allOf": [
+        {"$ref": "#/$defs/baseEnvelope"},
+        {
+          "type": "object",
+          "required": ["message", "data"],
+          "properties": {
+            "status": {"const": "success"},
+            "message": {"type": ["string", "null"]},
+            "data": true
+          },
+          "not": {"required": ["error"]},
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "errorEnvelope": {
+      "allOf": [
+        {"$ref": "#/$defs/baseEnvelope"},
+        {
+          "type": "object",
+          "required": ["error"],
+          "properties": {
+            "status": {"const": "error"},
+            "changed": {"const": false},
+            "error": {"$ref": "#/$defs/error"}
+          },
+          "not": {"anyOf": [{"required": ["data"]}, {"required": ["message"]}]},
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "warning": {
+      "type": "object",
+      "required": ["code", "message", "context"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+        "message": {"type": "string"},
+        "context": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "category", "message", "detail", "hint", "context"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+        "category": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "message": {"type": "string"},
+        "detail": {"type": ["string", "null"]},
+        "hint": {"type": ["string", "null"]},
+        "context": {"type": "object"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

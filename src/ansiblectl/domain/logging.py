@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Protocol
 
-_SENSITIVE = {"secret", "token", "password", "credential", "key"}
+from ansiblectl.domain.redaction import redact
 
 
 @dataclass(frozen=True)
@@ -25,7 +25,7 @@ class LogEvent:
             "level": self.level,
             "event": self.name,
             "correlation_id": self.correlation_id,
-            "fields": _redact(self.fields),
+            "fields": redact(self.fields),
         }
 
 
@@ -37,14 +37,3 @@ def emit(sink: LogSink, event: LogEvent) -> None:
     """Deliver a redacted record, never raw event fields, to a configured sink."""
 
     sink.emit(event.redacted())
-
-
-def _redact(value: object) -> object:
-    if isinstance(value, dict):
-        return {
-            key: "<redacted>" if key.lower() in _SENSITIVE else _redact(item)
-            for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [_redact(item) for item in value]
-    return value

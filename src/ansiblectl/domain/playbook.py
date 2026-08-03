@@ -4,11 +4,13 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
-from ansiblectl.domain.errors import DomainError
+from ansiblectl.domain.errors import ErrorCode, ValidationError
 
 
-class PlaybookError(DomainError):
+class PlaybookError(ValidationError):
     """Raised when a requested playbook cannot be safely selected."""
+
+    error_code = ErrorCode.PLAYBOOK_VALIDATION_FAILED
 
 
 @dataclass(frozen=True)

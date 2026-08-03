@@ -21,7 +21,12 @@ from ansiblectl.cli.main import (
     main,
 )
 from ansiblectl.domain.configuration import EffectiveConfiguration
-from ansiblectl.domain.errors import ExecutionError, WorkspaceNotFoundError
+from ansiblectl.domain.errors import (
+    ExecutionError,
+    ExternalToolError,
+    PermissionDeniedError,
+    WorkspaceNotFoundError,
+)
 from ansiblectl.domain.execution import (
     ExecutionMode,
     ExecutionRecord,
@@ -62,13 +67,28 @@ def test_help_lists_global_options_and_status_command(capsys: pytest.CaptureFixt
     captured = capsys.readouterr()
     assert raised.value.code == EXIT_SUCCESS
     assert "--workspace" in captured.out
+    assert "--output {text,json,yaml}" in captured.out
     assert "--output-format" in captured.out
+    assert "Deprecated compatibility alias" in captured.out
     assert "status" in captured.out
     assert "config" in captured.out
     assert "state" in captured.out
     assert "repository" in captured.out
     assert "playbook" in captured.out
     assert "execution" in captured.out
+
+
+def test_direct_main_accepts_phase_output_spelling_for_compatibility() -> None:
+    output = StringIO()
+
+    result = main(
+        ["--output", "json", "status"],
+        status_service=FakeStatusService(),
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue())["message"] == "Fake service is ready."
 
 
 def test_invalid_argument_uses_documented_invalid_input_exit_code(
@@ -1632,3 +1652,105 @@ def test_execution_prune_applies_only_with_explicit_flag(tmp_path: Path) -> None
     assert result == EXIT_SUCCESS
     assert "Applied: retain 0 execution(s)" in output.getvalue()
     assert "Execution: run-1" in output.getvalue()
+
+
+def test_installed_path_raises_typed_inventory_validator_failure(tmp_path: Path) -> None:
+    output = StringIO()
+
+    with pytest.raises(ExternalToolError, match="Inventory validation"):
+        main(
+            ["--workspace", str(tmp_path), "inventory", "validate"],
+            workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+            inventory_validation_service=FailingInventoryValidationService(),  # type: ignore[arg-type]
+            stdout=output,
+            propagate_errors=True,
+        )
+
+    assert output.getvalue() == ""
+
+
+def test_installed_path_raises_typed_syntax_validator_failure(tmp_path: Path) -> None:
+    output = StringIO()
+
+    with pytest.raises(ExternalToolError, match="syntax validation"):
+        main(
+            [
+                "--workspace",
+                str(tmp_path),
+                "playbook",
+                "validate",
+                "playbooks/site.yml",
+                "--revision",
+                "main",
+                "--syntax-check",
+                "--timeout",
+                "15",
+            ],
+            workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+            playbook_service=FakeSyntaxValidationService(),  # type: ignore[arg-type]
+            stdout=output,
+            propagate_errors=True,
+        )
+
+    assert output.getvalue() == ""
+
+
+@pytest.mark.parametrize(
+    ("service", "preflight", "message"),
+    [
+        (DeniedPreflightRunService(), True, "preflight was denied"),
+        (DeniedRunService(), False, "execution was denied"),
+    ],
+)
+def test_installed_path_raises_typed_policy_denial(
+    tmp_path: Path, service: object, preflight: bool, message: str
+) -> None:
+    output = StringIO()
+    arguments = [
+        "--workspace",
+        str(tmp_path),
+        "run",
+        "--playbook",
+        "playbooks/site.yml",
+        "--revision",
+        "main",
+        "--check",
+    ]
+    if preflight:
+        arguments.append("--preflight")
+
+    with pytest.raises(PermissionDeniedError, match=message):
+        main(
+            arguments,
+            workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+            run_service=service,  # type: ignore[arg-type]
+            stdout=output,
+            propagate_errors=True,
+        )
+
+    assert output.getvalue() == ""
+
+
+def test_installed_path_raises_typed_ansible_execution_failure(tmp_path: Path) -> None:
+    output = StringIO()
+
+    with pytest.raises(ExternalToolError, match="Ansible execution") as raised:
+        main(
+            [
+                "--workspace",
+                str(tmp_path),
+                "run",
+                "--playbook",
+                "playbooks/site.yml",
+                "--revision",
+                "main",
+                "--check",
+            ],
+            workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+            run_service=FailedRunService(),  # type: ignore[arg-type]
+            stdout=output,
+            propagate_errors=True,
+        )
+
+    assert output.getvalue() == ""
+    assert raised.value.context == {"status": "timed_out", "exit_code": None}

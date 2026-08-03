@@ -40,7 +40,7 @@ packages = ["src/ansiblectl"]
 [tool.pytest.ini_options]
 addopts = "--strict-markers --cov=ansiblectl --cov-report=term-missing --cov-fail-under=90"
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = [".", "src"]
 
 [tool.coverage.run]
 branch = true

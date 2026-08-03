@@ -32,7 +32,7 @@ references:
 
 ```console
 uv run ansiblectl --workspace ~/automation/example config show
-uv run ansiblectl --workspace ~/automation/example --output-format json config show
+uv run ansiblectl --workspace ~/automation/example --output json config show
 ```
 
 Inspect cache provenance and invalidation metadata without printing cached
@@ -61,9 +61,13 @@ all:
 ```console
 uv run ansiblectl --workspace ~/automation/example inventory show
 uv run ansiblectl --workspace ~/automation/example \
-  --output-format json inventory show
+  --output json inventory show
 uv run ansiblectl --workspace ~/automation/example inventory validate
 ```
+
+The global machine-output interface is `--output json` or `--output yaml`.
+`ANSIBLECTL_OUTPUT` can select the default. The older `--output-format`
+spelling remains available only for migration compatibility.
 
 The default source is `inventory/hosts.yml` inside the workspace. Select a
 different YAML file inside the same boundary with `inventory show --source`.
@@ -230,20 +234,21 @@ Captured Ansible output is not echoed directly. Non-empty stdout and stderr are
 stored with owner-only permissions below `.ansiblectl/runs`, and the command
 returns their file references for diagnosis.
 
-Completed runs return exit code `0`, failed or timed-out runs return `1`, and a
-classified cancellation returns `3` in both human and JSON output modes.
+Completed runs return exit code `0`, failed or timed-out external tools return
+`5`, and a classified cancellation returns `130` in every output mode.
 Unexpected internal failures are redacted at the installed CLI boundary and
-return `70`; Python exception details are not printed to normal command output.
-Invalid arguments return `2`. In JSON mode they produce one redacted structured
-document instead of argparse usage text, so supplied argument values are not
-echoed into automation logs.
+return `1`; Python exception details are not printed to normal command output.
+Invalid command syntax returns `2`, while parsed arguments that violate an
+application contract return `4`. In JSON and YAML modes failures produce one
+redacted structured document instead of argparse usage text, so supplied
+argument values are not echoed into automation logs.
 The same structured validation contract applies when `--apply` and `--confirm`
 are not supplied together.
-Expected run-preparation failures return `1` as a structured
-`operational_failure` in JSON mode and as an actionable stderr message in human
-mode.
+Policy-denied run preparation or execution returns `6`. Other typed failures
+use the stable exit-code registry documented in
+[TS-0005](docs/specifications/ts-0005-output-errors-and-exit-codes.md).
 Workspace, inventory, repository, plugin, and execution-history failures follow
-the same contract. Repository sync progress is suppressed in JSON mode.
+the same contract. Repository sync progress is suppressed in machine modes.
 
 Completed runs also append a redacted structured record to
 `.ansiblectl/logs/events.jsonl`, correlated by execution identifier.
