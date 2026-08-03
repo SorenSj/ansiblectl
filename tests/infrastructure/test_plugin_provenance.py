@@ -169,14 +169,18 @@ def test_complete_trust_verification_returns_unattended_permission_grants() -> N
         )
     )
 
-    assert verify_plugin_trust(
+    decision = verify_plugin_trust(
         provenance,
         io.BytesIO(_ARTIFACT),
         descriptor,
         {signing_key_id(public_bytes): public_bytes},
         _trusted_origins(public_bytes),
         policy,
-    ) == frozenset({"network"})
+    )
+
+    assert decision.trusted is True
+    assert decision.granted_permissions == ("network",)
+    assert decision.reasons == ()
 
 
 def test_cryptographic_failure_precedes_missing_unattended_policy() -> None:

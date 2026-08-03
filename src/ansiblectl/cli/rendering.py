@@ -14,6 +14,7 @@ import yaml
 from ansiblectl.domain.context import CommandContext
 from ansiblectl.domain.envelopes import ErrorEnvelope, SuccessEnvelope
 from ansiblectl.domain.errors import AnsiblectlError, ExitCode
+from ansiblectl.domain.plugin_trust import PluginTrustDecision
 from ansiblectl.domain.redaction import redact
 from ansiblectl.domain.results import CommandResult, CommandWarning
 
@@ -49,6 +50,41 @@ def render_error(
     else:
         _render_machine(envelope.to_payload(), context.output_format, stdout)
     return error.exit_code
+
+
+def render_plugin_trust_decision(
+    decision: PluginTrustDecision, output_format: str, output: TextIO
+) -> None:
+    """Render one redaction-safe plugin trust audit decision."""
+
+    if output_format in {"json", "yaml"}:
+        payload = decision.to_payload()
+        fingerprint = payload.pop("signing_key_id")
+        payload["publisher_fingerprint"] = fingerprint
+        safe_payload = _public_safe(redact(payload))
+        assert isinstance(safe_payload, dict)
+        safe_payload["signing_key_id"] = safe_payload.pop("publisher_fingerprint")
+        if output_format == "json":
+            print(json.dumps(safe_payload, sort_keys=True), file=output)
+        else:
+            yaml.safe_dump(safe_payload, output, sort_keys=True)
+        return
+    if output_format != "text":
+        raise ValueError(f"Unsupported plugin trust output format: {output_format}")
+    status = "trusted" if decision.trusted else "denied"
+    fields = (
+        ("Plugin trust", status),
+        ("Provider", decision.provider_identity),
+        ("Version", decision.plugin_version),
+        ("Artifact", decision.artifact_digest),
+        ("Signing key", decision.signing_key_id),
+        ("Origin", decision.origin),
+        ("Requested permissions", ", ".join(decision.requested_permissions) or "none"),
+        ("Granted permissions", ", ".join(decision.granted_permissions) or "none"),
+        ("Denied permissions", ", ".join(decision.denied_permissions) or "none"),
+        ("Reasons", ", ".join(reason.value for reason in decision.reasons) or "none"),
+    )
+    print("\n".join(f"{name}: {_terminal_safe(value)}" for name, value in fields), file=output)
 
 
 def _render_machine(payload: Mapping[str, object], output_format: str, output: TextIO) -> None:
@@ -134,4 +170,4 @@ def _terminal_safe(value: str) -> str:
     )
 
 
-__all__ = ["render_error", "render_success"]
+__all__ = ["render_error", "render_plugin_trust_decision", "render_success"]

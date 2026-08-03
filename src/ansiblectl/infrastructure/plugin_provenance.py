@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from ansiblectl.domain.plugin_policy import UnattendedPluginPolicy, evaluate_unattended_policy
 from ansiblectl.domain.plugin_trust import (
     PluginProvenance,
+    PluginTrustDecision,
     PluginTrustError,
     PluginTrustReason,
     canonical_payload,
@@ -77,11 +78,12 @@ def verify_plugin_trust(
     trusted_keys: Mapping[str, bytes],
     trusted_origins: Mapping[tuple[str, str], Set[str]],
     policy: UnattendedPluginPolicy | None,
-) -> frozenset[str]:
+) -> PluginTrustDecision:
     """Complete all unattended trust checks in normative order before import."""
 
     verify_provenance(provenance, artifact, descriptor, trusted_keys, trusted_origins)
-    return evaluate_unattended_policy(provenance, descriptor.permissions, policy)
+    granted = evaluate_unattended_policy(provenance, descriptor.permissions, policy)
+    return PluginTrustDecision.allowed(provenance, tuple(granted))
 
 
 __all__ = ["signing_key_id", "verify_plugin_trust", "verify_provenance"]
