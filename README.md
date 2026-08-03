@@ -81,6 +81,17 @@ uv run ansiblectl --workspace ~/automation/example \
 
 ## Check-mode execution
 
+Validate playbook selection, boundaries, file type, readability, and exact-byte
+digest without executing Ansible:
+
+```console
+uv run ansiblectl --workspace ~/automation/example \
+  playbook validate playbooks/site.yml --revision main
+```
+
+The result includes validator provenance. It is selection validation, not an
+Ansible syntax check.
+
 Validate workspace inputs, generate a private canonical inventory, and invoke
 Ansible with an explicit timeout and argument vector:
 

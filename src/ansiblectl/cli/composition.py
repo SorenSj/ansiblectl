@@ -7,6 +7,7 @@ from ansiblectl import __version__
 from ansiblectl.application.execution import ExecutionService
 from ansiblectl.application.execution_history import ExecutionHistoryService
 from ansiblectl.application.inventory import InventoryService
+from ansiblectl.application.playbook import PlaybookValidationService
 from ansiblectl.application.plugins import PluginDiscoveryService
 from ansiblectl.application.policy import PolicyService
 from ansiblectl.application.repository import RepositoryService
@@ -51,6 +52,12 @@ def build_plugin_discovery_service() -> PluginDiscoveryService:
     """Create safe file-based plugin manifest discovery."""
 
     return PluginDiscoveryService(file_loader=discover_manifests)
+
+
+def build_playbook_validation_service() -> PlaybookValidationService:
+    """Create selection validation with explicit tool provenance."""
+
+    return PlaybookValidationService(validator_version=__version__)
 
 
 def build_run_service(workspace_root: Path, inventory_source: Path | None = None) -> RunService:

@@ -57,6 +57,7 @@ def test_help_lists_global_options_and_status_command(capsys: pytest.CaptureFixt
     assert "--output-format" in captured.out
     assert "status" in captured.out
     assert "repository" in captured.out
+    assert "playbook" in captured.out
     assert "execution" in captured.out
 
 
@@ -376,6 +377,66 @@ def test_plugin_manifest_path_cannot_escape_workspace(tmp_path: Path) -> None:
     assert result == EXIT_EXPECTED_FAILURE
     assert service.locations == []
     assert "inside the selected workspace" in error.getvalue()
+
+
+def test_playbook_validate_reports_safe_selection_evidence(tmp_path: Path) -> None:
+    playbook = tmp_path / "playbooks/site.yml"
+    playbook.parent.mkdir()
+    playbook.write_text("---\n- hosts: all\n", encoding="utf-8")
+    output, error = StringIO(), StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "playbook",
+            "validate",
+            "playbooks/site.yml",
+            "--revision",
+            "main",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        stdout=output,
+        stderr=error,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert error.getvalue() == ""
+    payload = json.loads(output.getvalue())
+    assert payload["playbook_path"] == "playbooks/site.yml"
+    assert payload["revision"] == "main"
+    assert payload["digest"].startswith("sha256:")
+    assert payload["validator"] == "ansiblectl.selection"
+    assert str(tmp_path) not in output.getvalue()
+
+
+def test_playbook_validate_rejects_workspace_escape_as_structured_failure(tmp_path: Path) -> None:
+    output, error = StringIO(), StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "playbook",
+            "validate",
+            "../outside.yml",
+            "--revision",
+            "main",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        stdout=output,
+        stderr=error,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert error.getvalue() == ""
+    payload = json.loads(output.getvalue())
+    assert payload["kind"] == "operational_failure"
+    assert payload["operation"] == "playbook validate"
 
 
 class FakeRunService:

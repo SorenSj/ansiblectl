@@ -45,6 +45,12 @@ playbook's POSIX-style path relative to the validated workspace root. If a
 reference cannot be represented within that root, the safe path is omitted.
 Older records without the relative path remain readable.
 
+The CLI exposes selection validation as `playbook validate <path> --revision
+<revision>`. Its result contains the workspace-relative path, revision, exact
+byte digest, findings, and validator name/version. This command does not invoke
+Ansible or claim syntax validation; explicit syntax/lint validation remains a
+separate opt-in capability.
+
 ## Verification
 
 - A relative path resolves reproducibly within a workspace.
@@ -53,6 +59,7 @@ Older records without the relative path remain readable.
 - Changing any playbook byte changes the recorded digest.
 - A playbook that becomes unreadable after selection is rejected before execution.
 - Execution metadata reports `playbooks/site.yml`, not an absolute workspace path.
+- Selection validation reports tool provenance without executing the playbook.
 
 ## Non-goals
 

@@ -15,6 +15,7 @@ from typing import TextIO
 from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.execution_history import ExecutionHistoryService
 from ansiblectl.application.inventory import InventoryService
+from ansiblectl.application.playbook import PlaybookValidationResult, PlaybookValidationService
 from ansiblectl.application.plugins import PluginDiscoveryService
 from ansiblectl.application.repository import RepositoryService
 from ansiblectl.application.run import RunService
@@ -23,6 +24,7 @@ from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.cli.composition import (
     build_execution_history_service,
     build_inventory_service,
+    build_playbook_validation_service,
     build_plugin_discovery_service,
     build_repository_service,
     build_run_service,
@@ -189,6 +191,15 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Manifest path in the workspace; repeat for multiple plugins.",
     )
+    playbook = subcommands.add_parser("playbook", help="Validate playbook selection.")
+    playbook_commands = playbook.add_subparsers(dest="playbook_command", required=True)
+    playbook_validate = playbook_commands.add_parser(
+        "validate", help="Validate a playbook without executing it."
+    )
+    playbook_validate.add_argument("path", type=Path, help="Playbook path in the workspace.")
+    playbook_validate.add_argument(
+        "--revision", required=True, help="Explicit repository revision."
+    )
     run = subcommands.add_parser("run", help="Run a validated playbook through Ansible.")
     run.add_argument("--playbook", type=Path, required=True, help="Playbook path in the workspace.")
     run.add_argument("--revision", required=True, help="Explicit repository revision.")
@@ -247,6 +258,7 @@ def main(
     inventory_service: InventoryService | None = None,
     repository_service: RepositoryService | None = None,
     plugin_service: PluginDiscoveryService | None = None,
+    playbook_service: PlaybookValidationService | None = None,
     run_service: RunService | None = None,
     execution_history_service: ExecutionHistoryService | None = None,
     stdout: TextIO | None = None,
@@ -389,6 +401,35 @@ def main(
                 stderr,
             )
         _render_plugins(descriptors, options.output_format, stdout)
+    elif arguments.command == "playbook":
+        workspace_service_instance = workspace_service or build_workspace_service()
+        playbook_service_instance = playbook_service or build_playbook_validation_service()
+        try:
+            workspace = workspace_service_instance.resolve(
+                options.workspace, current_directory or Path.cwd()
+            )
+            validation = playbook_service_instance.validate(
+                workspace.root, arguments.path, arguments.revision
+            )
+        except WorkspaceError as error:
+            return _render_cli_failure(
+                "playbook validate",
+                str(error),
+                "Initialize or select a valid workspace and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
+        except PlaybookError as error:
+            return _render_cli_failure(
+                "playbook validate",
+                str(error),
+                "Select a readable YAML playbook inside the workspace and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
+        _render_playbook_validation(validation, options.output_format, stdout)
     elif arguments.command == "run":
         if arguments.apply != arguments.confirm:
             return render_outcome(
@@ -623,6 +664,26 @@ def _render_plugins(
         return
     for plugin in plugins:
         print(f"{plugin['identity']} {plugin['version']} ({plugin['source']})", file=output)
+
+
+def _render_playbook_validation(
+    result: PlaybookValidationResult, output_format: str, output: TextIO | None
+) -> None:
+    payload = {
+        "digest": result.digest,
+        "findings": list(result.findings),
+        "playbook_path": result.playbook_path,
+        "revision": result.revision,
+        "validator": result.validator,
+        "validator_version": result.validator_version,
+    }
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    print(f"Playbook: {result.playbook_path}", file=output)
+    print(f"Revision: {result.revision}", file=output)
+    print(f"Digest: {result.digest}", file=output)
+    print(f"Validator: {result.validator} {result.validator_version}", file=output)
 
 
 def _render_run_result(
