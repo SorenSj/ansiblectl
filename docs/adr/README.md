@@ -42,3 +42,5 @@ New decisions supersede earlier ADRs; accepted ADRs are not silently rewritten.
 | [0035](0035-change-management-and-contribution-workflow.md) | Change Management and Contribution Workflow | Accepted |
 | [0036](0036-transactional-filesystem-operations.md) | Transactional Filesystem Operations | Accepted |
 | [0037](0037-operational-reliability-and-platform-contract.md) | Operational Reliability and Platform Contract | Accepted |
+| [0038](0038-signed-plugin-provenance-and-registry-trust.md) | Signed Plugin Provenance and Registry Trust | Accepted |
+| [0039](0039-unattended-plugin-policy.md) | Unattended Plugin Policy | Accepted |

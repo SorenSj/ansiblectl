@@ -27,3 +27,4 @@ Architecture Handbook and applicable ADRs.
 | [TS-0019](ts-0019-build-packaging-and-release.md) | Build, Packaging, and Release | Normative |
 | [TS-0020](ts-0020-developer-contribution-workflow.md) | Developer Contribution Workflow | Normative |
 | [TS-0021](ts-0021-operational-reliability.md) | Operational Reliability | Normative |
+| [TS-0022](ts-0022-plugin-trust-verification.md) | Plugin Trust Verification | Normative |

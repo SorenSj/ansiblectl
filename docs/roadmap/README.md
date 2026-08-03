@@ -65,15 +65,32 @@ Explicit non-goals:
 - Remote API, hosted control plane, or terminal UI.
 - Moving or recreating an existing release tag.
 
-## Candidate later milestones
+## Active milestone
 
 ### v0.4.0 — Plugin trust and unattended policy
 
-- Plugin provenance and signing policy.
-- Registry trust and distribution rules.
-- Enterprise or unattended permission enforcement.
+- Signed plugin provenance bound to exact artifact bytes, manifest identity, publisher key, and
+  normalized distribution origin.
+- Explicit registry and signing-key trust without trust-on-first-use or network installation.
+- Default-deny unattended permission policy with deny precedence and non-interactive evaluation.
+- Safe human, JSON, and YAML trust decisions before archive extraction or plugin import.
 
-This milestone requires dedicated ADRs before its scope becomes normative.
+Exit criteria:
+
+- [x] ADR-0038, ADR-0039, and TS-0022 define provenance, origin, signature, and unattended policy
+  contracts before implementation.
+- [ ] Canonical provenance parsing and fixed-vector Ed25519 verification are implemented.
+- [ ] Artifact digest, manifest agreement, trusted-key, and origin checks occur before code import.
+- [ ] Unattended deny-overrides policy is deterministic and never prompts or persists approval.
+- [ ] Every stable decision reason has redacted human, JSON, and YAML contract tests.
+- [ ] Existing manifest discovery and interactive permission preflight remain compatible.
+- [ ] The complete quality, build, provenance, and release gates pass.
+
+Explicit non-goals:
+
+- Registry download, dependency resolution, or installation.
+- Online key discovery, trust on first use, automatic revocation, or transparency-log availability.
+- Hosted policy management, remote API, or plugin execution sandboxing.
 
 ### Future — Durable events and remote delivery
 
