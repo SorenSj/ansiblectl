@@ -519,6 +519,69 @@ def test_run_rejects_empty_targeting_before_service_invocation(tmp_path: Path) -
 
     assert result == EXIT_EXPECTED_FAILURE
     assert "targeting values" in error.getvalue()
+    assert "Next:" in error.getvalue()
+
+
+def test_run_operational_failure_is_structured_in_json_mode(tmp_path: Path) -> None:
+    output, error = StringIO(), StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "run",
+            "--playbook",
+            "playbooks/site.yml",
+            "--revision",
+            "main",
+            "--check",
+            "--tags",
+            "deploy,,config",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        run_service=FakeRunService(),  # type: ignore[arg-type]
+        stdout=output,
+        stderr=error,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert error.getvalue() == ""
+    payload = json.loads(output.getvalue())
+    assert payload["kind"] == "operational_failure"
+    assert payload["operation"] == "run"
+    assert "targeting values" in payload["reason"]
+    assert payload["remediation"] == "Correct the run inputs or repository state and retry."
+
+
+def test_run_workspace_failure_is_structured_in_json_mode(tmp_path: Path) -> None:
+    output, error = StringIO(), StringIO()
+
+    result = main(
+        [
+            "--output-format",
+            "json",
+            "run",
+            "--playbook",
+            "playbooks/site.yml",
+            "--revision",
+            "main",
+            "--check",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        run_service=FakeRunService(),  # type: ignore[arg-type]
+        stdout=output,
+        stderr=error,
+        current_directory=tmp_path,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert error.getvalue() == ""
+    payload = json.loads(output.getvalue())
+    assert payload["kind"] == "operational_failure"
+    assert payload["operation"] == "run"
+    assert payload["remediation"] == "Initialize or select a valid workspace and retry."
 
 
 def test_run_apply_requires_confirmation_and_records_mode(tmp_path: Path) -> None:

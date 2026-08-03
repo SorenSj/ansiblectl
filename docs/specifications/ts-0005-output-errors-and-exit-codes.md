@@ -51,6 +51,11 @@ Cross-option validation follows the same contract. In particular, mismatched
 `run --apply` and `--confirm` flags produce a typed validation outcome with a
 safe remediation, rather than writing human text beside JSON output.
 
+Expected `run` preparation failures, including workspace, inventory, playbook,
+repository, and execution input failures, produce a typed
+`operational_failure` outcome with exit code `1`. JSON is written only to
+stdout; human mode writes an actionable reason and remediation to stderr.
+
 ## Verification
 
 - The same application failure renders consistently in human and machine modes.

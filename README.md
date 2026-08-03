@@ -134,6 +134,9 @@ document instead of argparse usage text, so supplied argument values are not
 echoed into automation logs.
 The same structured validation contract applies when `--apply` and `--confirm`
 are not supplied together.
+Expected run-preparation failures return `1` as a structured
+`operational_failure` in JSON mode and as an actionable stderr message in human
+mode.
 
 Completed runs also append a redacted structured record to
 `.ansiblectl/logs/events.jsonl`, correlated by execution identifier.

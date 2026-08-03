@@ -385,11 +385,23 @@ def main(
                 else run_service_instance.run_check(*run_arguments, targeting=targeting)
             )
         except WorkspaceError as error:
-            print(f"Workspace error: {error}", file=stderr)
-            return EXIT_EXPECTED_FAILURE
+            return _render_cli_failure(
+                "run",
+                str(error),
+                "Initialize or select a valid workspace and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
         except (InventoryError, PlaybookError, ExecutionError, RepositoryError) as error:
-            print(f"Run error: {error}", file=stderr)
-            return EXIT_EXPECTED_FAILURE
+            return _render_cli_failure(
+                "run",
+                str(error),
+                "Correct the run inputs or repository state and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
         _render_run_result(run_result, options.output_format, stdout)
         if run_result.execution is None:
             return EXIT_EXPECTED_FAILURE
@@ -669,6 +681,29 @@ def _execution_record(record: ExecutionRecord) -> dict[str, object]:
 
 def _tag_values(values: list[str]) -> tuple[str, ...]:
     return tuple(tag.strip() for value in values for tag in value.split(","))
+
+
+def _render_cli_failure(
+    operation: str,
+    reason: str,
+    remediation: str,
+    output_format: str,
+    stdout: TextIO | None,
+    stderr: TextIO | None,
+) -> int:
+    """Render one expected operational failure through the typed CLI contract."""
+
+    return render_outcome(
+        CommandOutcome(
+            OutcomeKind.OPERATIONAL_FAILURE,
+            operation,
+            reason=reason,
+            remediation=remediation,
+        ),
+        output_format,
+        sys.stdout if stdout is None else stdout,
+        sys.stderr if stderr is None else stderr,
+    )
 
 
 def _targeting_record(targeting: ExecutionTargeting) -> dict[str, object]:
