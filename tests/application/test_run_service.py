@@ -138,6 +138,52 @@ def test_run_prepares_check_mode_request_from_validated_inputs(tmp_path: Path) -
     }
 
 
+def test_preflight_returns_same_safe_evidence_without_execution(tmp_path: Path) -> None:
+    playbook = tmp_path / "playbooks/site.yml"
+    playbook.parent.mkdir()
+    playbook.write_text("---\n", encoding="utf-8")
+    port = RecordingExecutionPort()
+    materialized = False
+
+    @contextmanager
+    def recording_materializer(inventory: object) -> Iterator[Path]:
+        nonlocal materialized
+        materialized = True
+        yield tmp_path / "unused.yml"
+
+    repository_result = RepositoryResult(tmp_path, "main", False, "abc", "abc")
+    service = RunService(
+        InventoryService([FakeInventoryProvider()]),
+        ExecutionService(port),
+        PolicyService([]),
+        recording_materializer,
+        RepositoryService(FakeRunRepositoryPort(repository_result)),
+    )
+
+    result = service.preflight(
+        tmp_path,
+        Path("playbooks/site.yml"),
+        "main",
+        EnforcementMode.DENY,
+        ExecutionMode.CHECK,
+        ExecutionTargeting("web"),
+        2,
+        True,
+    )
+
+    assert result.report.allowed is True
+    assert result.playbook_path == "playbooks/site.yml"
+    assert result.requested_revision == "main"
+    assert result.resolved_revision == "abc"
+    assert result.inventory_digest.startswith("sha256:")
+    assert result.playbook_digest.startswith("sha256:")
+    assert result.targeting == ExecutionTargeting("web")
+    assert result.verbosity == 2
+    assert result.diff is True
+    assert materialized is False
+    assert port.request is None
+
+
 def test_run_rejects_negative_verbosity_before_input_resolution(tmp_path: Path) -> None:
     service = RunService(
         InventoryService([FakeInventoryProvider()]),

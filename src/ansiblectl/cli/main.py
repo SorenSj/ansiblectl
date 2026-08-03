@@ -27,7 +27,7 @@ from ansiblectl.application.plugins import (
     PluginPermissionService,
 )
 from ansiblectl.application.repository import RepositoryService
-from ansiblectl.application.run import RunService
+from ansiblectl.application.run import RunPreflightResult, RunService
 from ansiblectl.application.state import CacheEntrySummary, StateService
 from ansiblectl.application.status import StatusService
 from ansiblectl.application.workspace import WorkspaceService
@@ -49,6 +49,7 @@ from ansiblectl.cli.outcomes import render_outcome
 from ansiblectl.domain.configuration import EffectiveConfiguration
 from ansiblectl.domain.errors import ConfigurationError, ExecutionError, StateError, WorkspaceError
 from ansiblectl.domain.execution import (
+    ExecutionMode,
     ExecutionRecord,
     ExecutionRetentionResult,
     ExecutionStatus,
@@ -286,6 +287,11 @@ def build_parser() -> argparse.ArgumentParser:
     run_mode.add_argument("--apply", action="store_true", help="Apply changes after confirmation.")
     run.add_argument(
         "--confirm", action="store_true", help="Explicitly confirm an apply-mode execution."
+    )
+    run.add_argument(
+        "--preflight",
+        action="store_true",
+        help="Validate inputs and policy without starting Ansible.",
     )
     run.add_argument("--timeout", type=float, default=300.0, help="Positive timeout in seconds.")
     run.add_argument(
@@ -628,13 +634,25 @@ def main(
         ):
             return EXIT_EXPECTED_FAILURE
     elif arguments.command == "run":
-        if arguments.apply != arguments.confirm:
+        if arguments.confirm and not arguments.apply:
             return render_outcome(
                 CommandOutcome(
                     OutcomeKind.VALIDATION_FAILURE,
                     "run",
-                    reason="--apply and --confirm must be used together.",
-                    remediation="Use --apply --confirm together, or select --check.",
+                    reason="--confirm requires --apply.",
+                    remediation="Remove --confirm or select --apply.",
+                ),
+                options.output_format,
+                sys.stdout if stdout is None else stdout,
+                sys.stderr if stderr is None else stderr,
+            )
+        if arguments.apply and not arguments.preflight and not arguments.confirm:
+            return render_outcome(
+                CommandOutcome(
+                    OutcomeKind.VALIDATION_FAILURE,
+                    "run",
+                    reason="Apply execution requires --confirm.",
+                    remediation="Add --confirm, or use --preflight without executing.",
                 ),
                 options.output_format,
                 sys.stdout if stdout is None else stdout,
@@ -653,30 +671,42 @@ def main(
                 _tag_values(arguments.tags),
                 _tag_values(arguments.skip_tags),
             )
-            run_arguments = (
-                workspace.root,
-                arguments.playbook,
-                arguments.revision,
-                lambda: execution_environment(workspace.root),
-                arguments.timeout,
-                arguments.policy_mode,
-            )
-            run_result = (
-                run_service_instance.run_apply(
-                    *run_arguments,
-                    confirmed=arguments.confirm,
+            if arguments.preflight:
+                preflight_result = run_service_instance.preflight(
+                    workspace.root,
+                    arguments.playbook,
+                    arguments.revision,
+                    arguments.policy_mode,
+                    ExecutionMode.APPLY if arguments.apply else ExecutionMode.CHECK,
                     targeting=targeting,
                     verbosity=options.verbosity,
                     diff=arguments.diff,
                 )
-                if arguments.apply
-                else run_service_instance.run_check(
-                    *run_arguments,
-                    targeting=targeting,
-                    verbosity=options.verbosity,
-                    diff=arguments.diff,
+            else:
+                run_arguments = (
+                    workspace.root,
+                    arguments.playbook,
+                    arguments.revision,
+                    lambda: execution_environment(workspace.root),
+                    arguments.timeout,
+                    arguments.policy_mode,
                 )
-            )
+                run_result = (
+                    run_service_instance.run_apply(
+                        *run_arguments,
+                        confirmed=arguments.confirm,
+                        targeting=targeting,
+                        verbosity=options.verbosity,
+                        diff=arguments.diff,
+                    )
+                    if arguments.apply
+                    else run_service_instance.run_check(
+                        *run_arguments,
+                        targeting=targeting,
+                        verbosity=options.verbosity,
+                        diff=arguments.diff,
+                    )
+                )
         except WorkspaceError as error:
             return _render_cli_failure(
                 "run",
@@ -701,6 +731,11 @@ def main(
                 stdout,
                 stderr,
             )
+        if arguments.preflight:
+            _render_run_preflight(preflight_result, options.output_format, stdout)
+            if not preflight_result.report.allowed:
+                return EXIT_EXPECTED_FAILURE
+            return EXIT_SUCCESS
         _render_run_result(run_result, options.output_format, stdout)
         if run_result.execution is None:
             return EXIT_EXPECTED_FAILURE
@@ -1034,6 +1069,38 @@ def _render_playbook_validation(
             print(f"Stdout: {result.syntax_check.stdout_reference}", file=output)
         if result.syntax_check.stderr_reference:
             print(f"Stderr: {result.syntax_check.stderr_reference}", file=output)
+
+
+def _render_run_preflight(
+    result: RunPreflightResult, output_format: str, output: TextIO | None
+) -> None:
+    payload = {
+        "diff": result.diff,
+        "inventory_digest": result.inventory_digest,
+        "mode": result.mode.value,
+        "playbook_digest": result.playbook_digest,
+        "playbook_path": result.playbook_path,
+        "policy": result.report.machine_output(),
+        "requested_revision": result.requested_revision,
+        "resolved_revision": result.resolved_revision,
+        "schema_version": 1,
+        "targeting": _targeting_record(result.targeting),
+        "verbosity": result.verbosity,
+    }
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    print(f"Preflight: {'allowed' if result.report.allowed else 'denied'}", file=output)
+    print(f"Mode: {result.mode.value}", file=output)
+    print(f"Playbook: {result.playbook_path}", file=output)
+    print(f"Requested revision: {result.requested_revision}", file=output)
+    if result.resolved_revision:
+        print(f"Resolved revision: {result.resolved_revision}", file=output)
+    print(f"Inventory digest: {result.inventory_digest}", file=output)
+    print(f"Playbook digest: {result.playbook_digest}", file=output)
+    for finding in result.report.findings:
+        print(f"Finding {finding.rule_id}: {finding.message} ({finding.location})", file=output)
+    _render_targeting(result.targeting, output)
 
 
 def _render_run_result(

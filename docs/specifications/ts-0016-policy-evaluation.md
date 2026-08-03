@@ -51,6 +51,7 @@ evaluation rather than an overridable finding.
 - Apply without a host limit produces `ANSIBLECTL-APPLY-001`; check mode does not.
 - The default CLI composition includes the bundled apply-limit rule.
 - Dirty apply produces `ANSIBLECTL-APPLY-002`; dirty check mode does not.
+- `run --preflight` presents the same deterministic policy report without invoking an adapter.
 
 ## Non-goals
 

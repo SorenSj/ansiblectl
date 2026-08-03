@@ -76,6 +76,12 @@ resolution, policy evaluation, inventory materialization, or adapter invocation.
 Confirmed apply requests are evaluated as `run.apply`; check requests are
 evaluated as `run.check`. Execution events and history retain the selected mode.
 
+The explicit `run --preflight` path performs the same configuration, playbook,
+inventory, repository, digest, targeting, and policy preparation, but returns
+safe evidence before environment preparation, inventory materialization, or
+adapter invocation. It accepts check or apply mode; confirmation remains
+required only when an apply execution is requested.
+
 The non-negative CLI verbosity count is converted to at most one explicit
 Ansible argument (`-v`, `-vv`, and so on), never a shell fragment. Requests,
 results, events, and history retain the numeric count; older records default to
@@ -115,6 +121,7 @@ configuration therefore cannot produce execution side effects.
 - A confirmed apply request omits `--check` and remains subject to the policy gate.
 - In the default deny mode, apply without an explicit host limit is blocked before materialization.
 - Run preflight requires the requested Git revision at HEAD; default apply policy also requires a clean worktree.
+- Run preflight returns matching safe evidence without materialization or execution.
 - Execution history distinguishes the requested revision from the resolved immutable commit.
 - Execution history identifies the canonical inventory by digest without exposing its contents.
 - Execution history identifies the exact validated playbook bytes by digest without exposing their contents.

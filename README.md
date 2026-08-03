@@ -156,6 +156,11 @@ uv run ansiblectl --workspace ~/automation/example run \
   --limit 'web:&staging' --tags deploy,config --skip-tags slow
 ```
 
+Add `--preflight` to either `--check` or `--apply` to perform the same
+configuration, playbook, inventory, repository, digest, targeting, and policy
+checks without materializing inventory or starting Ansible. Apply preflight
+does not require `--confirm`; an actual apply still does.
+
 Add global `-v`, `-vv`, or higher before `run` to increase Ansible verbosity.
 The numeric level is retained in execution output and history.
 Add `--diff` to request Ansible before-and-after differences. Diff mode is

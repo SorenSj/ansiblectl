@@ -13,12 +13,35 @@ from ansiblectl.application.repository import RepositoryService
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.execution import ExecutionMode, ExecutionRequest, ExecutionTargeting
 from ansiblectl.domain.inventory import canonical_inventory_digest
-from ansiblectl.domain.playbook import playbook_digest, select_playbook
-from ansiblectl.domain.policy import EnforcementMode, EvaluationRequest
+from ansiblectl.domain.playbook import PlaybookReference, playbook_digest, select_playbook
+from ansiblectl.domain.policy import EnforcementMode, EvaluationRequest, PolicyReport
 from ansiblectl.domain.repository import RepositoryRequest
 
 InventoryMaterializer = Callable[[Mapping[str, object]], AbstractContextManager[Path]]
 ExecutionEnvironment = Mapping[str, str] | Callable[[], Mapping[str, str]]
+
+
+@dataclass(frozen=True)
+class RunPreflightResult:
+    """Safe evidence produced before inventory materialization or execution."""
+
+    report: PolicyReport
+    mode: ExecutionMode
+    playbook_path: str
+    requested_revision: str
+    resolved_revision: str | None
+    inventory_digest: str
+    playbook_digest: str
+    targeting: ExecutionTargeting
+    verbosity: int
+    diff: bool
+
+
+@dataclass(frozen=True)
+class _PreparedRun:
+    result: RunPreflightResult
+    selected: PlaybookReference
+    canonical_inventory: Mapping[str, object]
 
 
 @dataclass(frozen=True)
@@ -29,6 +52,30 @@ class RunService:
     materialize_inventory: InventoryMaterializer
     repository: RepositoryService | None = None
     configuration: ConfigurationService | None = None
+
+    def preflight(
+        self,
+        workspace_root: Path,
+        playbook_identifier: Path,
+        revision: str,
+        policy_mode: EnforcementMode,
+        mode: ExecutionMode,
+        targeting: ExecutionTargeting | None = None,
+        verbosity: int = 0,
+        diff: bool = False,
+    ) -> RunPreflightResult:
+        """Validate all run inputs and policies without materializing or executing."""
+
+        return self._prepare(
+            workspace_root,
+            playbook_identifier,
+            revision,
+            policy_mode,
+            targeting or ExecutionTargeting(),
+            mode,
+            verbosity,
+            diff,
+        ).result
 
     def run_check(
         self,
@@ -100,11 +147,61 @@ class RunService:
         verbosity: int,
         diff: bool,
     ) -> GovernedExecutionResult:
-
         verbosity_arguments = _verbosity_arguments(verbosity)
+        prepared = self._prepare(
+            workspace_root,
+            playbook_identifier,
+            revision,
+            policy_mode,
+            targeting,
+            mode,
+            verbosity,
+            diff,
+        )
+        result = prepared.result
+        if not result.report.allowed:
+            return GovernedExecutionResult(result.report, None)
+        resolved_environment = environment() if callable(environment) else environment
+        with self.materialize_inventory(prepared.canonical_inventory) as inventory_path:
+            request = ExecutionRequest.for_playbook(
+                (
+                    "ansible-playbook",
+                    *verbosity_arguments,
+                    "--inventory",
+                    str(inventory_path),
+                    *(("--check",) if mode is ExecutionMode.CHECK else ()),
+                    *(("--diff",) if diff else ()),
+                    *_targeting_arguments(targeting),
+                    str(prepared.selected.path),
+                ),
+                workspace_root.resolve(),
+                resolved_environment,
+                prepared.selected,
+                timeout_seconds,
+                targeting,
+                mode,
+                result.resolved_revision,
+                result.inventory_digest,
+                result.playbook_digest,
+                verbosity,
+                diff,
+            )
+            return GovernedExecutionResult(result.report, self.execution.execute(request))
+
+    def _prepare(
+        self,
+        workspace_root: Path,
+        playbook_identifier: Path,
+        revision: str,
+        policy_mode: EnforcementMode,
+        targeting: ExecutionTargeting,
+        mode: ExecutionMode,
+        verbosity: int,
+        diff: bool,
+    ) -> _PreparedRun:
+        _verbosity_arguments(verbosity)
         if self.configuration is not None:
             self.configuration.resolve()
-        resolved_environment = environment() if callable(environment) else environment
         selected = select_playbook(workspace_root, playbook_identifier, revision)
         selected_playbook_digest = playbook_digest(selected)
         resolved_inventory = self.inventory.resolve()
@@ -137,33 +234,19 @@ class RunService:
             ),
             policy_mode,
         )
-        if not report.allowed:
-            return GovernedExecutionResult(report, None)
-        with self.materialize_inventory(canonical_inventory) as inventory_path:
-            request = ExecutionRequest.for_playbook(
-                (
-                    "ansible-playbook",
-                    *verbosity_arguments,
-                    "--inventory",
-                    str(inventory_path),
-                    *(("--check",) if mode is ExecutionMode.CHECK else ()),
-                    *(("--diff",) if diff else ()),
-                    *_targeting_arguments(targeting),
-                    str(selected.path),
-                ),
-                workspace_root.resolve(),
-                resolved_environment,
-                selected,
-                timeout_seconds,
-                targeting,
-                mode,
-                None if repository is None else repository.resolved_revision,
-                inventory_digest,
-                selected_playbook_digest,
-                verbosity,
-                diff,
-            )
-            return GovernedExecutionResult(report, self.execution.execute(request))
+        result = RunPreflightResult(
+            report,
+            mode,
+            selected.path.relative_to(workspace_root.resolve()).as_posix(),
+            revision,
+            None if repository is None else repository.resolved_revision,
+            inventory_digest,
+            selected_playbook_digest,
+            targeting,
+            verbosity,
+            diff,
+        )
+        return _PreparedRun(result, selected, canonical_inventory)
 
 
 def _targeting_arguments(targeting: ExecutionTargeting) -> tuple[str, ...]:

@@ -9,6 +9,7 @@ import pytest
 from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.inventory import InventoryValidationResult
 from ansiblectl.application.playbook import PlaybookValidationResult, SyntaxCheckEvidence
+from ansiblectl.application.run import RunPreflightResult
 from ansiblectl.application.state import CacheEntrySummary
 from ansiblectl.application.status import Status
 from ansiblectl.cli.main import (
@@ -847,6 +848,30 @@ def test_playbook_syntax_check_returns_classified_failure_and_provenance(tmp_pat
 
 
 class FakeRunService:
+    def preflight(
+        self,
+        workspace_root: Path,
+        playbook_identifier: Path,
+        revision: str,
+        policy_mode: EnforcementMode,
+        mode: ExecutionMode,
+        targeting: ExecutionTargeting,
+        verbosity: int,
+        diff: bool,
+    ) -> RunPreflightResult:
+        return RunPreflightResult(
+            PolicyReport((), policy_mode),
+            mode,
+            "playbooks/site.yml",
+            revision,
+            "abc123",
+            "sha256:inventory",
+            "sha256:playbook",
+            targeting,
+            verbosity,
+            diff,
+        )
+
     def run_check(
         self,
         workspace_root: Path,
@@ -909,6 +934,104 @@ class FakeRunService:
                 diff=diff,
             ),
         )
+
+
+def test_run_preflight_renders_safe_evidence_without_execution(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "-v",
+            "run",
+            "--playbook",
+            "playbooks/site.yml",
+            "--revision",
+            "main",
+            "--check",
+            "--preflight",
+            "--limit",
+            "web",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        run_service=FakeRunService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue()) == {
+        "diff": False,
+        "inventory_digest": "sha256:inventory",
+        "mode": "check",
+        "playbook_digest": "sha256:playbook",
+        "playbook_path": "playbooks/site.yml",
+        "policy": {"allowed": True, "findings": [], "mode": "deny", "schema_version": 1},
+        "requested_revision": "main",
+        "resolved_revision": "abc123",
+        "schema_version": 1,
+        "targeting": {"limit": "web", "skip_tags": [], "tags": []},
+        "verbosity": 1,
+    }
+
+
+class DeniedPreflightRunService(FakeRunService):
+    def preflight(
+        self,
+        workspace_root: Path,
+        playbook_identifier: Path,
+        revision: str,
+        policy_mode: EnforcementMode,
+        mode: ExecutionMode,
+        targeting: ExecutionTargeting,
+        verbosity: int,
+        diff: bool,
+    ) -> RunPreflightResult:
+        finding = PolicyFinding("RUN-001", "high", "Explicit limit required.", "playbooks/site.yml")
+        return RunPreflightResult(
+            PolicyReport((finding,), policy_mode),
+            mode,
+            "playbooks/site.yml",
+            revision,
+            "abc123",
+            "sha256:inventory",
+            "sha256:playbook",
+            targeting,
+            verbosity,
+            diff,
+        )
+
+
+def test_run_preflight_human_denial_is_actionable(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "run",
+            "--playbook",
+            "playbooks/site.yml",
+            "--revision",
+            "main",
+            "--apply",
+            "--preflight",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        run_service=DeniedPreflightRunService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert "Preflight: denied" in output.getvalue()
+    assert "Mode: apply" in output.getvalue()
+    assert "Requested revision: main" in output.getvalue()
+    assert "Resolved revision: abc123" in output.getvalue()
+    assert "Inventory digest: sha256:inventory" in output.getvalue()
+    assert "Playbook digest: sha256:playbook" in output.getvalue()
+    assert "Finding RUN-001: Explicit limit required." in output.getvalue()
 
 
 def test_run_check_renders_injected_execution_result(tmp_path: Path) -> None:
@@ -1164,9 +1287,18 @@ def test_run_apply_requires_confirmation_and_records_mode(tmp_path: Path) -> Non
     assert json.loads(validation_output.getvalue()) == {
         "kind": "validation_failure",
         "operation": "run",
-        "reason": "--apply and --confirm must be used together.",
-        "remediation": "Use --apply --confirm together, or select --check.",
+        "reason": "Apply execution requires --confirm.",
+        "remediation": "Add --confirm, or use --preflight without executing.",
     }
+    preflight_output = StringIO()
+    preflight_result = main(
+        [*arguments, "--preflight"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        run_service=FakeRunService(),  # type: ignore[arg-type]
+        stdout=preflight_output,
+    )
+    assert preflight_result == EXIT_SUCCESS
+    assert json.loads(preflight_output.getvalue())["mode"] == "apply"
     output = StringIO()
     result = main(
         [*arguments, "--confirm"],
@@ -1201,7 +1333,8 @@ def test_run_apply_confirmation_validation_is_actionable_in_human_mode(tmp_path:
 
     assert result == EXIT_INVALID_INPUT
     assert output.getvalue() == ""
-    assert "--apply and --confirm must be used together" in error.getvalue()
+    assert "Apply execution requires --confirm" in error.getvalue()
+    assert "use --preflight without executing" in error.getvalue()
     assert "Next:" in error.getvalue()
 
 
