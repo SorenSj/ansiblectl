@@ -35,7 +35,10 @@ from ansiblectl.infrastructure.git_repository import GitRepositoryAdapter
 from ansiblectl.infrastructure.json_logging import EventLogSubscriber, JsonLinesLogSink
 from ansiblectl.infrastructure.local_execution import LocalExecutionAdapter
 from ansiblectl.infrastructure.local_workspace_store import LocalWorkspaceStore
-from ansiblectl.infrastructure.plugin_manifests import discover_manifests
+from ansiblectl.infrastructure.plugin_manifests import (
+    discover_manifest_directory,
+    discover_manifests,
+)
 from ansiblectl.infrastructure.workspace_state import WorkspaceStateStore
 from ansiblectl.infrastructure.yaml_configuration import LocalConfigurationSourceProvider
 from ansiblectl.infrastructure.yaml_inventory import YamlInventoryProvider
@@ -77,7 +80,10 @@ def build_repository_service() -> RepositoryService:
 def build_plugin_discovery_service() -> PluginDiscoveryService:
     """Create safe file-based plugin manifest discovery."""
 
-    return PluginDiscoveryService(file_loader=discover_manifests)
+    return PluginDiscoveryService(
+        file_loader=discover_manifests,
+        directory_loader=discover_manifest_directory,
+    )
 
 
 def build_playbook_validation_service(workspace_root: Path) -> PlaybookValidationService:

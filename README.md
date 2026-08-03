@@ -86,7 +86,8 @@ uv run ansiblectl --workspace ~/automation/example \
 
 ## Plugin manifests
 
-Validate one provider manifest or list several validated descriptors without
+Validate one provider manifest, list explicitly selected manifests, or discover
+all direct YAML manifests in the workspace's `plugins` directory without
 loading plugin code:
 
 ```console
@@ -94,6 +95,7 @@ uv run ansiblectl --workspace ~/automation/example \
   plugin validate plugins/example.yaml
 uv run ansiblectl --workspace ~/automation/example \
   plugin list --manifest plugins/example.yaml --manifest plugins/other.yaml
+uv run ansiblectl --workspace ~/automation/example plugin discover
 ```
 
 ## Check-mode execution

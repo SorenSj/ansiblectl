@@ -477,6 +477,14 @@ class FakePluginDiscoveryService:
             )
         }
 
+    def discover_directory(self, location: Path) -> dict[str, ProviderDescriptor]:
+        self.locations = [location]
+        return {
+            "demo": ProviderDescriptor(
+                "demo", "1.0", "0.1", ("provider",), "schema.json", (), str(location)
+            )
+        }
+
 
 def test_plugin_validate_renders_descriptor_without_loading_code(tmp_path: Path) -> None:
     service, output = FakePluginDiscoveryService(), StringIO()
@@ -514,6 +522,39 @@ def test_plugin_manifest_path_cannot_escape_workspace(tmp_path: Path) -> None:
     assert result == EXIT_EXPECTED_FAILURE
     assert service.locations == []
     assert "inside the selected workspace" in error.getvalue()
+
+
+def test_plugin_discover_uses_default_workspace_directory(tmp_path: Path) -> None:
+    service, output = FakePluginDiscoveryService(), StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "--output-format", "json", "plugin", "discover"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        plugin_service=service,  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert service.locations == [(tmp_path / "plugins").resolve()]
+    assert json.loads(output.getvalue())["plugins"][0]["identity"] == "demo"
+
+
+def test_plugin_discover_rejects_directory_symlink(tmp_path: Path) -> None:
+    outside = tmp_path.parent / "outside-plugins"
+    outside.mkdir()
+    (tmp_path / "plugins").symlink_to(outside, target_is_directory=True)
+    service, error = FakePluginDiscoveryService(), StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "plugin", "discover"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        plugin_service=service,  # type: ignore[arg-type]
+        stderr=error,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert service.locations == []
+    assert "must not be a symbolic link" in error.getvalue()
 
 
 def test_playbook_validate_reports_safe_selection_evidence(tmp_path: Path) -> None:

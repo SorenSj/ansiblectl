@@ -210,6 +210,15 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Manifest path in the workspace; repeat for multiple plugins.",
     )
+    plugin_discover = plugin_commands.add_parser(
+        "discover", help="Discover manifests in one workspace directory."
+    )
+    plugin_discover.add_argument(
+        "--directory",
+        type=Path,
+        default=Path("plugins"),
+        help="Manifest directory inside the workspace (default: plugins).",
+    )
     playbook = subcommands.add_parser("playbook", help="Validate playbook selection.")
     playbook_commands = playbook.add_subparsers(dest="playbook_command", required=True)
     playbook_validate = playbook_commands.add_parser(
@@ -474,13 +483,17 @@ def main(
             workspace = workspace_service_instance.resolve(
                 options.workspace, current_directory or Path.cwd()
             )
-            identifiers = (
-                [arguments.manifest]
-                if arguments.plugin_command == "validate"
-                else arguments.manifest
-            )
-            locations = [_resolve_workspace_path(workspace.root, path) for path in identifiers]
-            descriptors = plugin_service_instance.discover_files(locations)
+            if arguments.plugin_command == "discover":
+                directory = _resolve_plugin_directory(workspace.root, arguments.directory)
+                descriptors = plugin_service_instance.discover_directory(directory)
+            else:
+                identifiers = (
+                    [arguments.manifest]
+                    if arguments.plugin_command == "validate"
+                    else arguments.manifest
+                )
+                locations = [_resolve_workspace_path(workspace.root, path) for path in identifiers]
+                descriptors = plugin_service_instance.discover_files(locations)
         except WorkspaceError as error:
             return _render_cli_failure(
                 f"plugin {arguments.plugin_command}",
@@ -817,6 +830,14 @@ def _resolve_workspace_path(workspace_root: Path, identifier: Path) -> Path:
     if not candidate.is_relative_to(root):
         raise PluginManifestError("Plugin manifest must remain inside the selected workspace.")
     return candidate
+
+
+def _resolve_plugin_directory(workspace_root: Path, identifier: Path) -> Path:
+    root = workspace_root.resolve()
+    candidate = root / identifier if not identifier.is_absolute() else identifier
+    if candidate.is_symlink():
+        raise PluginManifestError("Plugin manifest directory must not be a symbolic link.")
+    return _resolve_workspace_path(root, candidate)
 
 
 def _render_plugins(

@@ -10,6 +10,7 @@ from ansiblectl.domain.plugins import PluginManifestError, ProviderDescriptor, r
 @dataclass(frozen=True)
 class PluginDiscoveryService:
     file_loader: Callable[[list[Path]], dict[str, ProviderDescriptor]] | None = None
+    directory_loader: Callable[[Path], dict[str, ProviderDescriptor]] | None = None
 
     def discover(
         self, manifests: list[tuple[Mapping[str, object], str]]
@@ -22,3 +23,10 @@ class PluginDiscoveryService:
         if self.file_loader is None:
             raise PluginManifestError("Plugin manifest file discovery is not configured.")
         return self.file_loader(locations)
+
+    def discover_directory(self, location: Path) -> dict[str, ProviderDescriptor]:
+        """Discover and validate manifests in one configured directory."""
+
+        if self.directory_loader is None:
+            raise PluginManifestError("Plugin manifest directory discovery is not configured.")
+        return self.directory_loader(location)

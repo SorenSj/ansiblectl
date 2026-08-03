@@ -34,11 +34,18 @@ registered, so a malformed or duplicate descriptor leaves no partial registry.
 Configured filesystem locations use safe YAML parsing; discovery has no plugin
 code-import step.
 
+`plugin discover --directory <path>` scans one workspace-contained directory
+(default `plugins`) for direct `.yml` and `.yaml` children in deterministic name
+order. Nested content and non-YAML files are ignored; directory and manifest
+symlinks are rejected. All selected manifests still validate as one registry,
+so malformed or duplicate descriptors produce no partial result.
+
 ## Verification
 
 - Malformed manifests fail before code import.
 - An incompatible SDK range prevents provider registration.
 - Duplicate identity handling is covered by a registry test.
+- Directory discovery is deterministic and never follows manifest symlinks.
 
 ## Non-goals
 
