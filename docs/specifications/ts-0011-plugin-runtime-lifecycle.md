@@ -27,6 +27,11 @@ This specification defines the initial public and internal contract for this cap
 
 The runtime manages PluginDescriptor and PluginInstance records and exposes only public registered capabilities to the application composition root.
 
+The initial runtime receives an already validated descriptor and an explicit
+capability set. It calls plugin initialisation before changing the registry;
+an optional failure records only the plugin identity and exception class. On
+normal shutdown, initialised plugins are shut down in reverse load order.
+
 ## Verification
 
 - A plugin failing during initialisation registers no command or provider.
@@ -36,4 +41,3 @@ The runtime manages PluginDescriptor and PluginInstance records and exposes only
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
