@@ -31,3 +31,11 @@ the reviewed, reproducible dependency resolution for these commands.
 - Confirm CLI/SDK compatibility and migration guidance when public contracts change.
 - Run every local quality check above.
 - Record any temporary exception with an owner, scope, rationale, and expiry or removal plan.
+
+## Temporary exception example
+
+- Owner: `maintainer-on-call`
+- Scope: A one-time documentation-link validation exception for an external outage.
+- Rationale: The external documentation host is unavailable and the change must restore an
+  unrelated security fix.
+- Expiry or removal plan: Re-run validation and remove this exception within two business days.
