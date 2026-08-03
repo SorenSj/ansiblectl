@@ -12,6 +12,7 @@ All notable changes to Ansiblectl are documented here.
 - Exact provider-and-signing-key origin allowlists, including explicit local-origin trust.
 - Pure unattended plugin-policy evaluation with deny precedence and local restriction ceilings.
 - Redaction-safe human, JSON, and YAML trust-decision contracts for every stable reason.
+- Compatibility coverage preserving manifest discovery and explicit interactive permission grants.
 
 ## [0.3.0] - 2026-08-04
 
