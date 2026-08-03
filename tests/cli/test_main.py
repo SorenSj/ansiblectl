@@ -10,7 +10,12 @@ from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.status import Status
 from ansiblectl.cli.main import EXIT_EXPECTED_FAILURE, EXIT_INVALID_INPUT, EXIT_SUCCESS, main
 from ansiblectl.domain.errors import ExecutionError, WorkspaceNotFoundError
-from ansiblectl.domain.execution import ExecutionRecord, ExecutionResult, ExecutionStatus
+from ansiblectl.domain.execution import (
+    ExecutionRecord,
+    ExecutionResult,
+    ExecutionRetentionResult,
+    ExecutionStatus,
+)
 from ansiblectl.domain.inventory import Host, ResolvedInventory
 from ansiblectl.domain.plugins import ProviderDescriptor
 from ansiblectl.domain.policy import EnforcementMode, PolicyFinding, PolicyReport
@@ -468,6 +473,10 @@ class FakeExecutionHistoryService:
             raise ExecutionError(f"Execution '{execution_id}' was not found in this workspace.")
         return self.record
 
+    def retention(self, keep: int, *, apply: bool) -> ExecutionRetentionResult:
+        assert keep == 0
+        return ExecutionRetentionResult(0, (self.record.execution_id,), apply)
+
 
 def test_execution_list_renders_safe_machine_history(tmp_path: Path) -> None:
     output = StringIO()
@@ -512,3 +521,46 @@ def test_execution_show_reports_unknown_identifier(tmp_path: Path) -> None:
 
     assert result == EXIT_EXPECTED_FAILURE
     assert "was not found" in error.getvalue()
+
+
+def test_execution_prune_previews_unless_apply_is_explicit(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "execution",
+            "prune",
+            "--keep",
+            "0",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        execution_history_service=FakeExecutionHistoryService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue()) == {
+        "applied": False,
+        "removed_execution_ids": ["run-1"],
+        "retained_count": 0,
+        "schema_version": 1,
+    }
+
+
+def test_execution_prune_applies_only_with_explicit_flag(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "execution", "prune", "--keep", "0", "--apply"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        execution_history_service=FakeExecutionHistoryService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert "Applied: retain 0 execution(s)" in output.getvalue()
+    assert "Execution: run-1" in output.getvalue()

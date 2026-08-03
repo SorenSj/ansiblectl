@@ -28,7 +28,11 @@ from ansiblectl.cli.composition import (
     execution_environment,
 )
 from ansiblectl.domain.errors import ExecutionError, WorkspaceError
-from ansiblectl.domain.execution import ExecutionRecord, ExecutionStatus
+from ansiblectl.domain.execution import (
+    ExecutionRecord,
+    ExecutionRetentionResult,
+    ExecutionStatus,
+)
 from ansiblectl.domain.inventory import InventoryError, ResolvedInventory
 from ansiblectl.domain.playbook import PlaybookError
 from ansiblectl.domain.plugins import PluginManifestError, ProviderDescriptor
@@ -137,6 +141,15 @@ def build_parser() -> argparse.ArgumentParser:
     execution_commands.add_parser("list", help="List completed executions newest first.")
     execution_show = execution_commands.add_parser("show", help="Show one completed execution.")
     execution_show.add_argument("execution_id", help="Exact execution identifier.")
+    execution_prune = execution_commands.add_parser(
+        "prune", help="Preview or apply execution-history retention."
+    )
+    execution_prune.add_argument(
+        "--keep", type=int, required=True, help="Number of newest executions to retain."
+    )
+    execution_prune.add_argument(
+        "--apply", action="store_true", help="Apply the plan; otherwise only preview it."
+    )
     return parser
 
 
@@ -283,6 +296,10 @@ def main(
             )
             history = execution_history_service or build_execution_history_service(workspace.root)
             records: tuple[ExecutionRecord, ...]
+            if arguments.execution_command == "prune":
+                retention = history.retention(arguments.keep, apply=arguments.apply)
+                _render_execution_retention(retention, options.output_format, stdout)
+                return EXIT_SUCCESS
             if arguments.execution_command == "show":
                 records = (history.get(arguments.execution_id),)
             else:
@@ -501,3 +518,22 @@ def _execution_record(record: ExecutionRecord) -> dict[str, object]:
         "stdout_reference": record.stdout_reference,
         "timestamp": record.timestamp,
     }
+
+
+def _render_execution_retention(
+    result: ExecutionRetentionResult, output_format: str, output: TextIO | None
+) -> None:
+    payload = {
+        "applied": result.applied,
+        "removed_execution_ids": list(result.removed_execution_ids),
+        "retained_count": result.retained_count,
+        "schema_version": 1,
+    }
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    action = "Applied" if result.applied else "Preview"
+    print(f"{action}: retain {result.retained_count} execution(s)", file=output)
+    print(f"Remove: {len(result.removed_execution_ids)} execution(s)", file=output)
+    for execution_id in result.removed_execution_ids:
+        print(f"Execution: {execution_id}", file=output)

@@ -84,12 +84,23 @@ class ExecutionRecord:
     diagnostic: str | None = None
 
 
+@dataclass(frozen=True)
+class ExecutionRetentionResult:
+    """Safe summary of records selected for or removed by retention."""
+
+    retained_count: int
+    removed_execution_ids: tuple[str, ...]
+    applied: bool
+
+
 class ExecutionHistoryPort(Protocol):
     """Read safe persisted execution metadata for one workspace."""
 
     def list(self) -> tuple[ExecutionRecord, ...]: ...
 
     def get(self, execution_id: str) -> ExecutionRecord: ...
+
+    def prune(self, keep: int) -> ExecutionRetentionResult: ...
 
 
 class ExecutionPort(Protocol):

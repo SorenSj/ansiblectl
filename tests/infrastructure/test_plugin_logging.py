@@ -12,6 +12,7 @@ def test_plugin_logs_include_identity_correlation_and_redaction() -> None:
 
     assert sink.records == [
         {
+            "schema_version": 1,
             "timestamp": sink.records[0]["timestamp"],
             "level": "info",
             "event": "provider.ready",

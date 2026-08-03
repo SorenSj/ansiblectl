@@ -31,6 +31,9 @@ The stable `execution list` and `execution show <execution-id>` paths inspect
 safe records from the selected workspace. They do not read or render referenced
 Ansible stdout or stderr content.
 
+`execution prune --keep <count>` previews retention. Destructive mutation
+requires the additional explicit `--apply` flag.
+
 ## Verification
 
 - `ansiblectl --help` lists top-level commands and global options.

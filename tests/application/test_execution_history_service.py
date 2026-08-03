@@ -2,8 +2,15 @@
 
 from dataclasses import dataclass
 
+import pytest
+
 from ansiblectl.application.execution_history import ExecutionHistoryService
-from ansiblectl.domain.execution import ExecutionRecord, ExecutionStatus
+from ansiblectl.domain.errors import ExecutionError
+from ansiblectl.domain.execution import (
+    ExecutionRecord,
+    ExecutionRetentionResult,
+    ExecutionStatus,
+)
 
 
 @dataclass(frozen=True)
@@ -17,6 +24,10 @@ class FakeHistoryPort:
         assert execution_id == self.record.execution_id
         return self.record
 
+    def prune(self, keep: int) -> ExecutionRetentionResult:
+        assert keep == 0
+        return ExecutionRetentionResult(0, (self.record.execution_id,), True)
+
 
 def test_history_service_delegates_typed_queries() -> None:
     record = ExecutionRecord("timestamp", "run-1", ExecutionStatus.COMPLETED, 0, 0.1)
@@ -24,3 +35,7 @@ def test_history_service_delegates_typed_queries() -> None:
 
     assert service.list() == (record,)
     assert service.get("run-1") == record
+    assert service.retention(0, apply=False) == ExecutionRetentionResult(0, ("run-1",), False)
+    assert service.retention(0, apply=True) == ExecutionRetentionResult(0, ("run-1",), True)
+    with pytest.raises(ExecutionError, match="zero or greater"):
+        service.retention(-1, apply=False)

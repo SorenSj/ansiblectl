@@ -32,11 +32,18 @@ The initial workspace store uses `.ansiblectl/state.json`, with
 invalidation condition. Writes use temporary-file replacement. Corrupt or
 unsupported state fails safely and instructs the operator to remove that file.
 
+Execution event history is retained in the workspace's schema-versioned JSONL
+log. `execution prune --keep N` previews removal by default; `--apply` rewrites
+the log atomically while holding the same advisory lock used by event writers.
+Only output directories derived from removed execution identifiers are cleaned,
+and unknown files are never recursively deleted.
+
 ## Verification
 
 - A corrupt cache is discarded or reported without corrupting workspace data.
 - A schema-version mismatch follows documented migration or reset behaviour.
 - Concurrent update tests preserve a valid final record.
+- Execution retention preserves the newest requested records and unrelated public events.
 
 ## Non-goals
 

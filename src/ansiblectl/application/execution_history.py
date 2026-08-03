@@ -2,7 +2,12 @@
 
 from dataclasses import dataclass
 
-from ansiblectl.domain.execution import ExecutionHistoryPort, ExecutionRecord
+from ansiblectl.domain.errors import ExecutionError
+from ansiblectl.domain.execution import (
+    ExecutionHistoryPort,
+    ExecutionRecord,
+    ExecutionRetentionResult,
+)
 
 
 @dataclass(frozen=True)
@@ -14,3 +19,13 @@ class ExecutionHistoryService:
 
     def get(self, execution_id: str) -> ExecutionRecord:
         return self.port.get(execution_id)
+
+    def retention(self, keep: int, *, apply: bool) -> ExecutionRetentionResult:
+        if keep < 0:
+            raise ExecutionError("Execution retention count must be zero or greater.")
+        if apply:
+            return self.port.prune(keep)
+        records = self.port.list()
+        return ExecutionRetentionResult(
+            min(keep, len(records)), tuple(record.execution_id for record in records[keep:]), False
+        )

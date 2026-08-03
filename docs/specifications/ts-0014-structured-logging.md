@@ -27,7 +27,7 @@ This specification defines the initial public and internal contract for this cap
 
 The logging port accepts a typed LogEvent; sinks render console or configured destinations without changing event semantics.
 
-The initial `LogEvent` schema contains ISO-8601 UTC timestamp, level, stable
+The initial `LogEvent` schema contains schema version `1`, ISO-8601 UTC timestamp, level, stable
 event name, optional correlation identifier, and structured fields. Fields
 named `secret`, `token`, `password`, `credential`, or `key` are redacted before
 any sink receives a record. Plugins use the public `PluginLogger` protocol.

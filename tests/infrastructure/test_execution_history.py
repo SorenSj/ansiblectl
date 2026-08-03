@@ -1,13 +1,16 @@
 """Persisted execution-history adapter tests."""
 
+import hashlib
 import json
 from pathlib import Path
+from threading import Barrier, Thread
 
 import pytest
 
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.execution import ExecutionStatus
 from ansiblectl.infrastructure.execution_history import JsonLinesExecutionHistory
+from ansiblectl.infrastructure.json_logging import JsonLinesLogSink
 
 
 def _write_events(workspace: Path, records: list[dict[str, object]]) -> None:
@@ -82,3 +85,88 @@ def test_history_symlink_cannot_escape_workspace(tmp_path: Path) -> None:
 
     with pytest.raises(ExecutionError, match="remain inside"):
         JsonLinesExecutionHistory(workspace).list()
+
+
+def test_prune_atomically_retains_newest_records_and_removes_derived_outputs(
+    tmp_path: Path,
+) -> None:
+    records: list[dict[str, object]] = [
+        {
+            "timestamp": execution_id,
+            "event": "execution.completed",
+            "fields": {
+                "execution_id": execution_id,
+                "status": "completed",
+                "exit_code": 0,
+            },
+        }
+        for execution_id in ("run-1", "run-2", "run-3")
+    ]
+    records.insert(1, {"timestamp": "workspace", "event": "workspace.initialized", "fields": {}})
+    _write_events(tmp_path, records)
+    for execution_id in ("run-1", "run-2", "run-3"):
+        key = hashlib.sha256(execution_id.encode("utf-8")).hexdigest()
+        directory = tmp_path / ".ansiblectl" / "runs" / key
+        directory.mkdir(parents=True)
+        (directory / "stdout.log").write_text(execution_id, encoding="utf-8")
+
+    result = JsonLinesExecutionHistory(tmp_path).prune(1)
+
+    assert result.retained_count == 1
+    assert result.removed_execution_ids == ("run-2", "run-1")
+    assert [record.execution_id for record in JsonLinesExecutionHistory(tmp_path).list()] == [
+        "run-3"
+    ]
+    remaining_text = JsonLinesExecutionHistory(tmp_path).path.read_text(encoding="utf-8")
+    assert "workspace.initialized" in remaining_text
+    for execution_id in ("run-1", "run-2"):
+        key = hashlib.sha256(execution_id.encode("utf-8")).hexdigest()
+        assert not (tmp_path / ".ansiblectl" / "runs" / key).exists()
+
+
+def test_concurrent_append_and_prune_preserve_valid_history(tmp_path: Path) -> None:
+    _write_events(
+        tmp_path,
+        [
+            {
+                "timestamp": execution_id,
+                "event": "execution.completed",
+                "fields": {
+                    "execution_id": execution_id,
+                    "status": "completed",
+                    "exit_code": 0,
+                },
+            }
+            for execution_id in ("run-1", "run-2")
+        ],
+    )
+    barrier = Barrier(2)
+    failures: list[Exception] = []
+
+    def append_event() -> None:
+        try:
+            barrier.wait()
+            JsonLinesLogSink(tmp_path).emit(
+                {"timestamp": "workspace", "event": "workspace.initialized", "fields": {}}
+            )
+        except Exception as error:
+            failures.append(error)
+
+    def prune_history() -> None:
+        try:
+            barrier.wait()
+            JsonLinesExecutionHistory(tmp_path).prune(1)
+        except Exception as error:
+            failures.append(error)
+
+    threads = [Thread(target=append_event), Thread(target=prune_history)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert failures == []
+    lines = JsonLinesExecutionHistory(tmp_path).path.read_text(encoding="utf-8").splitlines()
+    entries = [json.loads(line) for line in lines]
+    assert sum(entry["event"] == "execution.completed" for entry in entries) == 1
+    assert sum(entry["event"] == "workspace.initialized" for entry in entries) == 1

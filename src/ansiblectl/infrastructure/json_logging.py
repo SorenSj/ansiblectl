@@ -10,6 +10,7 @@ from pathlib import Path
 
 from ansiblectl.domain.events import Event
 from ansiblectl.domain.logging import LogEvent, LogSink, emit
+from ansiblectl.infrastructure.file_locking import locked
 
 
 @dataclass(frozen=True)
@@ -27,10 +28,11 @@ class JsonLinesLogSink:
         for directory in (private_root, self.path.parent):
             directory.mkdir(mode=0o700, exist_ok=True)
             directory.chmod(0o700)
-        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
-        descriptor = os.open(self.path, flags, 0o600)
-        with os.fdopen(descriptor, "a", encoding="utf-8") as output_file:
-            output_file.write(json.dumps(dict(record), sort_keys=True) + "\n")
+        with locked(self.path.parent / "events.lock", exclusive=True):
+            flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
+            descriptor = os.open(self.path, flags, 0o600)
+            with os.fdopen(descriptor, "a", encoding="utf-8") as output_file:
+                output_file.write(json.dumps(dict(record), sort_keys=True) + "\n")
         self.path.chmod(0o600)
 
 

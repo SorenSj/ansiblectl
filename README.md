@@ -110,6 +110,13 @@ uv run ansiblectl --workspace ~/automation/example execution list
 uv run ansiblectl --workspace ~/automation/example execution show <execution-id>
 ```
 
+Preview retention, then explicitly apply the same policy:
+
+```console
+uv run ansiblectl --workspace ~/automation/example execution prune --keep 100
+uv run ansiblectl --workspace ~/automation/example execution prune --keep 100 --apply
+```
+
 ## Project governance
 
 The repository is the authoritative source for Ansiblectl's normative

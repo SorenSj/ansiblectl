@@ -20,6 +20,7 @@ class LogEvent:
 
     def redacted(self) -> dict[str, object]:
         return {
+            "schema_version": 1,
             "timestamp": self.timestamp,
             "level": self.level,
             "event": self.name,
