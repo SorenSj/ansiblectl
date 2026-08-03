@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.execution import (
     ExecutionHistoryPort,
+    ExecutionMode,
     ExecutionRecord,
     ExecutionRetentionResult,
     ExecutionStatus,
@@ -19,6 +20,7 @@ class ExecutionHistoryService:
         self,
         operation: str | None = None,
         status: ExecutionStatus | None = None,
+        mode: ExecutionMode | None = None,
         limit: int | None = None,
     ) -> tuple[ExecutionRecord, ...]:
         records = self.port.list()
@@ -28,6 +30,8 @@ class ExecutionHistoryService:
             records = tuple(record for record in records if record.operation == operation)
         if status is not None:
             records = tuple(record for record in records if record.status is status)
+        if mode is not None:
+            records = tuple(record for record in records if record.mode is mode)
         if limit is not None:
             if limit <= 0:
                 raise ExecutionError("Execution result limit must be greater than zero.")

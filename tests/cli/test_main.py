@@ -1407,11 +1407,13 @@ class FakeExecutionHistoryService:
         self,
         operation: str | None = None,
         status: ExecutionStatus | None = None,
+        mode: ExecutionMode | None = None,
         limit: int | None = None,
     ) -> tuple[ExecutionRecord, ...]:
         operation_matches = operation in {None, self.record.operation}
         status_matches = status in {None, self.record.status}
-        records = (self.record,) if operation_matches and status_matches else ()
+        mode_matches = mode in {None, self.record.mode}
+        records = (self.record,) if operation_matches and status_matches and mode_matches else ()
         return records if limit is None else records[:limit]
 
     def get(self, execution_id: str) -> ExecutionRecord:
@@ -1491,6 +1493,8 @@ def test_execution_list_combines_operation_and_status_filters(tmp_path: Path) ->
             "playbook.syntax_check",
             "--status",
             "completed",
+            "--mode",
+            "check",
             "--limit",
             "1",
         ],

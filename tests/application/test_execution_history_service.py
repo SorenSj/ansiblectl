@@ -7,6 +7,7 @@ import pytest
 from ansiblectl.application.execution_history import ExecutionHistoryService
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.execution import (
+    ExecutionMode,
     ExecutionRecord,
     ExecutionRetentionResult,
     ExecutionStatus,
@@ -57,6 +58,8 @@ def test_history_service_filters_exact_operation_and_rejects_empty_filter() -> N
     assert service.list(status=ExecutionStatus.COMPLETED) == (record,)
     assert service.list(status=ExecutionStatus.FAILED) == ()
     assert service.list("playbook.syntax_check", ExecutionStatus.COMPLETED) == (record,)
+    assert service.list(mode=ExecutionMode.CHECK) == (record,)
+    assert service.list(mode=ExecutionMode.APPLY) == ()
     assert service.list(limit=1) == (record,)
     with pytest.raises(ExecutionError, match="greater than zero"):
         service.list(limit=0)
