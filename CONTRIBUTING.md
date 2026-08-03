@@ -27,6 +27,17 @@ uv run python -m tools.inspect_release_artifacts
 The supported runtime matrix is Python 3.12 through 3.14. `uv.lock` records
 the reviewed, reproducible dependency resolution for these commands.
 
+## Manual CI and release-artifact recovery
+
+The CI workflow can be started from the GitHub Actions page with **Run
+workflow**. Leave `release_tag` empty to run the quality gates on the selected
+branch. To recover artifacts for an existing release, enter its immutable tag,
+for example `v0.1.0`. The workflow checks out that tag and requires it to match
+the package version and dated changelog entry before retaining any artifacts.
+
+Never move or recreate an existing release tag to recover a missed workflow
+run.
+
 ## Review checklist
 
 - Link the relevant requirement, ADR, or TS.
