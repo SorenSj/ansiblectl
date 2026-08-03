@@ -14,7 +14,7 @@ from typing import TextIO
 
 from ansiblectl.application.configuration import ConfigurationService
 from ansiblectl.application.execution import GovernedExecutionResult
-from ansiblectl.application.execution_history import ExecutionHistoryService
+from ansiblectl.application.execution_history import ExecutionHistoryService, ExecutionSummary
 from ansiblectl.application.inventory import (
     InventoryService,
     InventoryValidationResult,
@@ -349,6 +349,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     execution_list.add_argument(
         "--limit", type=int, help="Return at most this many newest matching records."
+    )
+    execution_commands.add_parser(
+        "summary", help="Summarise safe execution metadata by status, mode, and operation."
     )
     execution_show = execution_commands.add_parser("show", help="Show one completed execution.")
     execution_show.add_argument("execution_id", help="Exact execution identifier.")
@@ -785,6 +788,10 @@ def main(
             if arguments.execution_command == "prune":
                 retention = history.retention(arguments.keep, apply=arguments.apply)
                 _render_execution_retention(retention, options.output_format, stdout)
+                return EXIT_SUCCESS
+            if arguments.execution_command == "summary":
+                summary = history.summary()
+                _render_execution_summary(summary, options.output_format, stdout)
                 return EXIT_SUCCESS
             if arguments.execution_command == "show":
                 records = (history.get(arguments.execution_id),)
@@ -1255,6 +1262,28 @@ def _render_execution_records(
         if record.diagnostic:
             print(f"Diagnostic: {record.diagnostic}", file=output)
         _render_targeting(record.targeting, output)
+
+
+def _render_execution_summary(
+    summary: ExecutionSummary, output_format: str, output: TextIO | None
+) -> None:
+    payload = {
+        "by_mode": dict(summary.by_mode),
+        "by_operation": dict(summary.by_operation),
+        "by_status": dict(summary.by_status),
+        "schema_version": 1,
+        "total": summary.total,
+    }
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    print(f"Executions: {summary.total}", file=output)
+    for status, count in summary.by_status.items():
+        print(f"Status {status}: {count}", file=output)
+    for mode, count in summary.by_mode.items():
+        print(f"Mode {mode}: {count}", file=output)
+    for operation, count in summary.by_operation.items():
+        print(f"Operation {operation}: {count}", file=output)
 
 
 def _execution_record(record: ExecutionRecord) -> dict[str, object]:

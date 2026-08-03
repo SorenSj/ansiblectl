@@ -113,6 +113,10 @@ identifier and matches immutable execution attribution exactly.
 `--playbook-path` accepts only a canonical workspace-relative POSIX path and
 matches the safe persisted playbook attribution exactly.
 
+`execution summary` returns a versioned read-only count of safely parsed
+records by every classified status and mode plus sorted operation identifier.
+It omits output references, diagnostics, paths, revisions, and digests.
+
 Local Ansible processes receive a controlled `ANSIBLE_LOCAL_TEMP` below the
 validated workspace's private `.ansiblectl/tmp` directory. The directory uses
 owner-only permissions, external environment overrides are ignored, and
@@ -152,6 +156,7 @@ configuration therefore cannot produce execution side effects.
 - Execution history can be filtered by one validated exact playbook-byte digest.
 - Execution history can be filtered by one validated immutable resolved revision.
 - Execution history can be filtered by one validated workspace-relative playbook path.
+- Execution summary reports deterministic safe counts without execution details.
 - Ansible local temporary files remain inside the private workspace boundary.
 - Invalid effective configuration stops a run before other inputs or adapters are touched.
 

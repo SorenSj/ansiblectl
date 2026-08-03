@@ -1,5 +1,7 @@
 """Execution-history inspection use cases."""
 
+from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 
@@ -11,6 +13,14 @@ from ansiblectl.domain.execution import (
     ExecutionRetentionResult,
     ExecutionStatus,
 )
+
+
+@dataclass(frozen=True)
+class ExecutionSummary:
+    total: int
+    by_status: Mapping[str, int]
+    by_mode: Mapping[str, int]
+    by_operation: Mapping[str, int]
 
 
 @dataclass(frozen=True)
@@ -71,6 +81,18 @@ class ExecutionHistoryService:
 
     def get(self, execution_id: str) -> ExecutionRecord:
         return self.port.get(execution_id)
+
+    def summary(self) -> ExecutionSummary:
+        records = self.port.list()
+        status_counts = Counter(record.status.value for record in records)
+        mode_counts = Counter(record.mode.value for record in records)
+        operation_counts = Counter(record.operation for record in records)
+        return ExecutionSummary(
+            len(records),
+            {status.value: status_counts[status.value] for status in ExecutionStatus},
+            {mode.value: mode_counts[mode.value] for mode in ExecutionMode},
+            dict(sorted(operation_counts.items())),
+        )
 
     def retention(self, keep: int, *, apply: bool) -> ExecutionRetentionResult:
         if keep < 0:

@@ -35,6 +35,15 @@ def test_history_service_delegates_typed_queries() -> None:
     service = ExecutionHistoryService(FakeHistoryPort(record))
 
     assert service.list() == (record,)
+    assert service.summary().total == 1
+    assert service.summary().by_status == {
+        "cancelled": 0,
+        "completed": 1,
+        "failed": 0,
+        "timed_out": 0,
+    }
+    assert service.summary().by_mode == {"apply": 0, "check": 1}
+    assert service.summary().by_operation == {"run": 1}
     assert service.get("run-1") == record
     assert service.retention(0, apply=False) == ExecutionRetentionResult(0, ("run-1",), False)
     assert service.retention(0, apply=True) == ExecutionRetentionResult(0, ("run-1",), True)

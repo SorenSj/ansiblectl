@@ -158,6 +158,16 @@ labels are intentionally not used for this filter.
 Use `execution list --playbook-path playbooks/site.yml` to select the same safe
 workspace-relative playbook path reported by validation and execution output.
 
+Get a compact operational overview without output references or captured
+Ansible data:
+
+```console
+uv run ansiblectl --workspace ~/automation/example execution summary
+```
+
+The versioned result counts records by classified status, check/apply mode, and
+stable operation identifier.
+
 Ansiblectl isolates Ansible's controller-side temporary files below the
 workspace's owner-only `.ansiblectl/tmp` directory instead of relying on
 `~/.ansible/tmp`. Captured process output remains below `.ansiblectl/runs`;

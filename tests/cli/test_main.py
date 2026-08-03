@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from ansiblectl.application.execution import GovernedExecutionResult
+from ansiblectl.application.execution_history import ExecutionSummary
 from ansiblectl.application.inventory import InventoryValidationResult
 from ansiblectl.application.playbook import PlaybookValidationResult, SyntaxCheckEvidence
 from ansiblectl.application.run import RunPreflightResult
@@ -1439,6 +1440,14 @@ class FakeExecutionHistoryService:
             raise ExecutionError(f"Execution '{execution_id}' was not found in this workspace.")
         return self.record
 
+    def summary(self) -> ExecutionSummary:
+        return ExecutionSummary(
+            1,
+            {"completed": 1, "failed": 0, "timed_out": 0, "cancelled": 0},
+            {"check": 1, "apply": 0},
+            {"playbook.syntax_check": 1},
+        )
+
     def retention(self, keep: int, *, apply: bool) -> ExecutionRetentionResult:
         assert keep == 0
         return ExecutionRetentionResult(0, (self.record.execution_id,), apply)
@@ -1471,6 +1480,26 @@ def test_execution_list_renders_safe_machine_history(tmp_path: Path) -> None:
     assert payload["executions"][0]["verbosity"] == 3
     assert payload["executions"][0]["diff"] is True
     assert payload["executions"][0]["operation"] == "playbook.syntax_check"
+
+
+def test_execution_summary_renders_safe_stable_counts(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "--output-format", "json", "execution", "summary"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        execution_history_service=FakeExecutionHistoryService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue()) == {
+        "by_mode": {"apply": 0, "check": 1},
+        "by_operation": {"playbook.syntax_check": 1},
+        "by_status": {"cancelled": 0, "completed": 1, "failed": 0, "timed_out": 0},
+        "schema_version": 1,
+        "total": 1,
+    }
 
 
 def test_execution_list_filters_by_exact_operation(tmp_path: Path) -> None:
