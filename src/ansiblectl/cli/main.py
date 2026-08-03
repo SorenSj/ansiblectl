@@ -308,7 +308,7 @@ def main(
         except WorkspaceError as error:
             print(f"Workspace error: {error}", file=stderr)
             return EXIT_EXPECTED_FAILURE
-        except (InventoryError, PlaybookError, ExecutionError) as error:
+        except (InventoryError, PlaybookError, ExecutionError, RepositoryError) as error:
             print(f"Run error: {error}", file=stderr)
             return EXIT_EXPECTED_FAILURE
         _render_run_result(run_result, options.output_format, stdout)

@@ -1,6 +1,9 @@
 """Built-in policy tests."""
 
-from ansiblectl.application.standard_policies import ApplyRequiresLimitPolicy
+from ansiblectl.application.standard_policies import (
+    ApplyRequiresCleanRepositoryPolicy,
+    ApplyRequiresLimitPolicy,
+)
 from ansiblectl.domain.policy import EvaluationRequest
 
 
@@ -20,3 +23,17 @@ def test_apply_with_limit_and_check_mode_have_no_finding() -> None:
 
     assert policy.evaluate(EvaluationRequest("run.apply", "site.yml", {"limit": "web"})) == ()
     assert policy.evaluate(EvaluationRequest("run.check", "site.yml", {"limit": None})) == ()
+
+
+def test_apply_requires_clean_repository_but_check_allows_dirty_worktree() -> None:
+    policy = ApplyRequiresCleanRepositoryPolicy()
+
+    findings = policy.evaluate(
+        EvaluationRequest("run.apply", "site.yml", {"repository_dirty": True})
+    )
+
+    assert findings[0].rule_id == "ANSIBLECTL-APPLY-002"
+    assert (
+        policy.evaluate(EvaluationRequest("run.check", "site.yml", {"repository_dirty": True}))
+        == ()
+    )

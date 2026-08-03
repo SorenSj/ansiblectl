@@ -17,6 +17,10 @@ class DirtyWorktreeError(RepositoryError):
     """Raised when an operation would overwrite uncommitted user work."""
 
 
+class RevisionMismatchError(RepositoryError):
+    """Raised when the requested revision is not the checked-out content."""
+
+
 @dataclass(frozen=True)
 class RepositoryRequest:
     workspace_root: Path
@@ -39,6 +43,8 @@ class RepositoryResult:
     repository_path: Path
     revision: str
     dirty: bool
+    resolved_revision: str | None = None
+    head_revision: str | None = None
 
 
 class RepositoryPort(Protocol):
@@ -53,5 +59,16 @@ def require_clean_worktree(result: RepositoryResult) -> RepositoryResult:
     if result.dirty:
         raise DirtyWorktreeError(
             "Repository has uncommitted changes. Commit or stash them before synchronising."
+        )
+    return result
+
+
+def require_checked_out_revision(result: RepositoryResult) -> RepositoryResult:
+    if result.resolved_revision is None or result.head_revision is None:
+        raise RevisionMismatchError("Repository adapter did not resolve revision and HEAD.")
+    if result.resolved_revision != result.head_revision:
+        raise RevisionMismatchError(
+            f"Requested revision '{result.revision}' is not checked out. "
+            "Synchronise the repository before running the playbook."
         )
     return result

@@ -12,12 +12,14 @@ from ansiblectl.infrastructure.git_repository import GitRepositoryAdapter
 def test_adapter_uses_fixed_credential_free_git_arguments(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    captured: dict[str, object] = {}
+    calls: list[tuple[object, ...]] = []
 
     def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
-        captured["args"] = args
-        captured["kwargs"] = kwargs
-        return subprocess.CompletedProcess([], 0, stdout=" M README.md\n")
+        calls.append(args)
+        argv = args[0]
+        assert isinstance(argv, tuple)
+        stdout = " M README.md\n" if argv[1] == "status" else "abc123\n"
+        return subprocess.CompletedProcess([], 0, stdout=stdout)
 
     monkeypatch.setattr(subprocess, "run", fake_run)
     request = RepositoryRequest(tmp_path, tmp_path / "repo", "main")
@@ -25,14 +27,23 @@ def test_adapter_uses_fixed_credential_free_git_arguments(
     result = GitRepositoryAdapter().inspect(request)
 
     assert result.dirty is True
-    assert captured["args"] == (("git", "status", "--porcelain"),)
-    assert captured["kwargs"] == {
-        "cwd": request.repository_path,
-        "capture_output": True,
-        "check": True,
-        "shell": False,
-        "text": True,
-    }
+    assert result.resolved_revision == "abc123"
+    assert result.head_revision == "abc123"
+    assert calls == [
+        (
+            (
+                "git",
+                "status",
+                "--porcelain",
+                "--untracked-files=all",
+                "--",
+                ".",
+                ":(exclude).ansiblectl",
+            ),
+        ),
+        (("git", "rev-parse", "--verify", "main^{commit}"),),
+        (("git", "rev-parse", "--verify", "HEAD"),),
+    ]
 
 
 def test_adapter_returns_actionable_error_when_git_inspection_fails(

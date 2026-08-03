@@ -68,6 +68,7 @@ evaluated as `run.check`. Execution events and history retain the selected mode.
 - An unconfirmed apply request reaches neither policy nor the execution adapter.
 - A confirmed apply request omits `--check` and remains subject to the policy gate.
 - In the default deny mode, apply without an explicit host limit is blocked before materialization.
+- Run preflight requires the requested Git revision at HEAD; default apply policy also requires a clean worktree.
 
 ## Non-goals
 

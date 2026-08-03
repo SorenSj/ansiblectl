@@ -10,6 +10,7 @@ import yaml
 from ansiblectl.application.execution import ExecutionService
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.policy import PolicyService
+from ansiblectl.application.repository import RepositoryService
 from ansiblectl.application.run import RunService
 from ansiblectl.application.standard_policies import ApplyRequiresLimitPolicy
 from ansiblectl.domain.errors import ExecutionError
@@ -22,6 +23,7 @@ from ansiblectl.domain.execution import (
 )
 from ansiblectl.domain.inventory import Host, InventoryFragment
 from ansiblectl.domain.policy import EnforcementMode, EvaluationRequest, PolicyFinding
+from ansiblectl.domain.repository import RepositoryRequest, RepositoryResult
 
 
 class FakeInventoryProvider:
@@ -50,6 +52,17 @@ class RecordingPolicy:
     def evaluate(self, request: EvaluationRequest) -> tuple[PolicyFinding, ...]:
         self.requests.append(request)
         return ()
+
+
+class FakeRunRepositoryPort:
+    def __init__(self, result: RepositoryResult) -> None:
+        self.result = result
+
+    def inspect(self, request: RepositoryRequest) -> RepositoryResult:
+        return self.result
+
+    def sync(self, request: RepositoryRequest) -> RepositoryResult:
+        return self.result
 
 
 @contextmanager
@@ -113,11 +126,13 @@ def test_apply_requires_confirmation_before_execution(tmp_path: Path) -> None:
     playbook.write_text("---\n", encoding="utf-8")
     port = RecordingExecutionPort()
     policy = RecordingPolicy()
+    repository_result = RepositoryResult(tmp_path, "main", False, "abc", "abc")
     service = RunService(
         InventoryService([FakeInventoryProvider()]),
         ExecutionService(port),
         PolicyService([policy]),
         fake_materializer,
+        RepositoryService(FakeRunRepositoryPort(repository_result)),
     )
 
     with pytest.raises(ExecutionError, match="explicit confirmation"):
@@ -131,11 +146,13 @@ def test_confirmed_apply_omits_check_argument(tmp_path: Path) -> None:
     playbook.write_text("---\n", encoding="utf-8")
     port = RecordingExecutionPort()
     policy = RecordingPolicy()
+    repository_result = RepositoryResult(tmp_path, "main", False, "abc", "abc")
     service = RunService(
         InventoryService([FakeInventoryProvider()]),
         ExecutionService(port),
         PolicyService([policy]),
         fake_materializer,
+        RepositoryService(FakeRunRepositoryPort(repository_result)),
     )
 
     result = service.run_apply(
@@ -148,6 +165,8 @@ def test_confirmed_apply_omits_check_argument(tmp_path: Path) -> None:
     assert "--check" not in request.argv
     assert request.mode is ExecutionMode.APPLY
     assert policy.requests[0].operation == "run.apply"
+    assert policy.requests[0].attributes["repository_dirty"] is False
+    assert policy.requests[0].attributes["resolved_revision"] == "abc"
 
 
 def test_default_apply_limit_policy_blocks_before_materialization(tmp_path: Path) -> None:

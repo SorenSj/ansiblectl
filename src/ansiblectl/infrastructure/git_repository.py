@@ -13,20 +13,37 @@ class GitRepositoryAdapter:
     def inspect(self, request: RepositoryRequest) -> RepositoryResult:
         try:
             status = subprocess.run(
-                ("git", "status", "--porcelain"),
+                (
+                    "git",
+                    "status",
+                    "--porcelain",
+                    "--untracked-files=all",
+                    "--",
+                    ".",
+                    ":(exclude).ansiblectl",
+                ),
                 cwd=request.repository_path,
                 capture_output=True,
                 check=True,
                 shell=False,
                 text=True,
             )
+            resolved = _git_output(
+                request,
+                ("git", "rev-parse", "--verify", f"{request.revision}^{{commit}}"),
+            )
+            head = _git_output(request, ("git", "rev-parse", "--verify", "HEAD"))
         except (OSError, subprocess.CalledProcessError) as error:
             raise RepositoryError(
                 f"Cannot inspect repository at '{request.repository_path}'. "
                 "Verify it is a Git repository."
             ) from error
         return RepositoryResult(
-            request.repository_path, request.revision, bool(status.stdout.strip())
+            request.repository_path,
+            request.revision,
+            bool(status.stdout.strip()),
+            resolved,
+            head,
         )
 
     def sync(self, request: RepositoryRequest) -> RepositoryResult:
@@ -54,3 +71,15 @@ class GitRepositoryAdapter:
                 "Verify revision and authentication policy."
             ) from error
         return RepositoryResult(request.repository_path, request.revision, False)
+
+
+def _git_output(request: RepositoryRequest, argv: tuple[str, ...]) -> str:
+    completed = subprocess.run(
+        argv,
+        cwd=request.repository_path,
+        capture_output=True,
+        check=True,
+        shell=False,
+        text=True,
+    )
+    return completed.stdout.strip()

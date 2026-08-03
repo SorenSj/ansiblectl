@@ -33,6 +33,11 @@ Before a future sync mutation, the adapter inspects `git status --porcelain`;
 a dirty worktree is a typed failure that preserves user changes. Credentials
 are intentionally absent from this request and adapter contract.
 
+Execution preflight resolves both the requested revision and `HEAD` to commit
+identifiers and requires equality before policy evaluation. Inspection reports
+tracked and untracked workspace changes while excluding only Ansiblectl's own
+`.ansiblectl` runtime directory.
+
 For a clean repository, the initial Git sync runs fixed `git fetch --prune` and
 `git checkout --detach REVISION` argument vectors. It reports the repository
 and revision in the typed result; authentication remains external environment
@@ -43,6 +48,7 @@ policy rather than a command argument.
 - A fake repository port validates application orchestration.
 - A dirty worktree failure does not overwrite user changes.
 - Credentials are absent from rendered command diagnostics.
+- Revision mismatch prevents execution and recommends repository synchronisation.
 
 ## Non-goals
 

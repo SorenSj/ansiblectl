@@ -102,6 +102,11 @@ selected mode is retained in execution history. Omitting either apply flag
 fails before workspace access; the default deny policy blocks apply without a
 host limit before inventory materialization or execution.
 
+Before either mode runs, the workspace Git repository must resolve the supplied
+revision to the current `HEAD`. Default apply policy additionally requires a
+clean worktree; Ansiblectl's own `.ansiblectl` runtime files are excluded from
+that dirty-state calculation.
+
 Captured Ansible output is not echoed directly. Non-empty stdout and stderr are
 stored with owner-only permissions below `.ansiblectl/runs`, and the command
 returns their file references for diagnosis.

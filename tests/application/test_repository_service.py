@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 
 from ansiblectl.application.repository import RepositoryService
-from ansiblectl.domain.repository import DirtyWorktreeError, RepositoryRequest, RepositoryResult
+from ansiblectl.domain.repository import (
+    DirtyWorktreeError,
+    RepositoryRequest,
+    RepositoryResult,
+    RevisionMismatchError,
+)
 
 
 @dataclass(frozen=True)
@@ -32,3 +37,14 @@ def test_clean_worktree_is_inspected_before_sync(tmp_path: Path) -> None:
     request = RepositoryRequest(tmp_path, tmp_path / "repo", "main")
     result = RepositoryResult(request.repository_path, "main", False)
     assert RepositoryService(FakeRepositoryPort(result)).sync(request).revision == "main"
+
+
+def test_execution_requires_requested_revision_at_head(tmp_path: Path) -> None:
+    request = RepositoryRequest(tmp_path, tmp_path / "repo", "main")
+    matching = RepositoryResult(request.repository_path, "main", False, "abc", "abc")
+    mismatch = RepositoryResult(request.repository_path, "main", False, "abc", "def")
+
+    service = RepositoryService(FakeRepositoryPort(matching))
+    assert service.inspect_for_execution(request) == matching
+    with pytest.raises(RevisionMismatchError, match="not checked out"):
+        RepositoryService(FakeRepositoryPort(mismatch)).inspect_for_execution(request)

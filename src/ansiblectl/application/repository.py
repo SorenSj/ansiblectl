@@ -6,6 +6,7 @@ from ansiblectl.domain.repository import (
     RepositoryPort,
     RepositoryRequest,
     RepositoryResult,
+    require_checked_out_revision,
     require_clean_worktree,
 )
 
@@ -23,3 +24,6 @@ class RepositoryService:
     def sync(self, request: RepositoryRequest) -> RepositoryResult:
         self.inspect_for_sync(request)
         return self.port.sync(request)
+
+    def inspect_for_execution(self, request: RepositoryRequest) -> RepositoryResult:
+        return require_checked_out_revision(self.port.inspect(request))

@@ -8,10 +8,12 @@ from pathlib import Path
 from ansiblectl.application.execution import ExecutionService, GovernedExecutionResult
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.policy import PolicyService
+from ansiblectl.application.repository import RepositoryService
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.execution import ExecutionMode, ExecutionRequest, ExecutionTargeting
 from ansiblectl.domain.playbook import select_playbook
 from ansiblectl.domain.policy import EnforcementMode, EvaluationRequest
+from ansiblectl.domain.repository import RepositoryRequest
 
 InventoryMaterializer = Callable[[Mapping[str, object]], AbstractContextManager[Path]]
 
@@ -22,6 +24,7 @@ class RunService:
     execution: ExecutionService
     policy: PolicyService
     materialize_inventory: InventoryMaterializer
+    repository: RepositoryService | None = None
 
     def run_check(
         self,
@@ -86,6 +89,13 @@ class RunService:
 
         selected = select_playbook(workspace_root, playbook_identifier, revision)
         resolved_inventory = self.inventory.resolve()
+        repository = (
+            None
+            if self.repository is None
+            else self.repository.inspect_for_execution(
+                RepositoryRequest(workspace_root.resolve(), workspace_root.resolve(), revision)
+            )
+        )
         report = self.policy.evaluate(
             EvaluationRequest(
                 f"run.{mode.value}",
@@ -94,6 +104,10 @@ class RunService:
                     "limit": targeting.limit,
                     "tags": targeting.tags,
                     "skip_tags": targeting.skip_tags,
+                    "repository_dirty": None if repository is None else repository.dirty,
+                    "resolved_revision": (
+                        None if repository is None else repository.resolved_revision
+                    ),
                 },
             ),
             policy_mode,

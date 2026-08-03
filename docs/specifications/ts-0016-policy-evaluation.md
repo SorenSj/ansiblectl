@@ -38,6 +38,11 @@ composition enables this rule by default. In the default `deny` enforcement
 mode the finding prevents inventory materialization and adapter invocation;
 `report` and `warn` preserve their documented non-blocking semantics.
 
+The bundled rule `ANSIBLECTL-APPLY-002` emits a high-severity finding when
+`run.apply` targets a dirty repository worktree. It does not apply to
+`run.check`. Repository revision mismatch is a validation failure before policy
+evaluation rather than an overridable finding.
+
 ## Verification
 
 - The same inputs produce an identical ordered report.
@@ -45,6 +50,7 @@ mode the finding prevents inventory materialization and adapter invocation;
 - Machine-readable policy output validates against its schema.
 - Apply without a host limit produces `ANSIBLECTL-APPLY-001`; check mode does not.
 - The default CLI composition includes the bundled apply-limit rule.
+- Dirty apply produces `ANSIBLECTL-APPLY-002`; dirty check mode does not.
 
 ## Non-goals
 
