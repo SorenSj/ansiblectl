@@ -1,5 +1,6 @@
 """Workspace state-store tests."""
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -29,3 +30,15 @@ def test_unsupported_state_schema_offers_a_reset_path(tmp_path: Path) -> None:
 
     with pytest.raises(StateError, match="schema is unsupported"):
         WorkspaceStateStore(tmp_path).read()
+
+
+def test_concurrent_atomic_updates_leave_a_valid_state_record(tmp_path: Path) -> None:
+    store = WorkspaceStateStore(tmp_path)
+
+    def write(value: int) -> None:
+        store.write({"inventory": CacheEntry("git:main", "revision changes", {"hosts": value})})
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        list(executor.map(write, (1, 2)))
+
+    assert store.read()["inventory"].value["hosts"] in {1, 2}
