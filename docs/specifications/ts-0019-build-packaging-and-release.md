@@ -36,6 +36,11 @@ wheel, source archive, and build metadata as a retained workflow artifact.
 This initial workflow does not publish to a package index and uses no
 publication credentials.
 
+Artifact inspection requires exactly one wheel and source archive, verifies
+the wheel name and version against package metadata, and verifies that build
+metadata matches both the current Git revision and the SHA-256 digest of
+`uv.lock` before a tagged artifact is uploaded.
+
 ## Verification
 
 - A clean checkout builds the same package metadata.

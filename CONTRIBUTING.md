@@ -20,6 +20,8 @@ uv run python -m tools.validate_docs
 uv run python -m tools.check_architecture
 uv run python -m tools.validate_release
 uv build
+uv run python -m tools.write_build_metadata
+uv run python -m tools.inspect_release_artifacts
 ```
 
 The supported runtime matrix is Python 3.12 through 3.14. `uv.lock` records
