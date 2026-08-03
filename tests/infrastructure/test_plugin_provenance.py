@@ -4,9 +4,11 @@ import base64
 import hashlib
 import io
 import json
+from dataclasses import replace
 
 import pytest
 
+from ansiblectl.domain.plugin_policy import PluginPolicyRule, UnattendedPluginPolicy
 from ansiblectl.domain.plugin_trust import (
     PluginProvenance,
     PluginTrustError,
@@ -14,7 +16,11 @@ from ansiblectl.domain.plugin_trust import (
     parse_provenance,
 )
 from ansiblectl.domain.plugins import ProviderDescriptor
-from ansiblectl.infrastructure.plugin_provenance import signing_key_id, verify_provenance
+from ansiblectl.infrastructure.plugin_provenance import (
+    signing_key_id,
+    verify_plugin_trust,
+    verify_provenance,
+)
 
 _ARTIFACT = b"fixed plugin artifact\n"
 _PUBLIC_BYTES = bytes.fromhex("03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8")
@@ -146,3 +152,44 @@ def test_manifest_mismatch_precedes_origin_rejection() -> None:
         )
 
     assert raised.value.reason is PluginTrustReason.MANIFEST_PROVENANCE_MISMATCH
+
+
+def test_complete_trust_verification_returns_unattended_permission_grants() -> None:
+    provenance, descriptor, public_bytes = _fixture()
+    descriptor = replace(descriptor, permissions=("network",))
+    policy = UnattendedPluginPolicy(
+        allow=(
+            PluginPolicyRule(
+                provider_identity=provenance.provider_identity,
+                permissions=frozenset({"network"}),
+                artifact_digest=provenance.artifact_digest,
+                signing_key_id=provenance.signing_key_id,
+                origins=frozenset({provenance.origin}),
+            ),
+        )
+    )
+
+    assert verify_plugin_trust(
+        provenance,
+        io.BytesIO(_ARTIFACT),
+        descriptor,
+        {signing_key_id(public_bytes): public_bytes},
+        _trusted_origins(public_bytes),
+        policy,
+    ) == frozenset({"network"})
+
+
+def test_cryptographic_failure_precedes_missing_unattended_policy() -> None:
+    provenance, descriptor, public_bytes = _fixture()
+
+    with pytest.raises(PluginTrustError) as raised:
+        verify_plugin_trust(
+            replace(provenance, signature=b"x" * 64),
+            io.BytesIO(_ARTIFACT),
+            descriptor,
+            {signing_key_id(public_bytes): public_bytes},
+            _trusted_origins(public_bytes),
+            None,
+        )
+
+    assert raised.value.reason is PluginTrustReason.SIGNATURE_INVALID

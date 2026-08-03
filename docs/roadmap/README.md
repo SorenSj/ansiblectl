@@ -81,7 +81,7 @@ Exit criteria:
   contracts before implementation.
 - [x] Canonical provenance parsing and fixed-vector Ed25519 verification are implemented.
 - [x] Artifact digest, manifest agreement, trusted-key, and origin checks occur before code import.
-- [ ] Unattended deny-overrides policy is deterministic and never prompts or persists approval.
+- [x] Unattended deny-overrides policy is deterministic and never prompts or persists approval.
 - [ ] Every stable decision reason has redacted human, JSON, and YAML contract tests.
 - [ ] Existing manifest discovery and interactive permission preflight remain compatible.
 - [ ] The complete quality, build, provenance, and release gates pass.

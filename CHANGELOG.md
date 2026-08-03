@@ -10,6 +10,7 @@ All notable changes to Ansiblectl are documented here.
 - Ed25519 signing-key identification, signature verification, streaming artifact hashing, and
   manifest agreement before plugin import.
 - Exact provider-and-signing-key origin allowlists, including explicit local-origin trust.
+- Pure unattended plugin-policy evaluation with deny precedence and local restriction ceilings.
 
 ## [0.3.0] - 2026-08-04
 
