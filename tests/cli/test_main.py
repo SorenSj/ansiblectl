@@ -369,7 +369,13 @@ class FailedRunService(FakeRunService):
         return GovernedExecutionResult(
             PolicyReport((), policy_mode),
             ExecutionResult(
-                "run-2", ExecutionStatus.TIMED_OUT, None, 30.0, diagnostic="Timeout reached."
+                "run-2",
+                ExecutionStatus.TIMED_OUT,
+                None,
+                30.0,
+                "/private/run/stdout.log",
+                "/private/run/stderr.log",
+                "Timeout reached.",
             ),
         )
 
@@ -396,6 +402,8 @@ def test_run_failure_uses_expected_failure_exit_and_safe_diagnostic(tmp_path: Pa
     assert result == EXIT_EXPECTED_FAILURE
     assert "timed_out" in output.getvalue()
     assert "Timeout reached" in output.getvalue()
+    assert "Stdout: /private/run/stdout.log" in output.getvalue()
+    assert "Stderr: /private/run/stderr.log" in output.getvalue()
 
 
 class DeniedRunService(FakeRunService):

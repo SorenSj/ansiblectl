@@ -36,11 +36,18 @@ and expose only output references (not raw process output). A cancellation
 requested before a process starts returns `cancelled`; in-process cancellation
 will be added with the asynchronous execution lifecycle.
 
+The local adapter stores each non-empty captured stream below the workspace's
+private `.ansiblectl/runs` area. Execution identifiers are transformed into
+safe directory keys, output files use owner-only permissions, and CLI results
+expose file references without echoing raw Ansible output. Partial output from
+a timed-out process follows the same storage policy.
+
 ## Verification
 
 - A fake execution port can verify a request without invoking a process.
 - A timeout returns a classified failure and retains the execution identifier.
 - Arguments containing spaces or special characters are passed safely without shell interpolation.
+- Captured and partial timeout output is stored with owner-only permissions and returned by reference.
 
 ## Non-goals
 

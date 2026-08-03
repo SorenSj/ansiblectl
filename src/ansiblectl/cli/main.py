@@ -429,5 +429,9 @@ def _render_run_result(
     if execution is not None:
         print(f"Execution: {execution.execution_id}", file=output)
         print(f"Status: {execution.status.value}", file=output)
+        if execution.stdout_reference:
+            print(f"Stdout: {execution.stdout_reference}", file=output)
+        if execution.stderr_reference:
+            print(f"Stderr: {execution.stderr_reference}", file=output)
         if execution.diagnostic:
             print(f"Diagnostic: {execution.diagnostic}", file=output)
