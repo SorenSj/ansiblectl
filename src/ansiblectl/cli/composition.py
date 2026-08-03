@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from ansiblectl import __version__
+from ansiblectl.application.configuration import ConfigurationService
 from ansiblectl.application.execution import ExecutionService
 from ansiblectl.application.execution_history import ExecutionHistoryService
 from ansiblectl.application.inventory import InventoryService
@@ -21,6 +22,7 @@ from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.events import EventBus
 from ansiblectl.domain.inventory import InventoryError
+from ansiblectl.domain.workspace import Workspace
 from ansiblectl.infrastructure.execution_history import JsonLinesExecutionHistory
 from ansiblectl.infrastructure.generated_inventory import materialize_inventory
 from ansiblectl.infrastructure.git_repository import GitRepositoryAdapter
@@ -28,6 +30,7 @@ from ansiblectl.infrastructure.json_logging import EventLogSubscriber, JsonLines
 from ansiblectl.infrastructure.local_execution import LocalExecutionAdapter
 from ansiblectl.infrastructure.local_workspace_store import LocalWorkspaceStore
 from ansiblectl.infrastructure.plugin_manifests import discover_manifests
+from ansiblectl.infrastructure.yaml_configuration import LocalConfigurationSourceProvider
 from ansiblectl.infrastructure.yaml_inventory import YamlInventoryProvider
 
 
@@ -41,6 +44,15 @@ def build_workspace_service() -> WorkspaceService:
     """Create the local workspace use cases for a CLI invocation."""
 
     return WorkspaceService(store=LocalWorkspaceStore())
+
+
+def build_configuration_service(workspace: Workspace) -> ConfigurationService:
+    """Create typed local configuration resolution for one workspace."""
+
+    environment = {
+        name: value for name, value in os.environ.items() if name == "ANSIBLECTL_LOG_LEVEL"
+    }
+    return ConfigurationService(LocalConfigurationSourceProvider(workspace, environment))
 
 
 def build_repository_service() -> RepositoryService:

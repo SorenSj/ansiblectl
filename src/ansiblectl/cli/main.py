@@ -12,6 +12,7 @@ from io import StringIO
 from pathlib import Path
 from typing import TextIO
 
+from ansiblectl.application.configuration import ConfigurationService
 from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.execution_history import ExecutionHistoryService
 from ansiblectl.application.inventory import InventoryService
@@ -22,6 +23,7 @@ from ansiblectl.application.run import RunService
 from ansiblectl.application.status import StatusService
 from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.cli.composition import (
+    build_configuration_service,
     build_execution_history_service,
     build_inventory_service,
     build_playbook_validation_service,
@@ -33,7 +35,8 @@ from ansiblectl.cli.composition import (
     execution_environment,
 )
 from ansiblectl.cli.outcomes import render_outcome
-from ansiblectl.domain.errors import ExecutionError, WorkspaceError
+from ansiblectl.domain.configuration import EffectiveConfiguration
+from ansiblectl.domain.errors import ConfigurationError, ExecutionError, WorkspaceError
 from ansiblectl.domain.execution import (
     ExecutionRecord,
     ExecutionRetentionResult,
@@ -160,6 +163,9 @@ def build_parser() -> argparse.ArgumentParser:
         "path", type=Path, nargs="?", help="Workspace directory (default: current directory)."
     )
     workspace_commands.add_parser("show", help="Show the selected or discovered workspace.")
+    config = subcommands.add_parser("config", help="Inspect effective configuration safely.")
+    config_commands = config.add_subparsers(dest="config_command", required=True)
+    config_commands.add_parser("show", help="Show redacted effective configuration.")
     inventory = subcommands.add_parser("inventory", help="Resolve and inspect inventory.")
     inventory_commands = inventory.add_subparsers(dest="inventory_command", required=True)
     inventory_show = inventory_commands.add_parser("show", help="Show the resolved inventory.")
@@ -268,6 +274,7 @@ def main(
     *,
     status_service: StatusService | None = None,
     workspace_service: WorkspaceService | None = None,
+    configuration_service: ConfigurationService | None = None,
     inventory_service: InventoryService | None = None,
     repository_service: RepositoryService | None = None,
     plugin_service: PluginDiscoveryService | None = None,
@@ -308,6 +315,35 @@ def main(
                 stderr,
             )
         _render_workspace(workspace, options.output_format, stdout)
+    elif arguments.command == "config":
+        workspace_service_instance = workspace_service or build_workspace_service()
+        try:
+            workspace = workspace_service_instance.resolve(
+                options.workspace, current_directory or Path.cwd()
+            )
+            configuration_service_instance = configuration_service or build_configuration_service(
+                workspace
+            )
+            configuration = configuration_service_instance.resolve()
+        except WorkspaceError as error:
+            return _render_cli_failure(
+                "config show",
+                str(error),
+                "Initialize or select a valid workspace and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
+        except ConfigurationError as error:
+            return _render_cli_failure(
+                "config show",
+                str(error),
+                "Correct the identified configuration source and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
+        _render_configuration(configuration, options.output_format, stdout)
     elif arguments.command == "inventory":
         try:
             if inventory_service is None:
@@ -608,6 +644,24 @@ def _render_workspace(workspace: Workspace, output_format: str, output: TextIO |
         return
     print(f"Workspace: {workspace.root}", file=output)
     print(f"Metadata: {workspace.metadata_path}", file=output)
+
+
+def _render_configuration(
+    configuration: EffectiveConfiguration, output_format: str, output: TextIO | None
+) -> None:
+    payload = {**configuration.redacted(), "schema_version": 1}
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    project_name = configuration.project_name or "<not set>"
+    print(f"Project: {project_name}", file=output)
+    print(f"Log level: {configuration.log_level}", file=output)
+    print("Secrets:", file=output)
+    for name in sorted(configuration.secret_references):
+        print(f"  {name}: <redacted>", file=output)
+    print("Provenance:", file=output)
+    for field, origin in sorted(configuration.provenance.items()):
+        print(f"  {field}: {origin}", file=output)
 
 
 def _render_inventory(

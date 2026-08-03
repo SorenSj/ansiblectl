@@ -16,6 +16,7 @@ from ansiblectl.cli.main import (
     EXIT_SUCCESS,
     main,
 )
+from ansiblectl.domain.configuration import EffectiveConfiguration
 from ansiblectl.domain.errors import ExecutionError, WorkspaceNotFoundError
 from ansiblectl.domain.execution import (
     ExecutionMode,
@@ -57,6 +58,7 @@ def test_help_lists_global_options_and_status_command(capsys: pytest.CaptureFixt
     assert "--workspace" in captured.out
     assert "--output-format" in captured.out
     assert "status" in captured.out
+    assert "config" in captured.out
     assert "repository" in captured.out
     assert "playbook" in captured.out
     assert "execution" in captured.out
@@ -85,6 +87,56 @@ class FakeWorkspaceService:
         if explicit_path is None:
             raise WorkspaceNotFoundError("Run 'ansiblectl workspace init'.")
         return self.initialize(explicit_path)
+
+
+class FakeConfigurationService:
+    def resolve(self) -> EffectiveConfiguration:
+        return EffectiveConfiguration(
+            "demo",
+            "warning",
+            {"token": "vault:production-token"},
+            {"project_name": "project", "log_level": "environment", "secrets": "project"},
+        )
+
+
+def test_config_show_renders_redacted_effective_configuration(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "--output-format", "json", "config", "show"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        configuration_service=FakeConfigurationService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue()) == {
+        "log_level": "warning",
+        "project_name": "demo",
+        "provenance": {
+            "log_level": "environment",
+            "project_name": "project",
+            "secrets": "project",
+        },
+        "schema_version": 1,
+        "secrets": {"token": "<redacted>"},
+    }
+    assert "production-token" not in output.getvalue()
+
+
+def test_config_show_reports_invalid_source_safely(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    assert main(["workspace", "init", str(workspace)], stdout=StringIO()) == EXIT_SUCCESS
+    (workspace / "ansiblectl.yaml").write_text(
+        "schema_version: 1\nunknown: value\n", encoding="utf-8"
+    )
+    error = StringIO()
+
+    result = main(["--workspace", str(workspace), "config", "show"], stderr=error)
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert "Unknown field 'unknown'" in error.getvalue()
+    assert "Correct the identified configuration source" in error.getvalue()
 
 
 def test_workspace_init_renders_the_injected_service_result(tmp_path: Path) -> None:
@@ -279,6 +331,7 @@ def test_repository_sync_json_has_no_progress_decoration(tmp_path: Path) -> None
     ("command", "operation"),
     [
         (["workspace", "show"], "workspace show"),
+        (["config", "show"], "config show"),
         (["inventory", "show"], "inventory show"),
         (["repository", "inspect", "repo", "--revision", "main"], "repository inspect"),
         (["plugin", "validate", "plugin.yaml"], "plugin validate"),

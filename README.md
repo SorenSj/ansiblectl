@@ -27,6 +27,14 @@ uv run ansiblectl --workspace ~/automation/example workspace show
 
 This creates only `.ansiblectl/workspace.json` beneath the selected workspace.
 
+Inspect effective configuration and source provenance without exposing secret
+references:
+
+```console
+uv run ansiblectl --workspace ~/automation/example config show
+uv run ansiblectl --workspace ~/automation/example --output-format json config show
+```
+
 Resolve and inspect the currently configured inventory in human or stable JSON
 form:
 
