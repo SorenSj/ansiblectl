@@ -21,6 +21,7 @@ class ExecutionHistoryService:
         operation: str | None = None,
         status: ExecutionStatus | None = None,
         mode: ExecutionMode | None = None,
+        inventory_digest: str | None = None,
         limit: int | None = None,
     ) -> tuple[ExecutionRecord, ...]:
         records = self.port.list()
@@ -32,6 +33,12 @@ class ExecutionHistoryService:
             records = tuple(record for record in records if record.status is status)
         if mode is not None:
             records = tuple(record for record in records if record.mode is mode)
+        if inventory_digest is not None:
+            if not _is_canonical_sha256(inventory_digest):
+                raise ExecutionError("Inventory digest filter must be a lowercase sha256: value.")
+            records = tuple(
+                record for record in records if record.inventory_digest == inventory_digest
+            )
         if limit is not None:
             if limit <= 0:
                 raise ExecutionError("Execution result limit must be greater than zero.")
@@ -50,3 +57,12 @@ class ExecutionHistoryService:
         return ExecutionRetentionResult(
             min(keep, len(records)), tuple(record.execution_id for record in records[keep:]), False
         )
+
+
+def _is_canonical_sha256(value: str) -> bool:
+    digest = value.removeprefix("sha256:")
+    return (
+        value.startswith("sha256:")
+        and len(digest) == 64
+        and all(character in "0123456789abcdef" for character in digest)
+    )

@@ -146,6 +146,10 @@ combined to locate, for example, only failed apply executions without reading
 captured stdout or stderr. A positive `--limit` returns only the newest
 matching records without changing retention.
 
+Copy the canonical digest from `inventory show` or `inventory validate` into
+`execution list --inventory-digest sha256:...` to find only executions that
+used that exact resolved inventory representation.
+
 Ansiblectl isolates Ansible's controller-side temporary files below the
 workspace's owner-only `.ansiblectl/tmp` directory instead of relying on
 `~/.ansible/tmp`. Captured process output remains below `.ansiblectl/runs`;

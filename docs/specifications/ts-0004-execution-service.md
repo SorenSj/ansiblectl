@@ -103,6 +103,10 @@ alter retention ordering or data. Status values use the existing `completed`,
 positive `--limit` is applied after those filters and returns only the newest
 matching records without changing retention.
 
+`--inventory-digest` accepts the canonical lowercase `sha256:` representation
+and matches it exactly against safe execution metadata before the result limit
+is applied.
+
 Local Ansible processes receive a controlled `ANSIBLE_LOCAL_TEMP` below the
 validated workspace's private `.ansiblectl/tmp` directory. The directory uses
 owner-only permissions, external environment overrides are ignored, and
@@ -138,6 +142,7 @@ configuration therefore cannot produce execution side effects.
 - Execution history can be filtered by classified status and combined with operation filtering.
 - Execution history can distinguish and filter check-mode versus apply-mode records.
 - Execution-history results can be bounded by a positive newest-first limit after filtering.
+- Execution history can be filtered by one validated exact canonical inventory digest.
 - Ansible local temporary files remain inside the private workspace boundary.
 - Invalid effective configuration stops a run before other inputs or adapters are touched.
 

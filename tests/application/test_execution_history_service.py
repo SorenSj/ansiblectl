@@ -60,6 +60,20 @@ def test_history_service_filters_exact_operation_and_rejects_empty_filter() -> N
     assert service.list("playbook.syntax_check", ExecutionStatus.COMPLETED) == (record,)
     assert service.list(mode=ExecutionMode.CHECK) == (record,)
     assert service.list(mode=ExecutionMode.APPLY) == ()
+    digest = "sha256:" + "a" * 64
+    record_with_digest = ExecutionRecord(
+        "timestamp",
+        "run-2",
+        ExecutionStatus.COMPLETED,
+        0,
+        0.1,
+        inventory_digest=digest,
+    )
+    digest_service = ExecutionHistoryService(FakeHistoryPort(record_with_digest))
+    assert digest_service.list(inventory_digest=digest) == (record_with_digest,)
+    assert digest_service.list(inventory_digest="sha256:" + "b" * 64) == ()
+    with pytest.raises(ExecutionError, match="lowercase sha256"):
+        service.list(inventory_digest="sha256:not-a-digest")
     assert service.list(limit=1) == (record,)
     with pytest.raises(ExecutionError, match="greater than zero"):
         service.list(limit=0)

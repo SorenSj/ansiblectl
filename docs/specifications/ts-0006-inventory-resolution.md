@@ -41,6 +41,8 @@ not raw inventory data, is retained in execution metadata and public events.
 `inventory show` reports the same digest in human output and in its
 `schema_version: 1` JSON contract, allowing preflight output to be matched to
 execution history.
+The digest can be supplied to `execution list --inventory-digest` as an exact,
+read-only history filter.
 
 The explicit `inventory validate` preflight resolves and materializes the same
 canonical mapping, then invokes `ansible-inventory --list` with a controlled
@@ -55,6 +57,7 @@ execution history records the operation as `inventory.validate`.
 - A fake provider can be used in application tests.
 - Equivalent canonical mappings produce the same digest; content changes produce a different digest.
 - Inventory inspection and execution metadata use the same canonical digest algorithm.
+- Inventory inspection digests can select matching execution-history records exactly.
 - Materialized inventory is valid native Ansible YAML and remains private and ephemeral.
 - Explicit Ansible validation retains the canonical digest and private output references.
 
