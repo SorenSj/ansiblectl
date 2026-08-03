@@ -27,6 +27,12 @@ This specification defines the initial public and internal contract for this cap
 
 The repository port accepts a RepositoryRequest and returns typed state and operation results; Git is an adapter, not a public domain dependency.
 
+The initial request requires absolute workspace and repository paths, with the
+repository path contained by the workspace, and a non-empty explicit revision.
+Before a future sync mutation, the adapter inspects `git status --porcelain`;
+a dirty worktree is a typed failure that preserves user changes. Credentials
+are intentionally absent from this request and adapter contract.
+
 ## Verification
 
 - A fake repository port validates application orchestration.
@@ -36,4 +42,3 @@ The repository port accepts a RepositoryRequest and returns typed state and oper
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
