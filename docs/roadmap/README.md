@@ -100,9 +100,34 @@ Explicit non-goals:
 - Online key discovery, trust on first use, automatic revocation, or transparency-log availability.
 - Hosted policy management, remote API, or plugin execution sandboxing.
 
-### Future — Durable events and remote delivery
+## Active milestone
 
-- Persistent event ordering, retries, and delivery guarantees.
+### v0.5.0 — Durable event outbox
+
+- Workspace-scoped durable event envelopes with monotonic sequence allocation.
+- Ordered at-least-once delivery with independent consumer acknowledgements.
+- Deterministic bounded retry, explicit recovery, and safe prefix retention.
+- Redacted inspection without introducing any remote transport or credential boundary.
+
+Exit criteria:
+
+- [x] ADR-0040 and TS-0023 define durability, ordering, acknowledgement, retry, and retention
+  before implementation.
+- [ ] A schema-versioned SQLite outbox safely appends immutable redacted envelopes.
+- [ ] Consumer claims, acknowledgements, and stale-worker rejection preserve strict ordering.
+- [ ] Restart, crash-window, multiprocess, corruption, and symlink tests pass.
+- [ ] Retry, abandon, inspection, and retention are deterministic and redaction-safe.
+- [ ] Existing in-process subscribers and execution-history retention remain compatible.
+- [ ] The complete quality, build, provenance, and release gates pass.
+
+Explicit non-goals:
+
+- Remote delivery protocols, hosted brokers, endpoint credentials, authentication, or tenancy.
+- Exactly-once guarantees or distributed transactions with consumer side effects.
+- Automatic abandonment, unbounded retries, or using execution history as the outbox.
+
+### Future — Remote delivery adapters
+
 - Remote API authentication, authorization, tenancy, lifecycle, and compatibility.
 - A TUI implemented only as a delivery adapter over established application services.
 
