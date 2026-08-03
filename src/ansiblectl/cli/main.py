@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +28,7 @@ from ansiblectl.cli.composition import (
     build_workspace_service,
     execution_environment,
 )
+from ansiblectl.cli.outcomes import render_outcome
 from ansiblectl.domain.errors import ExecutionError, WorkspaceError
 from ansiblectl.domain.execution import (
     ExecutionRecord,
@@ -35,6 +37,7 @@ from ansiblectl.domain.execution import (
     ExecutionTargeting,
 )
 from ansiblectl.domain.inventory import InventoryError, ResolvedInventory
+from ansiblectl.domain.outcomes import CommandOutcome, OutcomeKind
 from ansiblectl.domain.playbook import PlaybookError
 from ansiblectl.domain.plugins import PluginManifestError, ProviderDescriptor
 from ansiblectl.domain.policy import EnforcementMode
@@ -45,6 +48,44 @@ EXIT_SUCCESS = 0
 EXIT_EXPECTED_FAILURE = 1
 EXIT_INVALID_INPUT = 2
 EXIT_CANCELLED = 3
+EXIT_UNEXPECTED_FAILURE = 70
+
+
+def cli(
+    argv: Sequence[str] | None = None,
+    *,
+    stdout: TextIO | None = None,
+    stderr: TextIO | None = None,
+) -> int:
+    """Run the installed CLI behind a safe unexpected-failure boundary."""
+
+    arguments = tuple(sys.argv[1:] if argv is None else argv)
+    try:
+        return main(arguments, stdout=stdout, stderr=stderr)
+    except Exception:
+        outcome = CommandOutcome(
+            OutcomeKind.UNEXPECTED_FAILURE,
+            "ansiblectl",
+            reason="Unexpected internal failure.",
+            remediation="Retry with increased verbosity and report the failure.",
+        )
+        return render_outcome(
+            outcome,
+            _requested_output_format(arguments),
+            stdout or sys.stdout,
+            stderr or sys.stderr,
+        )
+
+
+def _requested_output_format(arguments: Sequence[str]) -> str:
+    """Read only the global format switch without repeating full argument parsing."""
+
+    for index, argument in enumerate(arguments):
+        if argument == "--output-format" and index + 1 < len(arguments):
+            return "json" if arguments[index + 1] == "json" else "human"
+        if argument == "--output-format=json":
+            return "json"
+    return "human"
 
 
 @dataclass(frozen=True)

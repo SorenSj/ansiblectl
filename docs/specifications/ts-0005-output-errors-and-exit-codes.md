@@ -37,6 +37,11 @@ The `run` command maps a classified `cancelled` execution to exit code `3` in
 both human and machine-readable output modes. Failed and timed-out executions
 remain expected operational failures with exit code `1`.
 
+The installed console entry point maps otherwise unhandled `Exception`
+failures to a generic redacted outcome and exit code `70`. JSON mode remains a
+single structured document. `KeyboardInterrupt` and argparse's input-exit
+behaviour are not intercepted by this boundary.
+
 ## Verification
 
 - The same application failure renders consistently in human and machine modes.

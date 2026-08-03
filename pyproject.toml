@@ -22,7 +22,7 @@ classifiers = [
 ]
 
 [project.scripts]
-ansiblectl = "ansiblectl.cli.main:main"
+ansiblectl = "ansiblectl.cli.main:cli"
 
 [dependency-groups]
 dev = [
