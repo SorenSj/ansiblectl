@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol
@@ -50,6 +52,13 @@ class ResolvedInventory:
 class InventoryProvider(Protocol):
     def load(self) -> InventoryFragment:
         """Load one validated source fragment."""
+
+
+def canonical_inventory_digest(inventory: Mapping[str, object]) -> str:
+    """Return a stable digest of the exact canonical execution representation."""
+
+    serialized = json.dumps(inventory, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return f"sha256:{hashlib.sha256(serialized.encode('utf-8')).hexdigest()}"
 
 
 def resolve_inventory(providers: list[InventoryProvider]) -> ResolvedInventory:

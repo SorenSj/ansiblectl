@@ -47,6 +47,7 @@ def test_history_lists_only_executions_newest_first(tmp_path: Path) -> None:
                     "mode": "apply",
                     "requested_revision": "main",
                     "resolved_revision": "abc123",
+                    "inventory_digest": "sha256:inventory",
                     "targeting": {
                         "limit": "web",
                         "tags": ["deploy"],
@@ -67,8 +68,10 @@ def test_history_lists_only_executions_newest_first(tmp_path: Path) -> None:
     assert records[0].mode.value == "apply"
     assert records[0].requested_revision == "main"
     assert records[0].resolved_revision == "abc123"
+    assert records[0].inventory_digest == "sha256:inventory"
     assert records[1].mode.value == "check"
     assert records[1].resolved_revision is None
+    assert records[1].inventory_digest is None
     assert records[1].elapsed_seconds == 0.0
     assert JsonLinesExecutionHistory(tmp_path).get("run-1") == records[1]
 

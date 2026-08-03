@@ -36,6 +36,7 @@ class LocalExecutionAdapter:
                 mode=request.mode,
                 requested_revision=_requested_revision(request),
                 resolved_revision=request.resolved_revision,
+                inventory_digest=request.inventory_digest,
             )
         try:
             completed = subprocess.run(
@@ -64,6 +65,7 @@ class LocalExecutionAdapter:
                 request.mode,
                 _requested_revision(request),
                 request.resolved_revision,
+                request.inventory_digest,
             )
         except OSError as error:
             return ExecutionResult(
@@ -76,6 +78,7 @@ class LocalExecutionAdapter:
                 mode=request.mode,
                 requested_revision=_requested_revision(request),
                 resolved_revision=request.resolved_revision,
+                inventory_digest=request.inventory_digest,
             )
         status = ExecutionStatus.COMPLETED if completed.returncode == 0 else ExecutionStatus.FAILED
         stdout_reference, stderr_reference, diagnostic = _persist_outputs(
@@ -93,6 +96,7 @@ class LocalExecutionAdapter:
             request.mode,
             _requested_revision(request),
             request.resolved_revision,
+            request.inventory_digest,
         )
 
 

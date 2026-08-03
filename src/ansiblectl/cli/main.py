@@ -486,6 +486,7 @@ def _render_run_result(
             "mode": execution.mode.value,
             "requested_revision": execution.requested_revision,
             "resolved_revision": execution.resolved_revision,
+            "inventory_digest": execution.inventory_digest,
         }
     )
     if output_format == "json":
@@ -512,6 +513,8 @@ def _render_run_result(
             print(f"Requested revision: {execution.requested_revision}", file=output)
         if execution.resolved_revision:
             print(f"Resolved revision: {execution.resolved_revision}", file=output)
+        if execution.inventory_digest:
+            print(f"Inventory digest: {execution.inventory_digest}", file=output)
         if execution.stdout_reference:
             print(f"Stdout: {execution.stdout_reference}", file=output)
         if execution.stderr_reference:
@@ -542,6 +545,8 @@ def _render_execution_records(
             print(f"Requested revision: {record.requested_revision}", file=output)
         if record.resolved_revision:
             print(f"Resolved revision: {record.resolved_revision}", file=output)
+        if record.inventory_digest:
+            print(f"Inventory digest: {record.inventory_digest}", file=output)
         if record.stdout_reference:
             print(f"Stdout: {record.stdout_reference}", file=output)
         if record.stderr_reference:
@@ -565,6 +570,7 @@ def _execution_record(record: ExecutionRecord) -> dict[str, object]:
         "mode": record.mode.value,
         "requested_revision": record.requested_revision,
         "resolved_revision": record.resolved_revision,
+        "inventory_digest": record.inventory_digest,
     }
 
 

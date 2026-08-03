@@ -34,11 +34,16 @@ representation has sorted `hosts` with address and variables, plus sorted
 `groups` with host-name lists; providers themselves are never passed to an
 execution adapter.
 
+The exact canonical mapping passed to the materializer is serialized as sorted,
+compact UTF-8 JSON and identified by a `sha256:`-prefixed digest. The digest,
+not raw inventory data, is retained in execution metadata and public events.
+
 ## Verification
 
 - Two providers with a declared precedence resolve predictably.
 - An invalid host definition fails before execution.
 - A fake provider can be used in application tests.
+- Equivalent canonical mappings produce the same digest; content changes produce a different digest.
 
 ## Non-goals
 

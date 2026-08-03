@@ -113,6 +113,8 @@ def test_run_prepares_check_mode_request_from_validated_inputs(tmp_path: Path) -
         str(playbook),
     )
     assert port.request.targeting.limit == "web:&staging"
+    assert port.request.inventory_digest is not None
+    assert port.request.inventory_digest.startswith("sha256:")
     assert port.request.selected_playbook is not None
     assert port.request.selected_playbook.revision == "main"
     assert port.inventory == {
@@ -168,6 +170,7 @@ def test_confirmed_apply_omits_check_argument(tmp_path: Path) -> None:
     assert policy.requests[0].operation == "run.apply"
     assert policy.requests[0].attributes["repository_dirty"] is False
     assert policy.requests[0].attributes["resolved_revision"] == "abc"
+    assert str(policy.requests[0].attributes["inventory_digest"]).startswith("sha256:")
 
 
 def test_default_apply_limit_policy_blocks_before_materialization(tmp_path: Path) -> None:

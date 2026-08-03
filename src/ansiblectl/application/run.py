@@ -11,6 +11,7 @@ from ansiblectl.application.policy import PolicyService
 from ansiblectl.application.repository import RepositoryService
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.execution import ExecutionMode, ExecutionRequest, ExecutionTargeting
+from ansiblectl.domain.inventory import canonical_inventory_digest
 from ansiblectl.domain.playbook import select_playbook
 from ansiblectl.domain.policy import EnforcementMode, EvaluationRequest
 from ansiblectl.domain.repository import RepositoryRequest
@@ -89,6 +90,8 @@ class RunService:
 
         selected = select_playbook(workspace_root, playbook_identifier, revision)
         resolved_inventory = self.inventory.resolve()
+        canonical_inventory = resolved_inventory.canonical()
+        inventory_digest = canonical_inventory_digest(canonical_inventory)
         repository = (
             None
             if self.repository is None
@@ -108,13 +111,14 @@ class RunService:
                     "resolved_revision": (
                         None if repository is None else repository.resolved_revision
                     ),
+                    "inventory_digest": inventory_digest,
                 },
             ),
             policy_mode,
         )
         if not report.allowed:
             return GovernedExecutionResult(report, None)
-        with self.materialize_inventory(resolved_inventory.canonical()) as inventory_path:
+        with self.materialize_inventory(canonical_inventory) as inventory_path:
             request = ExecutionRequest.for_playbook(
                 (
                     "ansible-playbook",
@@ -131,6 +135,7 @@ class RunService:
                 targeting,
                 mode,
                 None if repository is None else repository.resolved_revision,
+                inventory_digest,
             )
             return GovernedExecutionResult(report, self.execution.execute(request))
 

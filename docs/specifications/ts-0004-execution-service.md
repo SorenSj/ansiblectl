@@ -51,6 +51,10 @@ When repository preflight is configured, execution requests, results, events,
 and history retain both the requested revision label and the resolved commit
 identifier. Older records without these fields remain readable.
 
+Execution metadata also retains the SHA-256 digest of the exact canonical
+inventory representation supplied to the inventory materializer. It does not
+embed raw host variables or addresses in the execution record.
+
 Check-mode executions may carry validated optional targeting: one Ansible host
 limit, task tags, and skipped task tags. The application layer emits these as
 separate argument-vector elements, and completed execution events retain the
@@ -74,6 +78,7 @@ evaluated as `run.check`. Execution events and history retain the selected mode.
 - In the default deny mode, apply without an explicit host limit is blocked before materialization.
 - Run preflight requires the requested Git revision at HEAD; default apply policy also requires a clean worktree.
 - Execution history distinguishes the requested revision from the resolved immutable commit.
+- Execution history identifies the canonical inventory by digest without exposing its contents.
 
 ## Non-goals
 

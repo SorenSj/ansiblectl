@@ -48,6 +48,7 @@ class ExecutionService:
                             else request.selected_playbook.revision
                         ),
                         "resolved_revision": request.resolved_revision,
+                        "inventory_digest": request.inventory_digest,
                     },
                 )
             )

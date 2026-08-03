@@ -40,6 +40,7 @@ When present, `execution.completed` also carries a structured `targeting`
 object containing the host limit, selected tags, and skipped tags.
 The payload also identifies execution mode as `check` or `apply`.
 Repository-backed executions include requested and resolved revision fields.
+Execution events include the canonical inventory digest, never raw inventory.
 
 ## Verification
 

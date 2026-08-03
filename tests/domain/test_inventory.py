@@ -4,7 +4,13 @@ from dataclasses import dataclass
 
 import pytest
 
-from ansiblectl.domain.inventory import Host, InventoryError, InventoryFragment, resolve_inventory
+from ansiblectl.domain.inventory import (
+    Host,
+    InventoryError,
+    InventoryFragment,
+    canonical_inventory_digest,
+    resolve_inventory,
+)
 
 
 @dataclass(frozen=True)
@@ -36,3 +42,15 @@ def test_invalid_group_fails_before_execution() -> None:
 
     with pytest.raises(InventoryError, match="Reference resolved host names"):
         resolve_inventory([FakeProvider(fragment)])
+
+
+def test_canonical_inventory_digest_is_stable_and_content_sensitive() -> None:
+    first = {"hosts": {"web": {"address": "192.0.2.1"}}, "groups": {"all": ["web"]}}
+    reordered = {"groups": {"all": ["web"]}, "hosts": {"web": {"address": "192.0.2.1"}}}
+    changed = {"groups": {"all": ["web"]}, "hosts": {"web": {"address": "192.0.2.2"}}}
+
+    digest = canonical_inventory_digest(first)
+
+    assert digest.startswith("sha256:")
+    assert digest == canonical_inventory_digest(reordered)
+    assert digest != canonical_inventory_digest(changed)
