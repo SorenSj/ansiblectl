@@ -32,6 +32,8 @@ def test_run_service_wires_execution_events_to_workspace_log(tmp_path: Path) -> 
     assert isinstance(service.policy.policies[0], ApplyRequiresLimitPolicy)
     assert isinstance(service.policy.policies[1], ApplyRequiresCleanRepositoryPolicy)
     assert service.repository is not None
+    assert service.configuration is not None
+    assert isinstance(service.configuration.source_provider, LocalConfigurationSourceProvider)
 
 
 def test_execution_environment_uses_private_workspace_local_temp(

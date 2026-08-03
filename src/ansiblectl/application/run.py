@@ -5,6 +5,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from pathlib import Path
 
+from ansiblectl.application.configuration import ConfigurationService
 from ansiblectl.application.execution import ExecutionService, GovernedExecutionResult
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.policy import PolicyService
@@ -17,6 +18,7 @@ from ansiblectl.domain.policy import EnforcementMode, EvaluationRequest
 from ansiblectl.domain.repository import RepositoryRequest
 
 InventoryMaterializer = Callable[[Mapping[str, object]], AbstractContextManager[Path]]
+ExecutionEnvironment = Mapping[str, str] | Callable[[], Mapping[str, str]]
 
 
 @dataclass(frozen=True)
@@ -26,13 +28,14 @@ class RunService:
     policy: PolicyService
     materialize_inventory: InventoryMaterializer
     repository: RepositoryService | None = None
+    configuration: ConfigurationService | None = None
 
     def run_check(
         self,
         workspace_root: Path,
         playbook_identifier: Path,
         revision: str,
-        environment: Mapping[str, str],
+        environment: ExecutionEnvironment,
         timeout_seconds: float,
         policy_mode: EnforcementMode,
         targeting: ExecutionTargeting | None = None,
@@ -59,7 +62,7 @@ class RunService:
         workspace_root: Path,
         playbook_identifier: Path,
         revision: str,
-        environment: Mapping[str, str],
+        environment: ExecutionEnvironment,
         timeout_seconds: float,
         policy_mode: EnforcementMode,
         confirmed: bool,
@@ -89,7 +92,7 @@ class RunService:
         workspace_root: Path,
         playbook_identifier: Path,
         revision: str,
-        environment: Mapping[str, str],
+        environment: ExecutionEnvironment,
         timeout_seconds: float,
         policy_mode: EnforcementMode,
         targeting: ExecutionTargeting,
@@ -99,6 +102,9 @@ class RunService:
     ) -> GovernedExecutionResult:
 
         verbosity_arguments = _verbosity_arguments(verbosity)
+        if self.configuration is not None:
+            self.configuration.resolve()
+        resolved_environment = environment() if callable(environment) else environment
         selected = select_playbook(workspace_root, playbook_identifier, revision)
         selected_playbook_digest = playbook_digest(selected)
         resolved_inventory = self.inventory.resolve()
@@ -146,7 +152,7 @@ class RunService:
                     str(selected.path),
                 ),
                 workspace_root.resolve(),
-                environment,
+                resolved_environment,
                 selected,
                 timeout_seconds,
                 targeting,

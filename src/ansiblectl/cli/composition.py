@@ -22,7 +22,12 @@ from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.events import EventBus
 from ansiblectl.domain.inventory import InventoryError
-from ansiblectl.domain.workspace import Workspace
+from ansiblectl.domain.workspace import (
+    WORKSPACE_DIRECTORY,
+    WORKSPACE_METADATA_FILENAME,
+    WORKSPACE_SCHEMA_VERSION,
+    Workspace,
+)
 from ansiblectl.infrastructure.execution_history import JsonLinesExecutionHistory
 from ansiblectl.infrastructure.generated_inventory import materialize_inventory
 from ansiblectl.infrastructure.git_repository import GitRepositoryAdapter
@@ -83,12 +88,19 @@ def build_run_service(workspace_root: Path, inventory_source: Path | None = None
 
     event_log = JsonLinesLogSink(workspace_root)
     events = EventBus([EventLogSubscriber(event_log)])
+    root = workspace_root.resolve()
+    workspace = Workspace(
+        root,
+        root / WORKSPACE_DIRECTORY / WORKSPACE_METADATA_FILENAME,
+        WORKSPACE_SCHEMA_VERSION,
+    )
     return RunService(
         inventory=build_inventory_service(workspace_root, inventory_source),
         execution=ExecutionService(LocalExecutionAdapter(), events),
         policy=PolicyService([ApplyRequiresLimitPolicy(), ApplyRequiresCleanRepositoryPolicy()]),
         materialize_inventory=materialize_inventory,
         repository=build_repository_service(),
+        configuration=build_configuration_service(workspace),
     )
 
 

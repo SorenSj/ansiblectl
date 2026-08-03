@@ -123,8 +123,10 @@ workspace's owner-only `.ansiblectl/tmp` directory instead of relying on
 `~/.ansible/tmp`. Captured process output remains below `.ansiblectl/runs`;
 symlinks cannot redirect those private logs outside the workspace.
 
-Validate workspace inputs, generate a private canonical inventory, and invoke
-Ansible with an explicit timeout and argument vector:
+Every run first validates the same effective configuration shown by
+`config show`; invalid configuration stops the workflow before Ansible starts.
+It then validates workspace inputs, generates a private canonical inventory,
+and invokes Ansible with an explicit timeout and argument vector:
 
 ```console
 uv run ansiblectl --workspace ~/automation/example run \

@@ -97,6 +97,11 @@ validated workspace's private `.ansiblectl/tmp` directory. The directory uses
 owner-only permissions, external environment overrides are ignored, and
 symlink escape is rejected before process invocation.
 
+Run preparation resolves and validates the effective typed configuration before
+playbook selection, inventory resolution, repository inspection, policy
+evaluation, inventory materialization, or process invocation. Invalid
+configuration therefore cannot produce execution side effects.
+
 ## Verification
 
 - A fake execution port can verify a request without invoking a process.
@@ -119,6 +124,7 @@ symlink escape is rejected before process invocation.
 - Execution history distinguishes playbook runs from syntax-check operations.
 - Execution history can be filtered by one exact non-empty operation identifier.
 - Ansible local temporary files remain inside the private workspace boundary.
+- Invalid effective configuration stops a run before other inputs or adapters are touched.
 
 ## Non-goals
 

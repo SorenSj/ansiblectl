@@ -7,13 +7,15 @@ from pathlib import Path
 import pytest
 import yaml
 
+from ansiblectl.application.configuration import ConfigurationService
 from ansiblectl.application.execution import ExecutionService
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.policy import PolicyService
 from ansiblectl.application.repository import RepositoryService
 from ansiblectl.application.run import RunService
 from ansiblectl.application.standard_policies import ApplyRequiresLimitPolicy
-from ansiblectl.domain.errors import ExecutionError
+from ansiblectl.domain.configuration import ConfigurationSource
+from ansiblectl.domain.errors import ConfigurationError, ExecutionError
 from ansiblectl.domain.execution import (
     ExecutionMode,
     ExecutionRequest,
@@ -30,6 +32,11 @@ class FakeInventoryProvider:
     def load(self) -> InventoryFragment:
         host = Host("web-1", "192.0.2.10", {"ansible_port": 22}, "fixture")
         return InventoryFragment("fixture", {"web-1": host}, {"web": ("web-1",)})
+
+
+class FailingConfigurationProvider:
+    def sources(self) -> list[ConfigurationSource]:
+        raise ConfigurationError("Configuration preflight failed safely.")
 
 
 class RecordingExecutionPort:
@@ -149,6 +156,37 @@ def test_run_rejects_negative_verbosity_before_input_resolution(tmp_path: Path) 
             EnforcementMode.DENY,
             verbosity=-1,
         )
+
+
+def test_run_validates_configuration_before_playbook_and_inventory(tmp_path: Path) -> None:
+    port = RecordingExecutionPort()
+    environment_prepared = False
+
+    def prepare_environment() -> dict[str, str]:
+        nonlocal environment_prepared
+        environment_prepared = True
+        return {}
+
+    service = RunService(
+        InventoryService([FakeInventoryProvider()]),
+        ExecutionService(port),
+        PolicyService([]),
+        fake_materializer,
+        configuration=ConfigurationService(FailingConfigurationProvider()),
+    )
+
+    with pytest.raises(ConfigurationError, match="preflight failed"):
+        service.run_check(
+            tmp_path,
+            Path("missing-playbook.yml"),
+            "main",
+            prepare_environment,
+            30,
+            EnforcementMode.DENY,
+        )
+
+    assert port.request is None
+    assert environment_prepared is False
 
 
 def test_apply_requires_confirmation_before_execution(tmp_path: Path) -> None:

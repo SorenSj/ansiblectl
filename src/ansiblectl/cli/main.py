@@ -521,7 +521,7 @@ def main(
                 workspace.root,
                 arguments.playbook,
                 arguments.revision,
-                execution_environment(workspace.root),
+                lambda: execution_environment(workspace.root),
                 arguments.timeout,
                 arguments.policy_mode,
             )
@@ -550,7 +550,13 @@ def main(
                 stdout,
                 stderr,
             )
-        except (InventoryError, PlaybookError, ExecutionError, RepositoryError) as error:
+        except (
+            ConfigurationError,
+            InventoryError,
+            PlaybookError,
+            ExecutionError,
+            RepositoryError,
+        ) as error:
             return _render_cli_failure(
                 "run",
                 str(error),

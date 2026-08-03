@@ -39,12 +39,16 @@ The CLI exposes the resolved model through `config show`. Human and JSON output
 include non-secret provenance and replace every configured secret reference
 with `<redacted>`; JSON output includes `schema_version: 1`.
 
+Playbook runs resolve the same effective configuration as an explicit preflight
+before selecting execution inputs or invoking external adapters.
+
 ## Verification
 
 - A higher-precedence valid value overrides a lower-precedence value.
 - An unknown or invalid field fails before an operation runs.
 - Effective configuration output redacts secret references and values as specified.
 - `config show` resolves the selected workspace and never renders a secret reference.
+- Invalid configuration prevents a playbook run before execution preparation continues.
 
 ## Non-goals
 
