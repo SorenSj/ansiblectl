@@ -14,6 +14,7 @@ from ansiblectl.domain.errors import (
     ExecutionError,
     ExitCode,
     ExternalToolError,
+    FilesystemCapabilityError,
     InfrastructureError,
     InternalOperationalError,
     InventoryError,
@@ -139,6 +140,12 @@ def test_error_metadata_must_match_registry() -> None:
         ),
         (OperationCancelledError, ErrorCode.OPERATION_CANCELLED, ExitCode.INTERRUPTED, "cancelled"),
         (InternalOperationalError, ErrorCode.INTERNAL_ERROR, ExitCode.GENERAL_ERROR, "internal"),
+        (
+            FilesystemCapabilityError,
+            ErrorCode.FILESYSTEM_CAPABILITY_UNSUPPORTED,
+            ExitCode.RESOURCE_CONFLICT,
+            "filesystem_capability",
+        ),
     ],
 )
 def test_public_error_categories_have_stable_metadata(

@@ -37,9 +37,9 @@ This initial workflow does not publish to a package index and uses no
 publication credentials.
 
 Artifact inspection requires exactly one wheel and source archive, verifies
-the wheel name and version against package metadata, and verifies that build
-metadata matches both the current Git revision and the SHA-256 digest of
-`uv.lock` before a tagged artifact is uploaded.
+their exact names and required package surfaces against package metadata, rejects unsafe source
+archive paths, and verifies that build metadata matches both the current Git revision and the
+SHA-256 digest of `uv.lock` before a tagged artifact is uploaded.
 
 ## Verification
 

@@ -13,6 +13,8 @@ from io import StringIO
 from pathlib import Path
 from typing import TextIO
 
+import yaml
+
 from ansiblectl.application.configuration import ConfigurationService
 from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.execution_history import ExecutionHistoryService, ExecutionSummary
@@ -73,7 +75,7 @@ from ansiblectl.domain.execution import (
     ExecutionStatus,
     ExecutionTargeting,
 )
-from ansiblectl.domain.filesystem import FilesystemRecoveryResult
+from ansiblectl.domain.filesystem import FilesystemRecoveryResult, RecoveryDiagnostic
 from ansiblectl.domain.inventory import (
     InventoryError,
     ResolvedInventory,
@@ -482,8 +484,14 @@ def build_parser() -> argparse.ArgumentParser:
     state_recover = state_commands.add_parser(
         "recover", help="Preview or recover interrupted filesystem transactions."
     )
-    state_recover.add_argument(
+    recovery_mode = state_recover.add_mutually_exclusive_group()
+    recovery_mode.add_argument(
         "--apply", action="store_true", help="Apply recovery; otherwise only preview it."
+    )
+    recovery_mode.add_argument(
+        "--details",
+        action="store_true",
+        help="Show safe journal state, age, owner status, and required action.",
     )
     inventory = subcommands.add_parser("inventory", help="Resolve and inspect inventory.")
     inventory_commands = inventory.add_subparsers(dest="inventory_command", required=True)
@@ -764,7 +772,10 @@ def main(
                 recovery_service = filesystem_recovery_service or build_filesystem_recovery_service(
                     workspace.root
                 )
-                recovery = recovery_service.recover(apply=arguments.apply)
+                if arguments.details:
+                    recovery_diagnostics = recovery_service.diagnostics()
+                else:
+                    recovery = recovery_service.recover(apply=arguments.apply)
             else:
                 entries = state_service_instance.inspect()
         except WorkspaceError as error:
@@ -803,7 +814,10 @@ def main(
         if arguments.state_command == "invalidate":
             _render_state_invalidation(invalidation, options.output_format, stdout)
         elif arguments.state_command == "recover":
-            _render_filesystem_recovery(recovery, options.output_format, stdout)
+            if arguments.details:
+                _render_recovery_diagnostics(recovery_diagnostics, options.output_format, stdout)
+            else:
+                _render_filesystem_recovery(recovery, options.output_format, stdout)
         else:
             _render_state(entries, options.output_format, stdout)
     elif arguments.command == "inventory":
@@ -1344,6 +1358,41 @@ def _render_filesystem_recovery(
     print(f"{action} filesystem transactions: {len(result.transaction_ids)}", file=output)
     for transaction_id in result.transaction_ids:
         print(f"  {transaction_id}", file=output)
+
+
+def _render_recovery_diagnostics(
+    diagnostics: tuple[RecoveryDiagnostic, ...], output_format: str, output: TextIO | None
+) -> None:
+    items = [
+        {
+            "action": diagnostic.action.value,
+            "active_owner": diagnostic.active_owner,
+            "age_seconds": diagnostic.age_seconds,
+            "reasons": [reason.value for reason in diagnostic.reasons],
+            "schema_version": diagnostic.schema_version,
+            "state": diagnostic.state,
+            "transaction_id": diagnostic.transaction_id,
+        }
+        for diagnostic in diagnostics
+    ]
+    payload = {"diagnostics": items, "schema_version": 1}
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    if output_format == "yaml":
+        yaml.safe_dump(payload, output, sort_keys=True)
+        return
+    if not diagnostics:
+        print("No filesystem transaction diagnostics.", file=output)
+        return
+    for diagnostic in diagnostics:
+        age = "unknown" if diagnostic.age_seconds is None else f"{diagnostic.age_seconds:.1f}s"
+        print(f"Transaction: {diagnostic.transaction_id}", file=output)
+        print(f"State: {diagnostic.state}", file=output)
+        print(f"Age: {age}", file=output)
+        print(f"Active owner: {'yes' if diagnostic.active_owner else 'no'}", file=output)
+        print(f"Action: {diagnostic.action.value}", file=output)
+        print(f"Reasons: {', '.join(reason.value for reason in diagnostic.reasons)}", file=output)
 
 
 def _render_inventory(

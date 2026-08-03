@@ -4,6 +4,31 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-04
+
+### Added
+
+- Roadmap and normative v0.3.0 operational-reliability contracts covering subprocess crash tests,
+  multiprocess ownership, filesystem capability checks, safe recovery diagnostics, and supported
+  platforms.
+- Typed workspace filesystem capability reports, stable unsupported-capability errors, and a
+  pre-transaction POSIX probe for permissions, advisory locks, atomic replacement, and syncing.
+- Pre-staging rejection of nested cross-device targets with the stable `CROSS_DEVICE_TARGET` reason.
+- Additive `state recover --details` diagnostics with bounded age, opaque identifiers, owner status,
+  required action, and stable reason codes without journal paths or content.
+- Stable human, JSON, and YAML rendering for detailed recovery diagnostics.
+- Real subprocess termination coverage across staging, write-ahead commit, target replacement,
+  automatic rollback, durable commit, and cleanup transitions.
+- Bounded multiprocess contention coverage for different and shared targets, live-owner preview and
+  recovery exclusion, and serialized simultaneous recovery.
+- Multiprocess contention coverage for state persistence and execution-history retention sharing
+  the workspace transaction lock.
+- An operator recovery runbook covering safe inspection, automatic recovery, retained corrupt
+  evidence, repeated failures, and supported filesystem limitations.
+- An explicit Ubuntu and macOS CI support matrix for Python 3.12 through 3.14.
+- Release artifact inspection for exact wheel/sdist names, safe source paths, typed package files,
+  CLI entry points, dependency lock, documentation, and provenance metadata.
+
 ## [0.2.0] - 2026-08-03
 
 ### Added

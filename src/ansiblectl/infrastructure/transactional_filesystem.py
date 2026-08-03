@@ -7,15 +7,29 @@ import json
 import os
 import shutil
 import tempfile
+import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
 
-from ansiblectl.domain.errors import FilesystemRecoveryError, FilesystemTransactionError
+from ansiblectl.domain.errors import (
+    FilesystemCapabilityError,
+    FilesystemRecoveryError,
+    FilesystemTransactionError,
+)
+from ansiblectl.domain.filesystem import (
+    MAX_RECOVERY_AGE_SECONDS,
+    FilesystemCapabilityReason,
+    FilesystemCapabilityReport,
+    RecoveryAction,
+    RecoveryDiagnostic,
+    RecoveryReason,
+)
 from ansiblectl.domain.logging import LogEvent, LogSink, emit
 from ansiblectl.infrastructure.file_locking import locked
+from ansiblectl.infrastructure.filesystem_capabilities import inspect_filesystem_capabilities
 
 _CONTROL: Final = ".ansiblectl/transactions"
 
@@ -30,14 +44,44 @@ class RecoveryResult:
 class TransactionalFilesystem:
     """Create isolated write sets and recover interrupted commits."""
 
-    def __init__(self, root: Path, *, audit_sink: LogSink | None = None) -> None:
+    def __init__(
+        self,
+        root: Path,
+        *,
+        audit_sink: LogSink | None = None,
+        checkpoint: Callable[[str], None] | None = None,
+    ) -> None:
         self.root = root.resolve()
         self.audit_sink = audit_sink
         self.control = self.root / _CONTROL
+        self._capability_report: FilesystemCapabilityReport | None = None
+        self._checkpoint_callback = checkpoint
+
+    def _checkpoint(self, name: str) -> None:
+        if self._checkpoint_callback is not None:
+            self._checkpoint_callback(name)
+
+    def capabilities(self, *, refresh: bool = False) -> FilesystemCapabilityReport:
+        """Return the safe capability report for this workspace filesystem."""
+
+        if refresh or self._capability_report is None:
+            self._capability_report = inspect_filesystem_capabilities(self.root)
+        return self._capability_report
 
     def begin(self, *, correlation_id: str | None = None) -> FilesystemTransaction:
         """Create a durable staging area for a new transaction."""
 
+        capability_report = self.capabilities()
+        if not capability_report.supported:
+            raise FilesystemCapabilityError(
+                "Workspace filesystem does not provide required transaction guarantees.",
+                hint="Use a supported local POSIX filesystem or inspect capability diagnostics.",
+                context={
+                    "platform": capability_report.platform,
+                    "scope_id": capability_report.scope_id,
+                    "reasons": [reason.value for reason in capability_report.reasons],
+                },
+            )
         self.control.mkdir(parents=True, exist_ok=True, mode=0o700)
         transaction_id = uuid.uuid4().hex
         directory = self.control / transaction_id
@@ -49,6 +93,7 @@ class TransactionalFilesystem:
             correlation_id=correlation_id,
             active_descriptor=_acquire_owner_lock(directory, blocking=True),
         )
+        self._checkpoint("transaction.directory_created")
         transaction._persist("staging")
         transaction._audit("filesystem.transaction.started")
         return transaction
@@ -98,6 +143,26 @@ class TransactionalFilesystem:
                 transaction._release_active()
             return tuple(identifiers)
 
+    def diagnostics(self) -> tuple[RecoveryDiagnostic, ...]:
+        """Return redaction-safe diagnostics for every durable journal."""
+
+        if not self.control.exists():
+            return ()
+        diagnostics: list[RecoveryDiagnostic] = []
+        with locked(self.control / ".lock", exclusive=False):
+            for directory in sorted(self.control.iterdir()):
+                if not directory.is_dir():
+                    continue
+                descriptor = _acquire_owner_lock(directory, blocking=False)
+                active_owner = descriptor is None
+                try:
+                    diagnostics.append(_diagnose_directory(directory, active_owner=active_owner))
+                finally:
+                    if descriptor is not None:
+                        fcntl.flock(descriptor, fcntl.LOCK_UN)
+                        os.close(descriptor)
+        return tuple(diagnostics)
+
 
 class FilesystemTransaction:
     """A staged set of writes and deletions committed as one recoverable unit."""
@@ -132,8 +197,10 @@ class FilesystemTransaction:
             stream.write(content)
             stream.flush()
             os.fsync(stream.fileno())
+        self.filesystem._checkpoint("stage.content_synced")
         self.operations.append({"kind": "write", "target": str(target), "staged": str(staged)})
         self._persist("staging")
+        self.filesystem._checkpoint("stage.journal_synced")
 
     def stage_delete(self, path: Path) -> None:
         """Stage removal of a file; missing targets remain a safe no-op."""
@@ -150,10 +217,12 @@ class FilesystemTransaction:
         with locked(self.filesystem.control / ".lock", exclusive=True):
             try:
                 self._persist("committing")
+                self.filesystem._checkpoint("commit.state_synced")
                 for index, operation in enumerate(self.operations):
                     self._apply(index, operation)
                     self._persist("committing")
                 self._persist("committed")
+                self.filesystem._checkpoint("commit.committed_synced")
                 _fsync_directory(self.filesystem.root)
             except OSError as error:
                 try:
@@ -185,11 +254,13 @@ class FilesystemTransaction:
                 if backup is not None and backup.exists():
                     target.parent.mkdir(parents=True, exist_ok=True)
                     _restore_backup(backup, target)
+                    self.filesystem._checkpoint("rollback.backup_restored")
                 else:
                     target.unlink(missing_ok=True)
                 operation["applied"] = False
                 self._persist("rolling_back")
             self._persist("rolled_back")
+            self.filesystem._checkpoint("rollback.complete_synced")
         except OSError as error:
             raise FilesystemTransactionError(
                 "Filesystem transaction rollback failed.",
@@ -212,15 +283,19 @@ class FilesystemTransaction:
             backup = self.directory / f"backup-{index}"
             shutil.copy2(target, backup)
             _fsync_file(backup)
+            self.filesystem._checkpoint("commit.backup_synced")
             operation["backup"] = str(backup)
             self._persist("committing")
         operation["applied"] = True
         self._persist("committing")
+        self.filesystem._checkpoint("commit.intent_synced")
         if operation["kind"] == "write":
             os.replace(operation["staged"], target)
         else:
             target.unlink(missing_ok=True)
+        self.filesystem._checkpoint("commit.target_changed")
         _fsync_directory(target.parent)
+        self.filesystem._checkpoint("commit.target_synced")
 
     def _validate_target_stable(self, target: Path) -> None:
         resolved_target = target.resolve(strict=False)
@@ -239,6 +314,12 @@ class FilesystemTransaction:
             ) from error
         if target == self.filesystem.root or self.filesystem.control in target.parents:
             raise FilesystemTransactionError("Filesystem transaction target is reserved.")
+        if not _same_device(self.filesystem.root, target):
+            raise FilesystemCapabilityError(
+                "Filesystem transaction target crosses a filesystem boundary.",
+                hint="Select a target on the workspace filesystem.",
+                context={"reasons": [FilesystemCapabilityReason.CROSS_DEVICE_TARGET.value]},
+            )
         if any(operation["target"] == str(target) for operation in self.operations):
             raise FilesystemTransactionError(
                 "Filesystem transaction target was staged more than once.",
@@ -339,6 +420,50 @@ class FilesystemTransaction:
             self._active_descriptor = None
 
 
+def _diagnose_directory(directory: Path, *, active_owner: bool) -> RecoveryDiagnostic:
+    journal = directory / "journal.json"
+    age_seconds: float | None
+    reasons: tuple[RecoveryReason, ...]
+    try:
+        age_seconds = min(max(0.0, time.time() - journal.stat().st_mtime), MAX_RECOVERY_AGE_SECONDS)
+    except OSError:
+        age_seconds = None
+    try:
+        data = json.loads(journal.read_text(encoding="utf-8"))
+        if (
+            not isinstance(data, dict)
+            or data.get("schema_version") != 1
+            or data.get("transaction_id") != directory.name
+            or not isinstance(data.get("state"), str)
+        ):
+            raise ValueError("unsupported journal")
+        state = data["state"]
+        if state in {"committed", "rolled_back"}:
+            action = RecoveryAction.CLEANUP
+            reasons = (RecoveryReason.CLEANUP_REQUIRED,)
+        elif state in {"staging", "committing", "rolling_back"}:
+            action = RecoveryAction.ROLLBACK
+            reasons = (RecoveryReason.ROLLBACK_REQUIRED,)
+        else:
+            action = RecoveryAction.MANUAL_INSPECTION
+            reasons = (RecoveryReason.JOURNAL_STATE_UNKNOWN,)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        state = "unknown"
+        action = RecoveryAction.MANUAL_INSPECTION
+        reasons = (RecoveryReason.JOURNAL_UNREADABLE,)
+    if active_owner:
+        action = RecoveryAction.NONE
+        reasons = (RecoveryReason.ACTIVE_OWNER, *reasons)
+    return RecoveryDiagnostic(
+        transaction_id=directory.name,
+        state=state,
+        age_seconds=age_seconds,
+        action=action,
+        reasons=reasons,
+        active_owner=active_owner,
+    )
+
+
 def _fsync_file(path: Path) -> None:
     descriptor = os.open(path, os.O_RDONLY)
     try:
@@ -379,3 +504,15 @@ def _fsync_directory(path: Path) -> None:
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
+
+
+def _same_device(root: Path, target: Path) -> bool:
+    """Return whether *target* resolves through the workspace filesystem."""
+
+    existing = target
+    while not existing.exists():
+        parent = existing.parent
+        if parent == existing:
+            return False
+        existing = parent
+    return root.stat().st_dev == existing.stat().st_dev
