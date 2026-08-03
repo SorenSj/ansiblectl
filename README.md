@@ -132,6 +132,8 @@ return `70`; Python exception details are not printed to normal command output.
 Invalid arguments return `2`. In JSON mode they produce one redacted structured
 document instead of argparse usage text, so supplied argument values are not
 echoed into automation logs.
+The same structured validation contract applies when `--apply` and `--confirm`
+are not supplied together.
 
 Completed runs also append a redacted structured record to
 `.ansiblectl/logs/events.jsonl`, correlated by execution identifier.

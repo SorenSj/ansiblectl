@@ -47,6 +47,10 @@ one redacted `validation_failure` document on stdout and exit code `2`; raw
 argument diagnostics are discarded so argument values cannot leak. Human mode
 retains argparse's usage and diagnostic text on stderr.
 
+Cross-option validation follows the same contract. In particular, mismatched
+`run --apply` and `--confirm` flags produce a typed validation outcome with a
+safe remediation, rather than writing human text beside JSON output.
+
 ## Verification
 
 - The same application failure renders consistently in human and machine modes.

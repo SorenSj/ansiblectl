@@ -345,8 +345,17 @@ def main(
         _render_plugins(descriptors, options.output_format, stdout)
     elif arguments.command == "run":
         if arguments.apply != arguments.confirm:
-            print("Run error: --apply and --confirm must be used together.", file=stderr)
-            return EXIT_INVALID_INPUT
+            return render_outcome(
+                CommandOutcome(
+                    OutcomeKind.VALIDATION_FAILURE,
+                    "run",
+                    reason="--apply and --confirm must be used together.",
+                    remediation="Use --apply --confirm together, or select --check.",
+                ),
+                options.output_format,
+                sys.stdout if stdout is None else stdout,
+                sys.stderr if stderr is None else stderr,
+            )
         workspace_service_instance = workspace_service or build_workspace_service()
         try:
             workspace = workspace_service_instance.resolve(

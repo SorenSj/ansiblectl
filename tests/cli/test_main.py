@@ -522,7 +522,7 @@ def test_run_rejects_empty_targeting_before_service_invocation(tmp_path: Path) -
 
 
 def test_run_apply_requires_confirmation_and_records_mode(tmp_path: Path) -> None:
-    error = StringIO()
+    validation_output, validation_error = StringIO(), StringIO()
     arguments = [
         "--workspace",
         str(tmp_path),
@@ -541,10 +541,18 @@ def test_run_apply_requires_confirmation_and_records_mode(tmp_path: Path) -> Non
             arguments,
             workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
             run_service=FakeRunService(),  # type: ignore[arg-type]
-            stderr=error,
+            stdout=validation_output,
+            stderr=validation_error,
         )
         == EXIT_INVALID_INPUT
     )
+    assert validation_error.getvalue() == ""
+    assert json.loads(validation_output.getvalue()) == {
+        "kind": "validation_failure",
+        "operation": "run",
+        "reason": "--apply and --confirm must be used together.",
+        "remediation": "Use --apply --confirm together, or select --check.",
+    }
     output = StringIO()
     result = main(
         [*arguments, "--confirm"],
@@ -555,6 +563,32 @@ def test_run_apply_requires_confirmation_and_records_mode(tmp_path: Path) -> Non
 
     assert result == EXIT_SUCCESS
     assert json.loads(output.getvalue())["execution"]["mode"] == "apply"
+
+
+def test_run_apply_confirmation_validation_is_actionable_in_human_mode(tmp_path: Path) -> None:
+    output, error = StringIO(), StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "run",
+            "--playbook",
+            "playbooks/site.yml",
+            "--revision",
+            "main",
+            "--apply",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        run_service=FakeRunService(),  # type: ignore[arg-type]
+        stdout=output,
+        stderr=error,
+    )
+
+    assert result == EXIT_INVALID_INPUT
+    assert output.getvalue() == ""
+    assert "--apply and --confirm must be used together" in error.getvalue()
+    assert "Next:" in error.getvalue()
 
 
 class DeniedRunService(FakeRunService):
