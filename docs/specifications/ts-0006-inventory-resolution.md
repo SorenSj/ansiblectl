@@ -27,6 +27,13 @@ This specification defines the initial public and internal contract for this cap
 
 The inventory service returns a typed ResolvedInventory with hosts, groups, variables, diagnostics, and provenance metadata.
 
+The initial merge policy is low-to-high provider precedence: a later host with
+the same name replaces the earlier definition and records a diagnostic naming
+both sources. Groups may reference only resolved hosts. The generated adapter
+representation has sorted `hosts` with address and variables, plus sorted
+`groups` with host-name lists; providers themselves are never passed to an
+execution adapter.
+
 ## Verification
 
 - Two providers with a declared precedence resolve predictably.
@@ -36,4 +43,3 @@ The inventory service returns a typed ResolvedInventory with hosts, groups, vari
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
