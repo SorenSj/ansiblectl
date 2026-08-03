@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from ansiblectl.domain.state import StatePort
+from ansiblectl.domain.state import StateInvalidationResult, StatePort
 
 
 @dataclass(frozen=True)
@@ -26,3 +26,8 @@ class StateService:
             CacheEntrySummary(name, entry.source_identity, entry.invalidation_condition)
             for name, entry in sorted(entries.items())
         )
+
+    def invalidate(self, name: str, *, apply: bool = False) -> StateInvalidationResult:
+        """Preview or apply invalidation of one exact named cache entry."""
+
+        return self.port.invalidate(name, apply=apply)

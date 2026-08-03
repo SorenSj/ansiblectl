@@ -38,6 +38,10 @@ rejected before reads or writes.
 conditions in human or schema-versioned JSON output. Stored cache values are
 deliberately omitted because they may contain sensitive provider data.
 
+`state invalidate <name>` previews removal of one exact cache entry by default.
+`--apply` performs the read, removal, and atomic replacement while holding an
+exclusive workspace-state lock; unrelated entries are retained.
+
 Execution event history is retained in the workspace's schema-versioned JSONL
 log. `execution prune --keep N` previews removal by default; `--apply` rewrites
 the log atomically while holding the same advisory lock used by event writers.
@@ -53,6 +57,7 @@ same retention lifecycle.
 - A schema-version mismatch follows documented migration or reset behaviour.
 - Concurrent update tests preserve a valid final record.
 - State inspection never renders stored cache values or follows symbolic links.
+- State invalidation defaults to preview and applies only to one exact named entry.
 - Execution retention preserves the newest requested records and unrelated public events.
 
 ## Non-goals

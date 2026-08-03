@@ -51,6 +51,7 @@ from ansiblectl.domain.playbook import PlaybookError
 from ansiblectl.domain.plugins import PluginManifestError, ProviderDescriptor
 from ansiblectl.domain.policy import EnforcementMode
 from ansiblectl.domain.repository import RepositoryError, RepositoryRequest, RepositoryResult
+from ansiblectl.domain.state import StateInvalidationResult
 from ansiblectl.domain.workspace import Workspace
 
 EXIT_SUCCESS = 0
@@ -171,6 +172,13 @@ def build_parser() -> argparse.ArgumentParser:
     state = subcommands.add_parser("state", help="Inspect workspace cache metadata safely.")
     state_commands = state.add_subparsers(dest="state_command", required=True)
     state_commands.add_parser("show", help="Show cache metadata without stored values.")
+    state_invalidate = state_commands.add_parser(
+        "invalidate", help="Preview or apply one exact cache-entry invalidation."
+    )
+    state_invalidate.add_argument("name", help="Exact cache-entry name.")
+    state_invalidate.add_argument(
+        "--apply", action="store_true", help="Apply invalidation; otherwise only preview it."
+    )
     inventory = subcommands.add_parser("inventory", help="Resolve and inspect inventory.")
     inventory_commands = inventory.add_subparsers(dest="inventory_command", required=True)
     inventory_show = inventory_commands.add_parser("show", help="Show the resolved inventory.")
@@ -352,15 +360,21 @@ def main(
         _render_configuration(configuration, options.output_format, stdout)
     elif arguments.command == "state":
         workspace_service_instance = workspace_service or build_workspace_service()
+        state_operation = f"state {arguments.state_command}"
         try:
             workspace = workspace_service_instance.resolve(
                 options.workspace, current_directory or Path.cwd()
             )
             state_service_instance = state_service or build_state_service(workspace.root)
-            entries = state_service_instance.inspect()
+            if arguments.state_command == "invalidate":
+                invalidation = state_service_instance.invalidate(
+                    arguments.name, apply=arguments.apply
+                )
+            else:
+                entries = state_service_instance.inspect()
         except WorkspaceError as error:
             return _render_cli_failure(
-                "state show",
+                state_operation,
                 str(error),
                 "Initialize or select a valid workspace and retry.",
                 options.output_format,
@@ -369,14 +383,17 @@ def main(
             )
         except StateError as error:
             return _render_cli_failure(
-                "state show",
+                state_operation,
                 str(error),
                 "Reset the identified state file and retry.",
                 options.output_format,
                 stdout,
                 stderr,
             )
-        _render_state(entries, options.output_format, stdout)
+        if arguments.state_command == "invalidate":
+            _render_state_invalidation(invalidation, options.output_format, stdout)
+        else:
+            _render_state(entries, options.output_format, stdout)
     elif arguments.command == "inventory":
         try:
             if inventory_service is None:
@@ -724,6 +741,25 @@ def _render_state(
         print(f"Cache entry: {entry.name}", file=output)
         print(f"Source: {entry.source_identity}", file=output)
         print(f"Invalidation: {entry.invalidation_condition}", file=output)
+
+
+def _render_state_invalidation(
+    result: StateInvalidationResult, output_format: str, output: TextIO | None
+) -> None:
+    payload = {
+        "applied": result.applied,
+        "existed": result.existed,
+        "name": result.name,
+        "remaining_count": result.remaining_count,
+        "schema_version": 1,
+    }
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    action = "Applied" if result.applied else "Preview"
+    presence = "found" if result.existed else "not found"
+    print(f"{action}: cache entry '{result.name}' {presence}.", file=output)
+    print(f"Remaining entries: {result.remaining_count}", file=output)
 
 
 def _render_inventory(

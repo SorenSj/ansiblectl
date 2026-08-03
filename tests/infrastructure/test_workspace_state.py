@@ -76,3 +76,42 @@ def test_state_store_rejects_state_file_symlink(tmp_path: Path) -> None:
 
     with pytest.raises(StateError, match="symbolic link"):
         WorkspaceStateStore(tmp_path).read()
+
+
+def test_state_invalidation_previews_then_removes_only_exact_entry(tmp_path: Path) -> None:
+    store = WorkspaceStateStore(tmp_path)
+    entries = {
+        "inventory": CacheEntry("git:main", "revision changes", {"hosts": 2}),
+        "plugins": CacheEntry("directory:plugins", "directory changes", {"count": 1}),
+    }
+    store.write(entries)
+
+    preview = store.invalidate("inventory", apply=False)
+
+    assert preview.existed is True
+    assert preview.applied is False
+    assert preview.remaining_count == 1
+    assert store.read() == entries
+
+    applied = store.invalidate("inventory", apply=True)
+
+    assert applied.existed is True
+    assert applied.applied is True
+    assert applied.remaining_count == 1
+    assert store.read() == {"plugins": entries["plugins"]}
+
+
+def test_state_invalidation_rejects_empty_name(tmp_path: Path) -> None:
+    with pytest.raises(StateError, match="name must be non-empty"):
+        WorkspaceStateStore(tmp_path).invalidate("  ", apply=True)
+
+
+def test_state_store_rejects_lock_file_symlink(tmp_path: Path) -> None:
+    state_directory = tmp_path / ".ansiblectl"
+    state_directory.mkdir()
+    outside = tmp_path / "outside.lock"
+    outside.touch()
+    (state_directory / "state.lock").symlink_to(outside)
+
+    with pytest.raises(StateError, match="lock must not be a symbolic link"):
+        WorkspaceStateStore(tmp_path).invalidate("inventory", apply=True)

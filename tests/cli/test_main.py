@@ -31,7 +31,7 @@ from ansiblectl.domain.inventory import Host, ResolvedInventory
 from ansiblectl.domain.plugins import ProviderDescriptor
 from ansiblectl.domain.policy import EnforcementMode, PolicyFinding, PolicyReport
 from ansiblectl.domain.repository import RepositoryRequest, RepositoryResult
-from ansiblectl.domain.state import CacheEntry
+from ansiblectl.domain.state import CacheEntry, StateInvalidationResult
 from ansiblectl.domain.workspace import Workspace
 from ansiblectl.infrastructure.workspace_state import WorkspaceStateStore
 
@@ -107,6 +107,9 @@ class FakeStateService:
     def inspect(self) -> tuple[CacheEntrySummary, ...]:
         return (CacheEntrySummary("inventory", "git:main", "revision changes"),)
 
+    def invalidate(self, name: str, *, apply: bool = False) -> StateInvalidationResult:
+        return StateInvalidationResult(name, True, apply, 0)
+
 
 def test_state_show_renders_only_safe_cache_metadata(tmp_path: Path) -> None:
     output = StringIO()
@@ -147,6 +150,34 @@ def test_state_show_omits_cached_values_from_local_store(tmp_path: Path) -> None
     assert result == EXIT_SUCCESS
     assert "secret-value" not in output.getvalue()
     assert json.loads(output.getvalue())["entries"][0]["name"] == "inventory"
+
+
+def test_state_invalidate_is_preview_only_without_apply(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "state",
+            "invalidate",
+            "inventory",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        state_service=FakeStateService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue()) == {
+        "applied": False,
+        "existed": True,
+        "name": "inventory",
+        "remaining_count": 0,
+        "schema_version": 1,
+    }
 
 
 def test_config_show_renders_redacted_effective_configuration(tmp_path: Path) -> None:
@@ -383,6 +414,7 @@ def test_repository_sync_json_has_no_progress_decoration(tmp_path: Path) -> None
         (["workspace", "show"], "workspace show"),
         (["config", "show"], "config show"),
         (["state", "show"], "state show"),
+        (["state", "invalidate", "inventory"], "state invalidate"),
         (["inventory", "show"], "inventory show"),
         (["repository", "inspect", "repo", "--revision", "main"], "repository inspect"),
         (["plugin", "validate", "plugin.yaml"], "plugin validate"),

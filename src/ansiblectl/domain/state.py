@@ -25,9 +25,21 @@ class CacheEntry:
             raise StateError("Cache entry metadata and value types are invalid.")
 
 
+@dataclass(frozen=True)
+class StateInvalidationResult:
+    """Preview or applied result for one exact cache-entry invalidation."""
+
+    name: str
+    existed: bool
+    applied: bool
+    remaining_count: int
+
+
 class StatePort(Protocol):
     """Read and atomically replace workspace-scoped cache entries."""
 
     def read(self) -> dict[str, CacheEntry]: ...
 
     def write(self, entries: dict[str, CacheEntry]) -> None: ...
+
+    def invalidate(self, name: str, *, apply: bool) -> StateInvalidationResult: ...
