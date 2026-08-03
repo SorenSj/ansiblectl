@@ -1,0 +1,39 @@
+# TS-0014: Structured Logging
+
+| Field | Value |
+| --- | --- |
+| Status | Normative |
+| Version | 1.0 |
+| Date | 2026-08-03 |
+| Related ADRs | [ADR index](../adr/README.md) |
+
+## Purpose
+
+Defines structured log records, levels, correlation, redaction, and CLI verbosity behaviour.
+
+## Scope
+
+This specification defines the initial public and internal contract for this capability. Implementation details that do not alter the stated contract remain flexible.
+
+## Functional requirements
+
+1. Log records MUST include timestamp, level, event name, and correlation or execution identifier when available.
+2. Log fields MUST be structured and safe for machine processing.
+3. Secret values and known sensitive fields MUST be redacted before a sink receives a record.
+4. Verbosity options MUST affect rendering or threshold, not the underlying business result.
+5. Plugins MUST log through the SDK logger contract.
+
+## Interfaces and data
+
+The logging port accepts a typed LogEvent; sinks render console or configured destinations without changing event semantics.
+
+## Verification
+
+- A captured log record contains mandatory fields.
+- A secret-like value is absent from all configured test sinks.
+- Plugin logs carry plugin identity and execution correlation.
+
+## Non-goals
+
+This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
+
