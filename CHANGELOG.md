@@ -4,6 +4,8 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-04
+
 ### Added
 
 - Strict, bounded plugin provenance parsing with canonical domain-separated JSON payloads.
