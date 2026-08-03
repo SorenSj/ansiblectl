@@ -31,6 +31,8 @@ The initial manifest requires `identity`, `version`, `sdk_compatibility`,
 `capabilities`, `configuration_schema`, and `permissions`. SDK compatibility is
 currently exact (`0.1`). All manifests are parsed before descriptors are
 registered, so a malformed or duplicate descriptor leaves no partial registry.
+Configured filesystem locations use safe YAML parsing; discovery has no plugin
+code-import step.
 
 ## Verification
 
