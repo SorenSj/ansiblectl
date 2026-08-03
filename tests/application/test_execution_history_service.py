@@ -39,3 +39,20 @@ def test_history_service_delegates_typed_queries() -> None:
     assert service.retention(0, apply=True) == ExecutionRetentionResult(0, ("run-1",), True)
     with pytest.raises(ExecutionError, match="zero or greater"):
         service.retention(-1, apply=False)
+
+
+def test_history_service_filters_exact_operation_and_rejects_empty_filter() -> None:
+    record = ExecutionRecord(
+        "timestamp",
+        "syntax-1",
+        ExecutionStatus.COMPLETED,
+        0,
+        0.1,
+        operation="playbook.syntax_check",
+    )
+    service = ExecutionHistoryService(FakeHistoryPort(record))
+
+    assert service.list("playbook.syntax_check") == (record,)
+    assert service.list("run") == ()
+    with pytest.raises(ExecutionError, match="non-empty"):
+        service.list(" ")

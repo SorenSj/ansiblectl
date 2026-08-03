@@ -87,6 +87,8 @@ metadata. Older records default the field to `false`.
 Every execution carries a non-empty operation identifier. Normal runs use
 `run`; explicit syntax checks use `playbook.syntax_check`. The operation is
 retained in results, events, and history, and older records default to `run`.
+`execution list --operation <identifier>` applies an exact read-only filter
+after records are safely parsed; it does not alter retention ordering or data.
 
 ## Verification
 
@@ -107,6 +109,7 @@ retained in results, events, and history, and older records default to `run`.
 - Global verbosity reaches Ansible as a separate argument and remains inspectable in execution history.
 - Diff mode reaches Ansible as a separate argument without embedding diff content in metadata.
 - Execution history distinguishes playbook runs from syntax-check operations.
+- Execution history can be filtered by one exact non-empty operation identifier.
 
 ## Non-goals
 

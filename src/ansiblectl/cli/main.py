@@ -243,7 +243,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     execution = subcommands.add_parser("execution", help="Inspect previous executions.")
     execution_commands = execution.add_subparsers(dest="execution_command", required=True)
-    execution_commands.add_parser("list", help="List completed executions newest first.")
+    execution_list = execution_commands.add_parser(
+        "list", help="List completed executions newest first."
+    )
+    execution_list.add_argument(
+        "--operation", help="Show only records with this exact operation identifier."
+    )
     execution_show = execution_commands.add_parser("show", help="Show one completed execution.")
     execution_show.add_argument("execution_id", help="Exact execution identifier.")
     execution_prune = execution_commands.add_parser(
@@ -540,7 +545,7 @@ def main(
             if arguments.execution_command == "show":
                 records = (history.get(arguments.execution_id),)
             else:
-                records = history.list()
+                records = history.list(arguments.operation)
         except WorkspaceError as error:
             return _render_cli_failure(
                 f"execution {arguments.execution_command}",

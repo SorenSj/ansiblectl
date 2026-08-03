@@ -14,8 +14,13 @@ from ansiblectl.domain.execution import (
 class ExecutionHistoryService:
     port: ExecutionHistoryPort
 
-    def list(self) -> tuple[ExecutionRecord, ...]:
-        return self.port.list()
+    def list(self, operation: str | None = None) -> tuple[ExecutionRecord, ...]:
+        records = self.port.list()
+        if operation is None:
+            return records
+        if not operation.strip():
+            raise ExecutionError("Execution operation filter must be non-empty.")
+        return tuple(record for record in records if record.operation == operation)
 
     def get(self, execution_id: str) -> ExecutionRecord:
         return self.port.get(execution_id)

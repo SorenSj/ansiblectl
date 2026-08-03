@@ -103,6 +103,12 @@ Syntax-check output is stored privately and returned by reference rather than
 embedded in terminal or JSON output.
 Syntax checks are recorded with operation `playbook.syntax_check`, allowing
 `execution list/show/prune` to inspect and retain their output safely.
+Filter mixed history without changing it:
+
+```console
+uv run ansiblectl --workspace ~/automation/example \
+  execution list --operation playbook.syntax_check
+```
 
 Validate workspace inputs, generate a private canonical inventory, and invoke
 Ansible with an explicit timeout and argument vector:

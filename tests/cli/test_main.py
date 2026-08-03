@@ -928,8 +928,8 @@ class FakeExecutionHistoryService:
         operation="playbook.syntax_check",
     )
 
-    def list(self) -> tuple[ExecutionRecord, ...]:
-        return (self.record,)
+    def list(self, operation: str | None = None) -> tuple[ExecutionRecord, ...]:
+        return (self.record,) if operation in {None, self.record.operation} else ()
 
     def get(self, execution_id: str) -> ExecutionRecord:
         if execution_id != self.record.execution_id:
@@ -968,6 +968,29 @@ def test_execution_list_renders_safe_machine_history(tmp_path: Path) -> None:
     assert payload["executions"][0]["verbosity"] == 3
     assert payload["executions"][0]["diff"] is True
     assert payload["executions"][0]["operation"] == "playbook.syntax_check"
+
+
+def test_execution_list_filters_by_exact_operation(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output-format",
+            "json",
+            "execution",
+            "list",
+            "--operation",
+            "run",
+        ],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        execution_history_service=FakeExecutionHistoryService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue())["executions"] == []
 
 
 def test_execution_show_renders_one_human_record(tmp_path: Path) -> None:
