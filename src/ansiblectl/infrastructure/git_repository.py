@@ -28,3 +28,29 @@ class GitRepositoryAdapter:
         return RepositoryResult(
             request.repository_path, request.revision, bool(status.stdout.strip())
         )
+
+    def sync(self, request: RepositoryRequest) -> RepositoryResult:
+        try:
+            subprocess.run(
+                ("git", "fetch", "--prune"),
+                cwd=request.repository_path,
+                capture_output=True,
+                check=True,
+                shell=False,
+                text=True,
+            )
+            subprocess.run(
+                ("git", "checkout", "--detach", request.revision),
+                cwd=request.repository_path,
+                capture_output=True,
+                check=True,
+                shell=False,
+                text=True,
+            )
+        except (OSError, subprocess.CalledProcessError) as error:
+            raise RepositoryError(
+                f"Cannot synchronise repository at '{request.repository_path}' "
+                f"to '{request.revision}'. "
+                "Verify revision and authentication policy."
+            ) from error
+        return RepositoryResult(request.repository_path, request.revision, False)

@@ -16,3 +16,7 @@ class RepositoryService:
 
     def inspect_for_sync(self, request: RepositoryRequest) -> RepositoryResult:
         return require_clean_worktree(self.port.inspect(request))
+
+    def sync(self, request: RepositoryRequest) -> RepositoryResult:
+        self.inspect_for_sync(request)
+        return self.port.sync(request)

@@ -45,6 +45,9 @@ class RepositoryPort(Protocol):
     def inspect(self, request: RepositoryRequest) -> RepositoryResult:
         """Inspect repository state without mutation."""
 
+    def sync(self, request: RepositoryRequest) -> RepositoryResult:
+        """Synchronise an already validated clean repository to its revision."""
+
 
 def require_clean_worktree(result: RepositoryResult) -> RepositoryResult:
     if result.dirty:

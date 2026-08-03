@@ -33,6 +33,11 @@ Before a future sync mutation, the adapter inspects `git status --porcelain`;
 a dirty worktree is a typed failure that preserves user changes. Credentials
 are intentionally absent from this request and adapter contract.
 
+For a clean repository, the initial Git sync runs fixed `git fetch --prune` and
+`git checkout --detach REVISION` argument vectors. It reports the repository
+and revision in the typed result; authentication remains external environment
+policy rather than a command argument.
+
 ## Verification
 
 - A fake repository port validates application orchestration.

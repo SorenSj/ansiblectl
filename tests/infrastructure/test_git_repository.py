@@ -45,3 +45,21 @@ def test_adapter_returns_actionable_error_when_git_inspection_fails(
 
     with pytest.raises(RepositoryError, match="Verify it is a Git repository"):
         GitRepositoryAdapter().inspect(RepositoryRequest(tmp_path, tmp_path / "repo", "main"))
+
+
+def test_sync_uses_fixed_non_credential_bearing_argument_vectors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[object, ...]] = []
+
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        return subprocess.CompletedProcess([], 0)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    request = RepositoryRequest(tmp_path, tmp_path / "repo", "release-1")
+    assert GitRepositoryAdapter().sync(request).revision == "release-1"
+    assert calls == [
+        (("git", "fetch", "--prune"),),
+        (("git", "checkout", "--detach", "release-1"),),
+    ]
