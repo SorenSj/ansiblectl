@@ -16,6 +16,7 @@ from ansiblectl.domain.filesystem import (
     RecoveryAction,
     RecoveryReason,
 )
+from ansiblectl.infrastructure import transactional_filesystem
 from ansiblectl.infrastructure.memory_logging import MemoryLogSink
 from ansiblectl.infrastructure.transactional_filesystem import TransactionalFilesystem
 
@@ -230,6 +231,21 @@ def test_targets_cannot_escape_root_or_modify_control_data(tmp_path: Path) -> No
         transaction.stage_write(Path("../outside"), b"bad")
     with pytest.raises(FilesystemTransactionError, match="reserved"):
         transaction.stage_delete(Path(".ansiblectl/transactions/data"))
+
+
+def test_cross_device_target_is_rejected_before_staging(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transaction = TransactionalFilesystem(tmp_path).begin()
+    monkeypatch.setattr(transactional_filesystem, "_same_device", lambda root, target: False)
+
+    with pytest.raises(FilesystemCapabilityError) as raised:
+        transaction.stage_write(Path("mounted/target"), b"must-not-stage")
+
+    assert raised.value.context == {"reasons": ["CROSS_DEVICE_TARGET"]}
+    assert transaction.operations == []
+    assert list(transaction.directory.glob("stage-*")) == []
+    transaction.rollback()
 
 
 def test_commit_rejects_parent_replaced_by_symlink_after_staging(tmp_path: Path) -> None:

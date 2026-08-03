@@ -11,6 +11,7 @@ All notable changes to Ansiblectl are documented here.
   platforms.
 - Typed workspace filesystem capability reports, stable unsupported-capability errors, and a
   pre-transaction POSIX probe for permissions, advisory locks, atomic replacement, and syncing.
+- Pre-staging rejection of nested cross-device targets with the stable `CROSS_DEVICE_TARGET` reason.
 - Additive `state recover --details` diagnostics with bounded age, opaque identifiers, owner status,
   required action, and stable reason codes without journal paths or content.
 - Stable human, JSON, and YAML rendering for detailed recovery diagnostics.

@@ -54,6 +54,8 @@ def test_probe_reports_non_posix_platform_without_writing(
         FilesystemCapabilityReason.ATOMIC_REPLACE_UNAVAILABLE,
         FilesystemCapabilityReason.FILE_SYNC_UNAVAILABLE,
         FilesystemCapabilityReason.DIRECTORY_SYNC_UNAVAILABLE,
+        FilesystemCapabilityReason.OWNER_PERMISSIONS_UNAVAILABLE,
+        FilesystemCapabilityReason.CAPABILITY_PROBE_FAILED,
     ],
 )
 def test_probe_preserves_stable_failure_reason(

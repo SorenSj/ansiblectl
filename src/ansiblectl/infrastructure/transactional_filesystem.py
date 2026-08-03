@@ -21,6 +21,7 @@ from ansiblectl.domain.errors import (
 )
 from ansiblectl.domain.filesystem import (
     MAX_RECOVERY_AGE_SECONDS,
+    FilesystemCapabilityReason,
     FilesystemCapabilityReport,
     RecoveryAction,
     RecoveryDiagnostic,
@@ -313,6 +314,12 @@ class FilesystemTransaction:
             ) from error
         if target == self.filesystem.root or self.filesystem.control in target.parents:
             raise FilesystemTransactionError("Filesystem transaction target is reserved.")
+        if not _same_device(self.filesystem.root, target):
+            raise FilesystemCapabilityError(
+                "Filesystem transaction target crosses a filesystem boundary.",
+                hint="Select a target on the workspace filesystem.",
+                context={"reasons": [FilesystemCapabilityReason.CROSS_DEVICE_TARGET.value]},
+            )
         if any(operation["target"] == str(target) for operation in self.operations):
             raise FilesystemTransactionError(
                 "Filesystem transaction target was staged more than once.",
@@ -497,3 +504,15 @@ def _fsync_directory(path: Path) -> None:
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
+
+
+def _same_device(root: Path, target: Path) -> bool:
+    """Return whether *target* resolves through the workspace filesystem."""
+
+    existing = target
+    while not existing.exists():
+        parent = existing.parent
+        if parent == existing:
+            return False
+        existing = parent
+    return root.stat().st_dev == existing.stat().st_dev

@@ -53,6 +53,9 @@ A capability result contains a schema version, supported boolean, platform ident
 scope identifier, and stable reason codes. Human remediation may accompany reason codes, but raw
 operating-system exception text is not public output.
 
+Targets whose nearest existing ancestor is on a different device from the workspace root fail
+before staging with `CROSS_DEVICE_TARGET`.
+
 Capability success is advisory evidence for the inspected workspace mount, not a permanent system
 guarantee. Commit and rollback continue to handle runtime failures defensively.
 
