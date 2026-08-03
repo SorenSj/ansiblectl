@@ -19,3 +19,7 @@ class WorkspaceValidationError(WorkspaceError):
 
 class ConfigurationError(DomainError):
     """Raised when configuration cannot be safely parsed or validated."""
+
+
+class ExecutionError(DomainError):
+    """Raised when an execution request violates its safe contract."""

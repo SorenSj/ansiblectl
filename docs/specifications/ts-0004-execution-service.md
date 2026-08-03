@@ -27,6 +27,15 @@ This specification defines the initial public and internal contract for this cap
 
 Application code submits an ExecutionRequest to an execution port and receives an ExecutionResult. The Ansible adapter is one implementation of that port.
 
+The initial request contract contains a non-empty argument vector, an absolute
+working directory, an explicit environment mapping, an optional positive
+timeout, and a generated execution identifier. The local adapter invokes that
+vector with shell execution disabled. Results classify `completed`, `failed`,
+`timed_out`, or `cancelled`, retain the execution identifier and elapsed time,
+and expose only output references (not raw process output). A cancellation
+requested before a process starts returns `cancelled`; in-process cancellation
+will be added with the asynchronous execution lifecycle.
+
 ## Verification
 
 - A fake execution port can verify a request without invoking a process.
@@ -36,4 +45,3 @@ Application code submits an ExecutionRequest to an execution port and receives a
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
