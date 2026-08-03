@@ -16,6 +16,8 @@ def test_public_error_module_exports_only_the_documented_contract() -> None:
         "ExecutionError",
         "ExitCode",
         "ExternalToolError",
+        "FilesystemRecoveryError",
+        "FilesystemTransactionError",
         "InfrastructureError",
         "InternalOperationalError",
         "InventoryError",

@@ -152,6 +152,7 @@ def test_prune_atomically_retains_newest_records_and_removes_derived_outputs(
     ]
     remaining_text = JsonLinesExecutionHistory(tmp_path).path.read_text(encoding="utf-8")
     assert "workspace.initialized" in remaining_text
+    assert list((tmp_path / ".ansiblectl/transactions").glob("[!.]*")) == []
     for execution_id in ("run-1", "run-2"):
         key = hashlib.sha256(execution_id.encode("utf-8")).hexdigest()
         assert not (tmp_path / ".ansiblectl" / "runs" / key).exists()

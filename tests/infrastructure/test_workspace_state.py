@@ -13,6 +13,7 @@ def test_atomic_state_round_trip_preserves_a_valid_record(tmp_path: Path) -> Non
     entries = {"inventory": CacheEntry("git:main", "revision changes", {"hosts": 2})}
     store.write(entries)
     assert store.read() == entries
+    assert list((tmp_path / ".ansiblectl/transactions").glob("[!.]*")) == []
 
 
 def test_corrupt_state_offers_recovery_path(tmp_path: Path) -> None:

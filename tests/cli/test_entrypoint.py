@@ -2,6 +2,7 @@
 
 import json
 from io import StringIO
+from pathlib import Path
 
 import pytest
 import yaml
@@ -49,6 +50,9 @@ def test_legacy_failure_adapter_uses_stable_command_subsystem(
         ("state invalidate", {"applied": True, "existed": True}, True),
         ("state invalidate", {"applied": False, "existed": True}, False),
         ("state invalidate", {"applied": True, "existed": False}, False),
+        ("state recover", {"applied": True, "transaction_ids": ["one"]}, True),
+        ("state recover", {"applied": False, "transaction_ids": ["one"]}, False),
+        ("state recover", {"applied": True, "transaction_ids": []}, False),
         ("execution prune", {"applied": True, "removed_execution_ids": ["run-1"]}, True),
         ("execution prune", {"applied": True, "removed_execution_ids": []}, False),
         ("repository sync", {"resolved_revision": "abc123"}, False),
@@ -65,6 +69,7 @@ def test_legacy_changed_inference_is_explicit_and_conservative(
     ("command", "payload"),
     [
         ("state invalidate", {"applied": True, "existed": True}),
+        ("state recover", {"applied": True, "transaction_ids": ["one"]}),
         ("execution prune", {"applied": True, "removed_execution_ids": ["run-1"]}),
     ],
 )
@@ -87,6 +92,27 @@ def test_entrypoint_preserves_explicit_legacy_change_state(
     assert result == 0
     assert stderr.getvalue() == ""
     assert envelope["changed"] is True
+
+
+def test_recovery_corrupt_journal_uses_stable_public_error(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    assert cli(["workspace", "init", str(workspace)], stdout=StringIO()) == 0
+    journal = workspace / ".ansiblectl/transactions/broken/journal.json"
+    journal.parent.mkdir(parents=True)
+    journal.write_text("not-json", encoding="utf-8")
+    stdout, stderr = StringIO(), StringIO()
+
+    result = cli(
+        ["--workspace", str(workspace), "--output", "json", "state", "recover"],
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert result == ExitCode.RESOURCE_CONFLICT
+    assert stderr.getvalue() == ""
+    envelope = json.loads(stdout.getvalue())
+    assert envelope["error"]["code"] == ErrorCode.FILESYSTEM_RECOVERY_REQUIRED
+    assert journal.exists()
 
 
 @pytest.mark.parametrize(

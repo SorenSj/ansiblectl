@@ -42,6 +42,8 @@ values:
 uv run ansiblectl --workspace ~/automation/example state show
 uv run ansiblectl --workspace ~/automation/example state invalidate inventory
 uv run ansiblectl --workspace ~/automation/example state invalidate inventory --apply
+uv run ansiblectl --workspace ~/automation/example state recover
+uv run ansiblectl --workspace ~/automation/example state recover --apply
 ```
 
 Resolve and inspect the currently configured inventory in human or stable JSON

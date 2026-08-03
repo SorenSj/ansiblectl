@@ -55,6 +55,8 @@ class ErrorCode(StrEnum):
     SECRET_NOT_FOUND = "SECRET_NOT_FOUND"
     REPOSITORY_DIRTY_WORKTREE = "REPOSITORY_DIRTY_WORKTREE"
     REPOSITORY_REVISION_MISMATCH = "REPOSITORY_REVISION_MISMATCH"
+    FILESYSTEM_TRANSACTION_ERROR = "FILESYSTEM_TRANSACTION_ERROR"
+    FILESYSTEM_RECOVERY_REQUIRED = "FILESYSTEM_RECOVERY_REQUIRED"
 
 
 @dataclass(frozen=True)
@@ -147,6 +149,16 @@ ERROR_CODE_REGISTRY: Mapping[str, ErrorDefinition] = MappingProxyType(
             _definition(
                 ErrorCode.REPOSITORY_REVISION_MISMATCH,
                 "repository",
+                ExitCode.RESOURCE_CONFLICT,
+            ),
+            _definition(
+                ErrorCode.FILESYSTEM_TRANSACTION_ERROR,
+                "filesystem_transaction",
+                ExitCode.RESOURCE_CONFLICT,
+            ),
+            _definition(
+                ErrorCode.FILESYSTEM_RECOVERY_REQUIRED,
+                "filesystem_recovery",
                 ExitCode.RESOURCE_CONFLICT,
             ),
         )
@@ -350,6 +362,20 @@ class StateError(DomainError):
     exit_code = ExitCode.RESOURCE_CONFLICT
 
 
+class FilesystemTransactionError(InfrastructureError):
+    """Raised when a filesystem transaction cannot complete safely."""
+
+    error_code = ErrorCode.FILESYSTEM_TRANSACTION_ERROR
+    exit_code = ExitCode.RESOURCE_CONFLICT
+
+
+class FilesystemRecoveryError(InfrastructureError):
+    """Raised when an interrupted transaction cannot be recovered automatically."""
+
+    error_code = ErrorCode.FILESYSTEM_RECOVERY_REQUIRED
+    exit_code = ExitCode.RESOURCE_CONFLICT
+
+
 __all__ = [
     "ERROR_CODE_REGISTRY",
     "AnsiblectlError",
@@ -362,6 +388,8 @@ __all__ = [
     "ExecutionError",
     "ExitCode",
     "ExternalToolError",
+    "FilesystemRecoveryError",
+    "FilesystemTransactionError",
     "InfrastructureError",
     "InternalOperationalError",
     "InventoryError",

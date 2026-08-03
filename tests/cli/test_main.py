@@ -35,12 +35,14 @@ from ansiblectl.domain.execution import (
     ExecutionStatus,
     ExecutionTargeting,
 )
+from ansiblectl.domain.filesystem import FilesystemRecoveryResult
 from ansiblectl.domain.inventory import Host, ResolvedInventory
 from ansiblectl.domain.plugins import ProviderDescriptor
 from ansiblectl.domain.policy import EnforcementMode, PolicyFinding, PolicyReport
 from ansiblectl.domain.repository import RepositoryRequest, RepositoryResult
 from ansiblectl.domain.state import CacheEntry, StateInvalidationResult
 from ansiblectl.domain.workspace import Workspace
+from ansiblectl.infrastructure.transactional_filesystem import TransactionalFilesystem
 from ansiblectl.infrastructure.workspace_state import WorkspaceStateStore
 
 
@@ -134,6 +136,11 @@ class FakeStateService:
         return StateInvalidationResult(name, True, apply, 0)
 
 
+class FakeFilesystemRecoveryService:
+    def recover(self, *, apply: bool = False) -> FilesystemRecoveryResult:
+        return FilesystemRecoveryResult(("transaction-1",), apply)
+
+
 def test_state_show_renders_only_safe_cache_metadata(tmp_path: Path) -> None:
     output = StringIO()
 
@@ -201,6 +208,56 @@ def test_state_invalidate_is_preview_only_without_apply(tmp_path: Path) -> None:
         "remaining_count": 0,
         "schema_version": 1,
     }
+
+
+def test_state_recover_previews_pending_transactions(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "--output-format", "json", "state", "recover"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        state_service=FakeStateService(),  # type: ignore[arg-type]
+        filesystem_recovery_service=FakeFilesystemRecoveryService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue()) == {
+        "applied": False,
+        "schema_version": 1,
+        "transaction_ids": ["transaction-1"],
+    }
+
+
+def test_state_recover_applies_durable_workspace_recovery(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    assert main(["workspace", "init", str(workspace)], stdout=StringIO()) == EXIT_SUCCESS
+    transaction = TransactionalFilesystem(workspace).begin()
+    transaction.stage_write(Path("pending.txt"), b"not-committed")
+    transaction._release_active()
+    output = StringIO()
+
+    result = main(
+        [
+            "--workspace",
+            str(workspace),
+            "--output-format",
+            "json",
+            "state",
+            "recover",
+            "--apply",
+        ],
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue()) == {
+        "applied": True,
+        "schema_version": 1,
+        "transaction_ids": [transaction.transaction_id],
+    }
+    assert not (workspace / "pending.txt").exists()
+    assert TransactionalFilesystem(workspace).pending() == ()
 
 
 def test_config_show_renders_redacted_effective_configuration(tmp_path: Path) -> None:

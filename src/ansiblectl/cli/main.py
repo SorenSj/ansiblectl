@@ -16,6 +16,7 @@ from typing import TextIO
 from ansiblectl.application.configuration import ConfigurationService
 from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.execution_history import ExecutionHistoryService, ExecutionSummary
+from ansiblectl.application.filesystem import FilesystemRecoveryService
 from ansiblectl.application.inventory import (
     InventoryService,
     InventoryValidationResult,
@@ -36,6 +37,7 @@ from ansiblectl.cli.boundary import render_exception
 from ansiblectl.cli.composition import (
     build_configuration_service,
     build_execution_history_service,
+    build_filesystem_recovery_service,
     build_inventory_service,
     build_inventory_validation_service,
     build_playbook_validation_service,
@@ -56,6 +58,7 @@ from ansiblectl.domain.errors import (
     ConfigurationError,
     ExecutionError,
     ExternalToolError,
+    FilesystemRecoveryError,
     InternalOperationalError,
     PluginError,
     StateError,
@@ -70,6 +73,7 @@ from ansiblectl.domain.execution import (
     ExecutionStatus,
     ExecutionTargeting,
 )
+from ansiblectl.domain.filesystem import FilesystemRecoveryResult
 from ansiblectl.domain.inventory import (
     InventoryError,
     ResolvedInventory,
@@ -98,7 +102,7 @@ _COMMANDS: dict[str, frozenset[str]] = {
     "plugin": frozenset({"discover", "list", "permissions", "validate"}),
     "repository": frozenset({"inspect", "sync"}),
     "run": frozenset(),
-    "state": frozenset({"invalidate", "show"}),
+    "state": frozenset({"invalidate", "recover", "show"}),
     "status": frozenset(),
     "workspace": frozenset({"init", "show"}),
 }
@@ -353,6 +357,9 @@ def _legacy_result_changed(command_name: str, payload: object) -> bool:
         return True
     if command_name == "state invalidate":
         return payload.get("applied") is True and payload.get("existed") is True
+    if command_name == "state recover":
+        recovered = payload.get("transaction_ids")
+        return payload.get("applied") is True and isinstance(recovered, list) and bool(recovered)
     if command_name == "execution prune":
         removed = payload.get("removed_execution_ids")
         return payload.get("applied") is True and isinstance(removed, list) and bool(removed)
@@ -471,6 +478,12 @@ def build_parser() -> argparse.ArgumentParser:
     state_invalidate.add_argument("name", help="Exact cache-entry name.")
     state_invalidate.add_argument(
         "--apply", action="store_true", help="Apply invalidation; otherwise only preview it."
+    )
+    state_recover = state_commands.add_parser(
+        "recover", help="Preview or recover interrupted filesystem transactions."
+    )
+    state_recover.add_argument(
+        "--apply", action="store_true", help="Apply recovery; otherwise only preview it."
     )
     inventory = subcommands.add_parser("inventory", help="Resolve and inspect inventory.")
     inventory_commands = inventory.add_subparsers(dest="inventory_command", required=True)
@@ -652,6 +665,7 @@ def main(
     workspace_service: WorkspaceService | None = None,
     configuration_service: ConfigurationService | None = None,
     state_service: StateService | None = None,
+    filesystem_recovery_service: FilesystemRecoveryService | None = None,
     inventory_service: InventoryService | None = None,
     inventory_validation_service: InventoryValidationService | None = None,
     repository_service: RepositoryService | None = None,
@@ -746,6 +760,11 @@ def main(
                 invalidation = state_service_instance.invalidate(
                     arguments.name, apply=arguments.apply
                 )
+            elif arguments.state_command == "recover":
+                recovery_service = filesystem_recovery_service or build_filesystem_recovery_service(
+                    workspace.root
+                )
+                recovery = recovery_service.recover(apply=arguments.apply)
             else:
                 entries = state_service_instance.inspect()
         except WorkspaceError as error:
@@ -770,8 +789,21 @@ def main(
                 stdout,
                 stderr,
             )
+        except FilesystemRecoveryError as error:
+            if propagate_errors:
+                raise
+            return _render_cli_failure(
+                state_operation,
+                str(error),
+                "Inspect the retained transaction journal and retry recovery.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
         if arguments.state_command == "invalidate":
             _render_state_invalidation(invalidation, options.output_format, stdout)
+        elif arguments.state_command == "recover":
+            _render_filesystem_recovery(recovery, options.output_format, stdout)
         else:
             _render_state(entries, options.output_format, stdout)
     elif arguments.command == "inventory":
@@ -1295,6 +1327,23 @@ def _render_state_invalidation(
     presence = "found" if result.existed else "not found"
     print(f"{action}: cache entry '{result.name}' {presence}.", file=output)
     print(f"Remaining entries: {result.remaining_count}", file=output)
+
+
+def _render_filesystem_recovery(
+    result: FilesystemRecoveryResult, output_format: str, output: TextIO | None
+) -> None:
+    payload = {
+        "applied": result.applied,
+        "schema_version": 1,
+        "transaction_ids": list(result.transaction_ids),
+    }
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    action = "Recovered" if result.applied else "Pending"
+    print(f"{action} filesystem transactions: {len(result.transaction_ids)}", file=output)
+    for transaction_id in result.transaction_ids:
+        print(f"  {transaction_id}", file=output)
 
 
 def _render_inventory(

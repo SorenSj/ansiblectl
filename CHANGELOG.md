@@ -4,8 +4,18 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-03
+
 ### Added
 
+- Durable transactional filesystem writes and deletions with rollback, interrupted-operation
+  recovery, stable error contracts, and structured audit events.
+- Workspace cache persistence now uses the transactional filesystem primitive.
+- Execution-history retention transactionally replaces its canonical event log before deleting
+  derived run output.
+- `state recover` previews interrupted transaction identifiers and requires `--apply` before
+  performing rollback or completed-journal cleanup.
+- ADR 0036 documenting guarantees, failure semantics, and known filesystem limitations.
 - Unified public error hierarchy, stable error-code registry, and documented process exit codes.
 - Versioned command success and error envelopes with text, JSON, and YAML rendering.
 - Public command context, structured result, warning, and envelope integration contracts.
