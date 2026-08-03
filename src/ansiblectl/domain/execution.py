@@ -70,6 +70,28 @@ class ExecutionResult:
     diagnostic: str | None = None
 
 
+@dataclass(frozen=True)
+class ExecutionRecord:
+    """Persisted safe execution metadata available for later inspection."""
+
+    timestamp: str
+    execution_id: str
+    status: ExecutionStatus
+    exit_code: int | None
+    elapsed_seconds: float
+    stdout_reference: str | None = None
+    stderr_reference: str | None = None
+    diagnostic: str | None = None
+
+
+class ExecutionHistoryPort(Protocol):
+    """Read safe persisted execution metadata for one workspace."""
+
+    def list(self) -> tuple[ExecutionRecord, ...]: ...
+
+    def get(self, execution_id: str) -> ExecutionRecord: ...
+
+
 class ExecutionPort(Protocol):
     """Port for controlled external process execution."""
 

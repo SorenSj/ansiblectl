@@ -102,6 +102,14 @@ returns their file references for diagnosis.
 Completed runs also append a redacted structured record to
 `.ansiblectl/logs/events.jsonl`, correlated by execution identifier.
 
+Inspect safe execution metadata later without automatically printing captured
+Ansible output:
+
+```console
+uv run ansiblectl --workspace ~/automation/example execution list
+uv run ansiblectl --workspace ~/automation/example execution show <execution-id>
+```
+
 ## Project governance
 
 The repository is the authoritative source for Ansiblectl's normative

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from ansiblectl import __version__
 from ansiblectl.application.execution import ExecutionService
+from ansiblectl.application.execution_history import ExecutionHistoryService
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.plugins import PluginDiscoveryService
 from ansiblectl.application.policy import PolicyService
@@ -14,6 +15,7 @@ from ansiblectl.application.status import DefaultStatusService, StatusService
 from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.domain.events import EventBus
 from ansiblectl.domain.inventory import InventoryError
+from ansiblectl.infrastructure.execution_history import JsonLinesExecutionHistory
 from ansiblectl.infrastructure.generated_inventory import materialize_inventory
 from ansiblectl.infrastructure.git_repository import GitRepositoryAdapter
 from ansiblectl.infrastructure.json_logging import EventLogSubscriber, JsonLinesLogSink
@@ -58,6 +60,12 @@ def build_run_service(workspace_root: Path, inventory_source: Path | None = None
         policy=PolicyService([]),
         materialize_inventory=materialize_inventory,
     )
+
+
+def build_execution_history_service(workspace_root: Path) -> ExecutionHistoryService:
+    """Create read-only inspection of safe workspace execution records."""
+
+    return ExecutionHistoryService(JsonLinesExecutionHistory(workspace_root))
 
 
 def execution_environment() -> dict[str, str]:

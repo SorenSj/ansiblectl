@@ -42,12 +42,18 @@ safe directory keys, output files use owner-only permissions, and CLI results
 expose file references without echoing raw Ansible output. Partial output from
 a timed-out process follows the same storage policy.
 
+Completed execution metadata is inspectable through an execution-history port.
+Records contain timestamp, identifier, classified status, exit code, elapsed
+time, safe output references, and a safe diagnostic. History inspection never
+dereferences captured output automatically.
+
 ## Verification
 
 - A fake execution port can verify a request without invoking a process.
 - A timeout returns a classified failure and retains the execution identifier.
 - Arguments containing spaces or special characters are passed safely without shell interpolation.
 - Captured and partial timeout output is stored with owner-only permissions and returned by reference.
+- Execution history lists records newest first and resolves one exact execution identifier.
 
 ## Non-goals
 

@@ -72,6 +72,10 @@ def test_execution_event_is_published_after_a_completed_port_call(tmp_path: Path
                 "execution_id": request.execution_id,
                 "status": ExecutionStatus.COMPLETED,
                 "exit_code": 0,
+                "elapsed_seconds": 0.1,
+                "stdout_reference": None,
+                "stderr_reference": None,
+                "diagnostic": None,
             },
         )
     ]

@@ -27,6 +27,10 @@ This specification defines the initial public and internal contract for this cap
 
 Input is argv plus environment; output is human text by default or an explicit machine-readable result. Command handlers invoke typed application commands and map results to output and exit codes.
 
+The stable `execution list` and `execution show <execution-id>` paths inspect
+safe records from the selected workspace. They do not read or render referenced
+Ansible stdout or stderr content.
+
 ## Verification
 
 - `ansiblectl --help` lists top-level commands and global options.
@@ -36,4 +40,3 @@ Input is argv plus environment; output is human text by default or an explicit m
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-

@@ -32,6 +32,10 @@ The initial public event names are `execution.completed` and
 subscriber exceptions are recorded by event name and exception class without
 changing the completed use-case result.
 
+The `execution.completed` payload contains the execution identifier, status,
+exit code, elapsed time, optional stdout and stderr references, and an optional
+safe diagnostic. It contains no raw process output.
+
 ## Verification
 
 - A subscriber receives the documented payload type.

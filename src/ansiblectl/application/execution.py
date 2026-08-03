@@ -32,6 +32,10 @@ class ExecutionService:
                         "execution_id": result.execution_id,
                         "status": result.status,
                         "exit_code": result.exit_code,
+                        "elapsed_seconds": result.elapsed_seconds,
+                        "stdout_reference": result.stdout_reference,
+                        "stderr_reference": result.stderr_reference,
+                        "diagnostic": result.diagnostic,
                     },
                 )
             )

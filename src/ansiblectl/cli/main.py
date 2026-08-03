@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TextIO
 
 from ansiblectl.application.execution import GovernedExecutionResult
+from ansiblectl.application.execution_history import ExecutionHistoryService
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.plugins import PluginDiscoveryService
 from ansiblectl.application.repository import RepositoryService
@@ -17,6 +18,7 @@ from ansiblectl.application.run import RunService
 from ansiblectl.application.status import StatusService
 from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.cli.composition import (
+    build_execution_history_service,
     build_inventory_service,
     build_plugin_discovery_service,
     build_repository_service,
@@ -26,7 +28,7 @@ from ansiblectl.cli.composition import (
     execution_environment,
 )
 from ansiblectl.domain.errors import ExecutionError, WorkspaceError
-from ansiblectl.domain.execution import ExecutionStatus
+from ansiblectl.domain.execution import ExecutionRecord, ExecutionStatus
 from ansiblectl.domain.inventory import InventoryError, ResolvedInventory
 from ansiblectl.domain.playbook import PlaybookError
 from ansiblectl.domain.plugins import PluginManifestError, ProviderDescriptor
@@ -130,6 +132,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=EnforcementMode.DENY,
         help="Policy enforcement mode (default: deny).",
     )
+    execution = subcommands.add_parser("execution", help="Inspect previous executions.")
+    execution_commands = execution.add_subparsers(dest="execution_command", required=True)
+    execution_commands.add_parser("list", help="List completed executions newest first.")
+    execution_show = execution_commands.add_parser("show", help="Show one completed execution.")
+    execution_show.add_argument("execution_id", help="Exact execution identifier.")
     return parser
 
 
@@ -142,6 +149,7 @@ def main(
     repository_service: RepositoryService | None = None,
     plugin_service: PluginDiscoveryService | None = None,
     run_service: RunService | None = None,
+    execution_history_service: ExecutionHistoryService | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
     current_directory: Path | None = None,
@@ -267,6 +275,27 @@ def main(
             return EXIT_EXPECTED_FAILURE
         if run_result.execution.status is not ExecutionStatus.COMPLETED:
             return EXIT_EXPECTED_FAILURE
+    elif arguments.command == "execution":
+        workspace_service_instance = workspace_service or build_workspace_service()
+        try:
+            workspace = workspace_service_instance.resolve(
+                options.workspace, current_directory or Path.cwd()
+            )
+            history = execution_history_service or build_execution_history_service(workspace.root)
+            records: tuple[ExecutionRecord, ...]
+            if arguments.execution_command == "show":
+                records = (history.get(arguments.execution_id),)
+            else:
+                records = history.list()
+        except WorkspaceError as error:
+            print(f"Workspace error: {error}", file=stderr)
+            return EXIT_EXPECTED_FAILURE
+        except ExecutionError as error:
+            print(f"Execution history error: {error}", file=stderr)
+            return EXIT_EXPECTED_FAILURE
+        _render_execution_records(
+            records, arguments.execution_command == "show", options.output_format, stdout
+        )
     return EXIT_SUCCESS
 
 
@@ -435,3 +464,40 @@ def _render_run_result(
             print(f"Stderr: {execution.stderr_reference}", file=output)
         if execution.diagnostic:
             print(f"Diagnostic: {execution.diagnostic}", file=output)
+
+
+def _render_execution_records(
+    records: tuple[ExecutionRecord, ...], show_one: bool, output_format: str, output: TextIO | None
+) -> None:
+    payload = [_execution_record(record) for record in records]
+    if output_format == "json":
+        key = "execution" if show_one else "executions"
+        value: object = payload[0] if show_one else payload
+        print(json.dumps({key: value, "schema_version": 1}, sort_keys=True), file=output)
+        return
+    if not records:
+        print("No executions recorded.", file=output)
+        return
+    for record in records:
+        print(f"Execution: {record.execution_id}", file=output)
+        print(f"Timestamp: {record.timestamp}", file=output)
+        print(f"Status: {record.status.value}", file=output)
+        if record.stdout_reference:
+            print(f"Stdout: {record.stdout_reference}", file=output)
+        if record.stderr_reference:
+            print(f"Stderr: {record.stderr_reference}", file=output)
+        if record.diagnostic:
+            print(f"Diagnostic: {record.diagnostic}", file=output)
+
+
+def _execution_record(record: ExecutionRecord) -> dict[str, object]:
+    return {
+        "diagnostic": record.diagnostic,
+        "elapsed_seconds": record.elapsed_seconds,
+        "execution_id": record.execution_id,
+        "exit_code": record.exit_code,
+        "status": record.status.value,
+        "stderr_reference": record.stderr_reference,
+        "stdout_reference": record.stdout_reference,
+        "timestamp": record.timestamp,
+    }

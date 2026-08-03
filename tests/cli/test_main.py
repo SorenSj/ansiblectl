@@ -9,8 +9,8 @@ import pytest
 from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.status import Status
 from ansiblectl.cli.main import EXIT_EXPECTED_FAILURE, EXIT_INVALID_INPUT, EXIT_SUCCESS, main
-from ansiblectl.domain.errors import WorkspaceNotFoundError
-from ansiblectl.domain.execution import ExecutionResult, ExecutionStatus
+from ansiblectl.domain.errors import ExecutionError, WorkspaceNotFoundError
+from ansiblectl.domain.execution import ExecutionRecord, ExecutionResult, ExecutionStatus
 from ansiblectl.domain.inventory import Host, ResolvedInventory
 from ansiblectl.domain.plugins import ProviderDescriptor
 from ansiblectl.domain.policy import EnforcementMode, PolicyFinding, PolicyReport
@@ -44,6 +44,7 @@ def test_help_lists_global_options_and_status_command(capsys: pytest.CaptureFixt
     assert "--output-format" in captured.out
     assert "status" in captured.out
     assert "repository" in captured.out
+    assert "execution" in captured.out
 
 
 def test_invalid_argument_uses_documented_invalid_input_exit_code(
@@ -447,3 +448,67 @@ def test_run_deny_renders_policy_without_execution(tmp_path: Path) -> None:
     assert result == EXIT_EXPECTED_FAILURE
     assert payload["execution"] is None
     assert payload["policy"]["findings"][0]["rule_id"] == "RUN-001"
+
+
+class FakeExecutionHistoryService:
+    record = ExecutionRecord(
+        "2026-08-03T12:00:00+00:00",
+        "run-1",
+        ExecutionStatus.COMPLETED,
+        0,
+        1.25,
+        "/workspace/.ansiblectl/runs/stdout.log",
+    )
+
+    def list(self) -> tuple[ExecutionRecord, ...]:
+        return (self.record,)
+
+    def get(self, execution_id: str) -> ExecutionRecord:
+        if execution_id != self.record.execution_id:
+            raise ExecutionError(f"Execution '{execution_id}' was not found in this workspace.")
+        return self.record
+
+
+def test_execution_list_renders_safe_machine_history(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "--output-format", "json", "execution", "list"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        execution_history_service=FakeExecutionHistoryService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    payload = json.loads(output.getvalue())
+    assert result == EXIT_SUCCESS
+    assert payload["executions"][0]["execution_id"] == "run-1"
+    assert payload["executions"][0]["stdout_reference"].endswith("stdout.log")
+
+
+def test_execution_show_renders_one_human_record(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "execution", "show", "run-1"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        execution_history_service=FakeExecutionHistoryService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert "Execution: run-1" in output.getvalue()
+    assert "Status: completed" in output.getvalue()
+
+
+def test_execution_show_reports_unknown_identifier(tmp_path: Path) -> None:
+    error = StringIO()
+
+    result = main(
+        ["--workspace", str(tmp_path), "execution", "show", "missing"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        execution_history_service=FakeExecutionHistoryService(),  # type: ignore[arg-type]
+        stderr=error,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert "was not found" in error.getvalue()
