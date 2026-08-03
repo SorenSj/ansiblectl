@@ -27,6 +27,11 @@ This specification defines the initial public and internal contract for this cap
 
 The public namespace is `ansiblectl.sdk`; all other `ansiblectl` imports are internal and unsupported for plugins.
 
+The initial public surface is `SDK_VERSION`, `SDKContext`, and the documented
+`ansiblectl.sdk.testing.mock_context` utility. `SDKContext` exposes only a
+frozen granted-capability set; it does not expose core services, adapters, or
+mutable registries.
+
 ## Verification
 
 - A plugin importing only the SDK passes compatibility tests.
@@ -36,4 +41,3 @@ The public namespace is `ansiblectl.sdk`; all other `ansiblectl` imports are int
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
