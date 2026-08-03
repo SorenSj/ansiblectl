@@ -27,6 +27,10 @@ This specification defines the initial public and internal contract for this cap
 
 The policy service receives a typed EvaluationRequest and returns a PolicyReport with findings and enforcement outcome.
 
+The initial evaluator sorts findings by rule identifier and affected location.
+Its explicit modes are `report`, `warn`, and `deny`; only `deny` with one or
+more findings blocks the governed operation before adapter invocation.
+
 ## Verification
 
 - The same inputs produce an identical ordered report.
@@ -36,4 +40,3 @@ The policy service receives a typed EvaluationRequest and returns a PolicyReport
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
