@@ -52,6 +52,7 @@ class ExecutionService:
                         "playbook_digest": request.playbook_digest,
                         "playbook_path": request.playbook_path,
                         "verbosity": request.verbosity,
+                        "diff": request.diff,
                     },
                 )
             )

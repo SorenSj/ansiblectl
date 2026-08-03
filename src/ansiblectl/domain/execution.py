@@ -61,6 +61,7 @@ class ExecutionRequest:
     inventory_digest: str | None = None
     playbook_digest: str | None = None
     verbosity: int = 0
+    diff: bool = False
 
     def __post_init__(self) -> None:
         if not self.argv or any(not argument for argument in self.argv):
@@ -97,6 +98,7 @@ class ExecutionRequest:
         inventory_digest: str | None = None,
         playbook_digest: str | None = None,
         verbosity: int = 0,
+        diff: bool = False,
     ) -> ExecutionRequest:
         """Create a request that retains the validated canonical playbook and revision."""
 
@@ -112,6 +114,7 @@ class ExecutionRequest:
             inventory_digest=inventory_digest,
             playbook_digest=playbook_digest,
             verbosity=verbosity,
+            diff=diff,
         )
 
 
@@ -134,6 +137,7 @@ class ExecutionResult:
     playbook_digest: str | None = None
     playbook_path: str | None = None
     verbosity: int = 0
+    diff: bool = False
 
 
 @dataclass(frozen=True)
@@ -156,6 +160,7 @@ class ExecutionRecord:
     playbook_digest: str | None = None
     playbook_path: str | None = None
     verbosity: int = 0
+    diff: bool = False
 
 
 @dataclass(frozen=True)

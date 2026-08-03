@@ -96,6 +96,7 @@ def test_run_prepares_check_mode_request_from_validated_inputs(tmp_path: Path) -
         EnforcementMode.DENY,
         ExecutionTargeting("web:&staging", ("deploy", "config"), ("slow",)),
         3,
+        True,
     )
 
     assert result.execution is not None
@@ -105,6 +106,7 @@ def test_run_prepares_check_mode_request_from_validated_inputs(tmp_path: Path) -
     assert "--check" in port.request.argv
     assert port.request.argv[4:] == (
         "--check",
+        "--diff",
         "--limit",
         "web:&staging",
         "--tags",
@@ -120,6 +122,7 @@ def test_run_prepares_check_mode_request_from_validated_inputs(tmp_path: Path) -
     assert port.request.playbook_digest.startswith("sha256:")
     assert port.request.playbook_path == "playbooks/site.yml"
     assert port.request.verbosity == 3
+    assert port.request.diff is True
     assert port.request.selected_playbook is not None
     assert port.request.selected_playbook.revision == "main"
     assert port.inventory == {
@@ -198,6 +201,7 @@ def test_confirmed_apply_omits_check_argument(tmp_path: Path) -> None:
     assert str(policy.requests[0].attributes["inventory_digest"]).startswith("sha256:")
     assert str(policy.requests[0].attributes["playbook_digest"]).startswith("sha256:")
     assert policy.requests[0].attributes["verbosity"] == 0
+    assert policy.requests[0].attributes["diff"] is False
 
 
 def test_default_apply_limit_policy_blocks_before_materialization(tmp_path: Path) -> None:

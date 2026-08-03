@@ -50,6 +50,8 @@ path. It never publishes the absolute workspace path.
 
 Execution events include the non-negative Ansible verbosity count. Consumers
 reading older events default an absent count to zero.
+They also identify whether diff mode was enabled, but never include captured
+diff content.
 
 ## Verification
 

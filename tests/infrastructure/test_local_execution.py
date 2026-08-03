@@ -81,6 +81,7 @@ def test_adapter_persists_non_empty_output_as_private_references(
         inventory_digest="sha256:inventory",
         playbook_digest="sha256:playbook",
         verbosity=3,
+        diff=True,
     )
     result = LocalExecutionAdapter().execute(request)
 
@@ -93,6 +94,7 @@ def test_adapter_persists_non_empty_output_as_private_references(
     assert result.playbook_digest == "sha256:playbook"
     assert result.playbook_path == "site.yml"
     assert result.verbosity == 3
+    assert result.diff is True
     stdout_path = Path(result.stdout_reference)
     stderr_path = Path(result.stderr_reference)
     assert stdout_path.read_text(encoding="utf-8") == "play recap\n"

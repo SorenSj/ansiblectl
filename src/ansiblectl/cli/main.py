@@ -205,6 +205,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--confirm", action="store_true", help="Explicitly confirm an apply-mode execution."
     )
     run.add_argument("--timeout", type=float, default=300.0, help="Positive timeout in seconds.")
+    run.add_argument(
+        "--diff", action="store_true", help="Show Ansible before-and-after differences."
+    )
     run.add_argument("--limit", help="Ansible host pattern to target.")
     run.add_argument(
         "--tags", action="append", default=[], help="Comma-separated task tags; repeatable."
@@ -426,10 +429,14 @@ def main(
                     confirmed=arguments.confirm,
                     targeting=targeting,
                     verbosity=options.verbosity,
+                    diff=arguments.diff,
                 )
                 if arguments.apply
                 else run_service_instance.run_check(
-                    *run_arguments, targeting=targeting, verbosity=options.verbosity
+                    *run_arguments,
+                    targeting=targeting,
+                    verbosity=options.verbosity,
+                    diff=arguments.diff,
                 )
             )
         except WorkspaceError as error:
@@ -643,6 +650,7 @@ def _render_run_result(
             "playbook_digest": execution.playbook_digest,
             "playbook_path": execution.playbook_path,
             "verbosity": execution.verbosity,
+            "diff": execution.diff,
         }
     )
     if output_format == "json":
@@ -677,6 +685,8 @@ def _render_run_result(
             print(f"Playbook: {execution.playbook_path}", file=output)
         if execution.verbosity:
             print(f"Verbosity: {execution.verbosity}", file=output)
+        if execution.diff:
+            print("Diff: enabled", file=output)
         if execution.stdout_reference:
             print(f"Stdout: {execution.stdout_reference}", file=output)
         if execution.stderr_reference:
@@ -715,6 +725,8 @@ def _render_execution_records(
             print(f"Playbook: {record.playbook_path}", file=output)
         if record.verbosity:
             print(f"Verbosity: {record.verbosity}", file=output)
+        if record.diff:
+            print("Diff: enabled", file=output)
         if record.stdout_reference:
             print(f"Stdout: {record.stdout_reference}", file=output)
         if record.stderr_reference:
@@ -742,6 +754,7 @@ def _execution_record(record: ExecutionRecord) -> dict[str, object]:
         "playbook_digest": record.playbook_digest,
         "playbook_path": record.playbook_path,
         "verbosity": record.verbosity,
+        "diff": record.diff,
     }
 
 

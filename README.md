@@ -93,6 +93,9 @@ uv run ansiblectl --workspace ~/automation/example run \
 
 Add global `-v`, `-vv`, or higher before `run` to increase Ansible verbosity.
 The numeric level is retained in execution output and history.
+Add `--diff` to request Ansible before-and-after differences. Diff mode is
+recorded, while the potentially sensitive diff content remains only in the
+private captured-output files.
 
 Ansible tasks can explicitly disable check mode. Review playbooks before
 execution; `--check` is not an absolute guarantee that no remote changes occur.

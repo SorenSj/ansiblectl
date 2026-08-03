@@ -37,6 +37,7 @@ class RunService:
         policy_mode: EnforcementMode,
         targeting: ExecutionTargeting | None = None,
         verbosity: int = 0,
+        diff: bool = False,
     ) -> GovernedExecutionResult:
         """Validate inputs and execute ansible-playbook with an ephemeral canonical inventory."""
 
@@ -50,6 +51,7 @@ class RunService:
             targeting or ExecutionTargeting(),
             ExecutionMode.CHECK,
             verbosity,
+            diff,
         )
 
     def run_apply(
@@ -63,6 +65,7 @@ class RunService:
         confirmed: bool,
         targeting: ExecutionTargeting | None = None,
         verbosity: int = 0,
+        diff: bool = False,
     ) -> GovernedExecutionResult:
         """Execute an explicitly confirmed, policy-governed Ansible apply."""
 
@@ -78,6 +81,7 @@ class RunService:
             targeting or ExecutionTargeting(),
             ExecutionMode.APPLY,
             verbosity,
+            diff,
         )
 
     def _run(
@@ -91,6 +95,7 @@ class RunService:
         targeting: ExecutionTargeting,
         mode: ExecutionMode,
         verbosity: int,
+        diff: bool,
     ) -> GovernedExecutionResult:
 
         verbosity_arguments = _verbosity_arguments(verbosity)
@@ -121,6 +126,7 @@ class RunService:
                     "inventory_digest": inventory_digest,
                     "playbook_digest": selected_playbook_digest,
                     "verbosity": verbosity,
+                    "diff": diff,
                 },
             ),
             policy_mode,
@@ -135,6 +141,7 @@ class RunService:
                     "--inventory",
                     str(inventory_path),
                     *(("--check",) if mode is ExecutionMode.CHECK else ()),
+                    *(("--diff",) if diff else ()),
                     *_targeting_arguments(targeting),
                     str(selected.path),
                 ),
@@ -148,6 +155,7 @@ class RunService:
                 inventory_digest,
                 selected_playbook_digest,
                 verbosity,
+                diff,
             )
             return GovernedExecutionResult(report, self.execution.execute(request))
 

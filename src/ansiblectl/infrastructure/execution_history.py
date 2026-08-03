@@ -158,6 +158,7 @@ def _parse_record(data: Any) -> ExecutionRecord | None:
         playbook_digest=_optional_string(fields, "playbook_digest"),
         playbook_path=_optional_string(fields, "playbook_path"),
         verbosity=_optional_int(fields, "verbosity") or 0,
+        diff=fields.get("diff") is True,
     )
 
 

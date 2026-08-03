@@ -79,6 +79,11 @@ Ansible argument (`-v`, `-vv`, and so on), never a shell fragment. Requests,
 results, events, and history retain the numeric count; older records default to
 zero.
 
+An explicit `--diff` run option is passed as its own Ansible argument and is
+retained as boolean metadata in requests, results, events, and history. Diff
+content follows the private captured-output policy and is never embedded in
+metadata. Older records default the field to `false`.
+
 ## Verification
 
 - A fake execution port can verify a request without invoking a process.
@@ -96,6 +101,7 @@ zero.
 - Execution history identifies the exact validated playbook bytes by digest without exposing their contents.
 - Execution history identifies the selected playbook without exposing the absolute workspace path.
 - Global verbosity reaches Ansible as a separate argument and remains inspectable in execution history.
+- Diff mode reaches Ansible as a separate argument without embedding diff content in metadata.
 
 ## Non-goals
 

@@ -389,6 +389,7 @@ class FakeRunService:
         policy_mode: EnforcementMode,
         targeting: ExecutionTargeting,
         verbosity: int,
+        diff: bool,
     ) -> GovernedExecutionResult:
         assert workspace_root.is_absolute()
         assert playbook_identifier == Path("playbooks/site.yml")
@@ -396,6 +397,7 @@ class FakeRunService:
         assert timeout_seconds == 30
         assert policy_mode is EnforcementMode.DENY
         assert verbosity == 2
+        assert diff is True
         assert targeting == ExecutionTargeting("web:&staging", ("deploy", "config"), ("slow",))
         return GovernedExecutionResult(
             PolicyReport((), policy_mode),
@@ -406,6 +408,7 @@ class FakeRunService:
                 0.1,
                 targeting=targeting,
                 verbosity=verbosity,
+                diff=diff,
             ),
         )
 
@@ -420,9 +423,11 @@ class FakeRunService:
         confirmed: bool,
         targeting: ExecutionTargeting,
         verbosity: int,
+        diff: bool,
     ) -> GovernedExecutionResult:
         assert confirmed is True
         assert verbosity == 0
+        assert diff is False
         return GovernedExecutionResult(
             PolicyReport((), policy_mode),
             ExecutionResult(
@@ -433,6 +438,7 @@ class FakeRunService:
                 targeting=targeting,
                 mode=ExecutionMode.APPLY,
                 verbosity=verbosity,
+                diff=diff,
             ),
         )
 
@@ -453,6 +459,7 @@ def test_run_check_renders_injected_execution_result(tmp_path: Path) -> None:
             "--revision",
             "main",
             "--check",
+            "--diff",
             "--timeout",
             "30",
             "--limit",
@@ -471,6 +478,7 @@ def test_run_check_renders_injected_execution_result(tmp_path: Path) -> None:
     assert json.loads(output.getvalue())["execution"]["status"] == "completed"
     assert json.loads(output.getvalue())["execution"]["targeting"]["limit"] == "web:&staging"
     assert json.loads(output.getvalue())["execution"]["verbosity"] == 2
+    assert json.loads(output.getvalue())["execution"]["diff"] is True
     assert json.loads(output.getvalue())["policy"]["allowed"] is True
 
 
@@ -485,6 +493,7 @@ class FailedRunService(FakeRunService):
         policy_mode: EnforcementMode,
         targeting: ExecutionTargeting,
         verbosity: int,
+        diff: bool,
     ) -> GovernedExecutionResult:
         return GovernedExecutionResult(
             PolicyReport((), policy_mode),
@@ -537,6 +546,7 @@ class CancelledRunService(FakeRunService):
         policy_mode: EnforcementMode,
         targeting: ExecutionTargeting,
         verbosity: int,
+        diff: bool,
     ) -> GovernedExecutionResult:
         return GovernedExecutionResult(
             PolicyReport((), policy_mode),
@@ -738,6 +748,7 @@ class DeniedRunService(FakeRunService):
         policy_mode: EnforcementMode,
         targeting: ExecutionTargeting,
         verbosity: int,
+        diff: bool,
     ) -> GovernedExecutionResult:
         finding = PolicyFinding("RUN-001", "high", "Execution denied", str(playbook_identifier))
         return GovernedExecutionResult(PolicyReport((finding,), policy_mode), None)
@@ -787,6 +798,7 @@ class FakeExecutionHistoryService:
         playbook_digest="sha256:playbook",
         playbook_path="playbooks/site.yml",
         verbosity=3,
+        diff=True,
     )
 
     def list(self) -> tuple[ExecutionRecord, ...]:
@@ -827,6 +839,7 @@ def test_execution_list_renders_safe_machine_history(tmp_path: Path) -> None:
     assert payload["executions"][0]["playbook_digest"] == "sha256:playbook"
     assert payload["executions"][0]["playbook_path"] == "playbooks/site.yml"
     assert payload["executions"][0]["verbosity"] == 3
+    assert payload["executions"][0]["diff"] is True
 
 
 def test_execution_show_renders_one_human_record(tmp_path: Path) -> None:
