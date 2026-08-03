@@ -1,0 +1,39 @@
+# TS-0017: State and Cache Management
+
+| Field | Value |
+| --- | --- |
+| Status | Normative |
+| Version | 1.0 |
+| Date | 2026-08-03 |
+| Related ADRs | [ADR index](../adr/README.md) |
+
+## Purpose
+
+Defines ownership, scope, invalidation, locking, and inspection of local persistent state and cache entries.
+
+## Scope
+
+This specification defines the initial public and internal contract for this capability. Implementation details that do not alter the stated contract remain flexible.
+
+## Functional requirements
+
+1. State MUST be scoped to a workspace or documented user-level location.
+2. Each persistent format MUST contain a schema version.
+3. Cache entries MUST declare their source identity and invalidation condition.
+4. Cache corruption MUST fail safely and offer a recovery path.
+5. Concurrent mutations MUST use documented locking or atomic replacement.
+
+## Interfaces and data
+
+The state port exposes typed reads, writes, invalidation, and inspection; callers do not access storage paths directly.
+
+## Verification
+
+- A corrupt cache is discarded or reported without corrupting workspace data.
+- A schema-version mismatch follows documented migration or reset behaviour.
+- Concurrent update tests preserve a valid final record.
+
+## Non-goals
+
+This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
+

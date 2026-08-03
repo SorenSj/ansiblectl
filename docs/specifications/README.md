@@ -1,4 +1,28 @@
-# Technical Specifications
++# Technical Specifications
 
-This directory contains normative technical specifications for components,
-interfaces, and externally observable behaviours.
+Technical Specifications are normative, versioned contracts for components,
+interfaces, and externally observable behaviours. They implement the
+Architecture Handbook and applicable ADRs.
+
+| Specification | Title | Status |
+| --- | --- | --- |
+| [TS-0001](ts-0001-cli-foundation.md) | CLI Foundation | Normative |
+| [TS-0002](ts-0002-workspace-lifecycle.md) | Workspace Lifecycle | Normative |
+| [TS-0003](ts-0003-configuration-resolution.md) | Configuration Resolution | Normative |
+| [TS-0004](ts-0004-execution-service.md) | Execution Service | Normative |
+| [TS-0005](ts-0005-output-errors-and-exit-codes.md) | Output, Errors, and Exit Codes | Normative |
+| [TS-0006](ts-0006-inventory-resolution.md) | Inventory Resolution | Normative |
+| [TS-0007](ts-0007-repository-operations.md) | Repository Operations | Normative |
+| [TS-0008](ts-0008-playbook-selection-and-validation.md) | Playbook Selection and Validation | Normative |
+| [TS-0009](ts-0009-secret-provider-contract.md) | Secret Provider Contract | Normative |
+| [TS-0010](ts-0010-provider-manifest-and-discovery.md) | Provider Manifest and Discovery | Normative |
+| [TS-0011](ts-0011-plugin-runtime-lifecycle.md) | Plugin Runtime Lifecycle | Normative |
+| [TS-0012](ts-0012-plugin-sdk-contracts.md) | Plugin SDK Contracts | Normative |
+| [TS-0013](ts-0013-plugin-permission-enforcement.md) | Plugin Permission Enforcement | Normative |
+| [TS-0014](ts-0014-structured-logging.md) | Structured Logging | Normative |
+| [TS-0015](ts-0015-event-publication-and-subscription.md) | Event Publication and Subscription | Normative |
+| [TS-0016](ts-0016-policy-evaluation.md) | Policy Evaluation | Normative |
+| [TS-0017](ts-0017-state-and-cache-management.md) | State and Cache Management | Normative |
+| [TS-0018](ts-0018-architecture-and-documentation-validation.md) | Architecture and Documentation Validation | Normative |
+| [TS-0019](ts-0019-build-packaging-and-release.md) | Build, Packaging, and Release | Normative |
+| [TS-0020](ts-0020-developer-contribution-workflow.md) | Developer Contribution Workflow | Normative |
