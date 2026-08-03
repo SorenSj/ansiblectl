@@ -39,6 +39,25 @@ class PolicyReport:
     def allowed(self) -> bool:
         return not (self.mode is EnforcementMode.DENY and self.findings)
 
+    def machine_output(self) -> dict[str, object]:
+        """Return the versioned public policy-report representation."""
+
+        return {
+            "schema_version": 1,
+            "mode": self.mode.value,
+            "allowed": self.allowed,
+            "findings": [
+                {
+                    "rule_id": finding.rule_id,
+                    "severity": finding.severity,
+                    "message": finding.message,
+                    "location": finding.location,
+                    "remediation": finding.remediation,
+                }
+                for finding in self.findings
+            ],
+        }
+
 
 def evaluate(
     policies: list[Policy], request: EvaluationRequest, mode: EnforcementMode
