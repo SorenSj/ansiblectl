@@ -1411,6 +1411,7 @@ class FakeExecutionHistoryService:
         inventory_digest: str | None = None,
         playbook_digest: str | None = None,
         resolved_revision: str | None = None,
+        playbook_path: str | None = None,
         limit: int | None = None,
     ) -> tuple[ExecutionRecord, ...]:
         operation_matches = operation in {None, self.record.operation}
@@ -1419,6 +1420,7 @@ class FakeExecutionHistoryService:
         digest_matches = inventory_digest in {None, self.record.inventory_digest}
         playbook_matches = playbook_digest in {None, self.record.playbook_digest}
         revision_matches = resolved_revision in {None, self.record.resolved_revision}
+        path_matches = playbook_path in {None, self.record.playbook_path}
         records = (
             (self.record,)
             if operation_matches
@@ -1427,6 +1429,7 @@ class FakeExecutionHistoryService:
             and digest_matches
             and playbook_matches
             and revision_matches
+            and path_matches
             else ()
         )
         return records if limit is None else records[:limit]
@@ -1516,6 +1519,8 @@ def test_execution_list_combines_operation_and_status_filters(tmp_path: Path) ->
             "sha256:playbook",
             "--resolved-revision",
             "abc123",
+            "--playbook-path",
+            "playbooks/site.yml",
             "--limit",
             "1",
         ],

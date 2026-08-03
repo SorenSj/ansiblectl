@@ -53,6 +53,8 @@ separate opt-in capability.
 
 The reported digest can be supplied to `execution list --playbook-digest` as
 an exact, read-only filter for records that used those validated playbook bytes.
+The reported workspace-relative path can likewise be supplied to
+`execution list --playbook-path`; absolute paths and traversal are rejected.
 
 Passing `--syntax-check` explicitly invokes `ansible-playbook --syntax-check`
 through the execution port with shell execution disabled, an allowlisted
@@ -71,6 +73,7 @@ raw validator output is not embedded in CLI results.
 - Selection validation reports tool provenance without executing the playbook.
 - Explicit syntax validation reports Ansible provenance and private diagnostic references.
 - A validated playbook digest selects matching execution-history records exactly.
+- A validated workspace-relative playbook path selects matching history records exactly.
 
 ## Non-goals
 

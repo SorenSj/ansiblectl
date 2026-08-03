@@ -155,6 +155,8 @@ playbook bytes.
 The immutable commit reported by `repository inspect` or `run --preflight` can
 be matched with `execution list --resolved-revision <object-id>`; branch and tag
 labels are intentionally not used for this filter.
+Use `execution list --playbook-path playbooks/site.yml` to select the same safe
+workspace-relative playbook path reported by validation and execution output.
 
 Ansiblectl isolates Ansible's controller-side temporary files below the
 workspace's owner-only `.ansiblectl/tmp` directory instead of relying on

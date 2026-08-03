@@ -102,6 +102,20 @@ def test_history_service_filters_exact_operation_and_rejects_empty_filter() -> N
     assert revision_service.list(resolved_revision="2" * 40) == ()
     with pytest.raises(ExecutionError, match="lowercase Git object"):
         service.list(resolved_revision="main")
+    path_record = ExecutionRecord(
+        "timestamp",
+        "run-5",
+        ExecutionStatus.COMPLETED,
+        0,
+        0.1,
+        playbook_path="playbooks/site.yml",
+    )
+    path_service = ExecutionHistoryService(FakeHistoryPort(path_record))
+    assert path_service.list(playbook_path="playbooks/site.yml") == (path_record,)
+    assert path_service.list(playbook_path="playbooks/other.yml") == ()
+    for invalid_path in ("/site.yml", "../site.yml", "playbooks\\site.yml", "playbooks//site.yml"):
+        with pytest.raises(ExecutionError, match="workspace-relative POSIX"):
+            service.list(playbook_path=invalid_path)
     assert service.list(limit=1) == (record,)
     with pytest.raises(ExecutionError, match="greater than zero"):
         service.list(limit=0)

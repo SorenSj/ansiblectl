@@ -1,6 +1,7 @@
 """Execution-history inspection use cases."""
 
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.execution import (
@@ -24,6 +25,7 @@ class ExecutionHistoryService:
         inventory_digest: str | None = None,
         playbook_digest: str | None = None,
         resolved_revision: str | None = None,
+        playbook_path: str | None = None,
         limit: int | None = None,
     ) -> tuple[ExecutionRecord, ...]:
         records = self.port.list()
@@ -55,6 +57,12 @@ class ExecutionHistoryService:
             records = tuple(
                 record for record in records if record.resolved_revision == resolved_revision
             )
+        if playbook_path is not None:
+            if not _is_canonical_relative_path(playbook_path):
+                raise ExecutionError(
+                    "Playbook path filter must be a canonical workspace-relative POSIX path."
+                )
+            records = tuple(record for record in records if record.playbook_path == playbook_path)
         if limit is not None:
             if limit <= 0:
                 raise ExecutionError("Execution result limit must be greater than zero.")
@@ -86,3 +94,14 @@ def _is_canonical_sha256(value: str) -> bool:
 
 def _is_canonical_git_object_id(value: str) -> bool:
     return len(value) in {40, 64} and all(character in "0123456789abcdef" for character in value)
+
+
+def _is_canonical_relative_path(value: str) -> bool:
+    path = PurePosixPath(value)
+    return (
+        bool(value)
+        and "\\" not in value
+        and not path.is_absolute()
+        and ".." not in path.parts
+        and str(path) == value
+    )
