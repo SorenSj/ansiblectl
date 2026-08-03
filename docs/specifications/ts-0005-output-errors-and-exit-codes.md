@@ -27,6 +27,12 @@ This specification defines the initial public and internal contract for this cap
 
 A command result contains a result kind, data model, diagnostics, and optional remediation. The renderer owns all terminal formatting.
 
+The initial JSON schema has `kind`, `operation`, and optional `data`, `reason`,
+and `remediation` fields. Exit codes are: success `0`, expected operational
+failure `1`, validation failure `2`, cancellation `3`, and unexpected failure
+`70`. Fields named `secret`, `token`, `password`, `credential`, or `key` are
+rendered as `<redacted>`.
+
 ## Verification
 
 - The same application failure renders consistently in human and machine modes.
@@ -36,4 +42,3 @@ A command result contains a result kind, data model, diagnostics, and optional r
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
