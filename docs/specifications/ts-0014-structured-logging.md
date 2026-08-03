@@ -32,11 +32,17 @@ event name, optional correlation identifier, and structured fields. Fields
 named `secret`, `token`, `password`, `credential`, or `key` are redacted before
 any sink receives a record. Plugins use the public `PluginLogger` protocol.
 
+The local CLI composition records completed execution events as JSON Lines in
+the workspace's private `.ansiblectl/logs/events.jsonl` file. The execution
+identifier is used as the correlation identifier; directories and the log file
+are restricted to the workspace owner.
+
 ## Verification
 
 - A captured log record contains mandatory fields.
 - A secret-like value is absent from all configured test sinks.
 - Plugin logs carry plugin identity and execution correlation.
+- A completed CLI execution appends a redacted, correlated JSON record to the private workspace log.
 
 ## Non-goals
 

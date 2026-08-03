@@ -99,6 +99,9 @@ Captured Ansible output is not echoed directly. Non-empty stdout and stderr are
 stored with owner-only permissions below `.ansiblectl/runs`, and the command
 returns their file references for diagnosis.
 
+Completed runs also append a redacted structured record to
+`.ansiblectl/logs/events.jsonl`, correlated by execution identifier.
+
 ## Project governance
 
 The repository is the authoritative source for Ansiblectl's normative

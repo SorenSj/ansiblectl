@@ -12,9 +12,11 @@ from ansiblectl.application.repository import RepositoryService
 from ansiblectl.application.run import RunService
 from ansiblectl.application.status import DefaultStatusService, StatusService
 from ansiblectl.application.workspace import WorkspaceService
+from ansiblectl.domain.events import EventBus
 from ansiblectl.domain.inventory import InventoryError
 from ansiblectl.infrastructure.generated_inventory import materialize_inventory
 from ansiblectl.infrastructure.git_repository import GitRepositoryAdapter
+from ansiblectl.infrastructure.json_logging import EventLogSubscriber, JsonLinesLogSink
 from ansiblectl.infrastructure.local_execution import LocalExecutionAdapter
 from ansiblectl.infrastructure.local_workspace_store import LocalWorkspaceStore
 from ansiblectl.infrastructure.plugin_manifests import discover_manifests
@@ -48,9 +50,11 @@ def build_plugin_discovery_service() -> PluginDiscoveryService:
 def build_run_service(workspace_root: Path, inventory_source: Path | None = None) -> RunService:
     """Create check-mode Ansible execution from concrete local adapters."""
 
+    event_log = JsonLinesLogSink(workspace_root)
+    events = EventBus([EventLogSubscriber(event_log)])
     return RunService(
         inventory=build_inventory_service(workspace_root, inventory_source),
-        execution=ExecutionService(LocalExecutionAdapter()),
+        execution=ExecutionService(LocalExecutionAdapter(), events),
         policy=PolicyService([]),
         materialize_inventory=materialize_inventory,
     )
