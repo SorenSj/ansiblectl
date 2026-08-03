@@ -39,15 +39,20 @@ Planned scope:
 
 Exit criteria:
 
-- [ADR-0037](../adr/0037-operational-reliability-and-platform-contract.md) and
+- [x] [ADR-0037](../adr/0037-operational-reliability-and-platform-contract.md) and
   [TS-0021](../specifications/ts-0021-operational-reliability.md) define the capability and platform
   contracts before implementation is considered complete.
-- Real subprocess termination tests demonstrate recovery at every durable journal transition.
-- Concurrent recovery cannot mutate transactions owned by live processes.
-- All new diagnostics pass redaction and stable-envelope tests.
-- CI passes on every declared supported Python and operating-system combination.
-- Documentation includes operator recovery procedures and known filesystem limitations.
-- The complete quality, build, provenance, and tagged-release gates pass from a clean commit.
+- [x] Real subprocess termination tests demonstrate recovery at every durable journal transition.
+- [x] Concurrent recovery cannot mutate transactions owned by live processes.
+- [x] All new diagnostics pass redaction and stable human, JSON, and YAML rendering tests.
+- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [x] Documentation includes operator recovery procedures and known filesystem limitations.
+- [x] Local quality, build, provenance, and artifact-inspection gates pass from a clean commit.
+- [ ] The v0.3.0 version, dated changelog, immutable tag, and tagged artifact workflow pass after the
+  hosted CI matrix is green.
+
+Readiness evidence was last reviewed on 2026-08-04. The package remains at v0.2.0 while either
+hosted-CI or tagged-release criteria are open; no existing release tag is moved or recreated.
 
 Explicit non-goals:
 
