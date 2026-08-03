@@ -11,6 +11,7 @@ from typing import Protocol
 from uuid import uuid4
 
 from ansiblectl.domain.errors import ExecutionError
+from ansiblectl.domain.playbook import PlaybookReference
 
 
 class ExecutionStatus(StrEnum):
@@ -30,6 +31,7 @@ class ExecutionRequest:
     working_directory: Path
     environment: Mapping[str, str]
     timeout_seconds: float | None = None
+    selected_playbook: PlaybookReference | None = None
     execution_id: str = field(default_factory=lambda: str(uuid4()))
     cancel_requested: bool = False
 
@@ -40,6 +42,19 @@ class ExecutionRequest:
             raise ExecutionError("Execution working directory must be an absolute validated path.")
         if self.timeout_seconds is not None and self.timeout_seconds <= 0:
             raise ExecutionError("Execution timeout must be greater than zero.")
+
+    @classmethod
+    def for_playbook(
+        cls,
+        argv: tuple[str, ...],
+        working_directory: Path,
+        environment: Mapping[str, str],
+        selected_playbook: PlaybookReference,
+        timeout_seconds: float | None = None,
+    ) -> ExecutionRequest:
+        """Create a request that retains the validated canonical playbook and revision."""
+
+        return cls(argv, working_directory, environment, timeout_seconds, selected_playbook)
 
 
 @dataclass(frozen=True)

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from ansiblectl.domain.execution import ExecutionRequest
 from ansiblectl.domain.playbook import PlaybookError, select_playbook
 
 
@@ -24,3 +25,13 @@ def test_traversal_and_unsupported_types_are_rejected(tmp_path: Path) -> None:
     invalid.write_text("x")
     with pytest.raises(PlaybookError, match="supported"):
         select_playbook(tmp_path, invalid, "main")
+
+
+def test_execution_request_retains_canonical_playbook_and_revision(tmp_path: Path) -> None:
+    path = tmp_path / "site.yml"
+    path.write_text("---\n")
+    selected = select_playbook(tmp_path, Path("site.yml"), "release-1")
+
+    request = ExecutionRequest.for_playbook(("ansible-playbook", str(path)), tmp_path, {}, selected)
+
+    assert request.selected_playbook == selected
