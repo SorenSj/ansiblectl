@@ -1,5 +1,6 @@
 # Architecture
 
-This directory contains the normative Architecture Handbook and its supporting
-architecture documents. The handbook will apply the Engineering Principles and
-reference ADRs and Technical Specifications without duplicating their decisions.
+The normative architecture specification is the
+[Architecture Handbook v1.0](architecture-handbook-v1.0.md). Supporting
+architecture documents in this directory apply that handbook and must not
+contradict it.
