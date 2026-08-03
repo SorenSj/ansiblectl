@@ -77,7 +77,8 @@ uv run ansiblectl --workspace ~/automation/example \
 ```
 
 Synchronisation reports its target before fetching and checking out the
-revision. It refuses to modify a dirty worktree:
+revision. It refuses to modify a dirty worktree, then verifies and reports the
+resolved commit and post-checkout `HEAD`:
 
 ```console
 uv run ansiblectl --workspace ~/automation/example \

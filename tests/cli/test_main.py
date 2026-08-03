@@ -327,7 +327,9 @@ class FakeRepositoryService:
 
     def sync(self, request: RepositoryRequest) -> RepositoryResult:
         self.calls.append(("sync", request))
-        return RepositoryResult(request.repository_path, request.revision, False)
+        return RepositoryResult(
+            request.repository_path, request.revision, False, "abc123", "abc123"
+        )
 
 
 def test_repository_inspect_builds_workspace_scoped_request(tmp_path: Path) -> None:
@@ -405,7 +407,10 @@ def test_repository_sync_json_has_no_progress_decoration(tmp_path: Path) -> None
 
     assert result == EXIT_SUCCESS
     assert error.getvalue() == ""
-    assert json.loads(output.getvalue())["revision"] == "release-1"
+    payload = json.loads(output.getvalue())
+    assert payload["revision"] == "release-1"
+    assert payload["resolved_revision"] == "abc123"
+    assert payload["head_revision"] == "abc123"
 
 
 @pytest.mark.parametrize(

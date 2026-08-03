@@ -35,8 +35,16 @@ def test_dirty_worktree_is_not_overwritten(tmp_path: Path) -> None:
 
 def test_clean_worktree_is_inspected_before_sync(tmp_path: Path) -> None:
     request = RepositoryRequest(tmp_path, tmp_path / "repo", "main")
-    result = RepositoryResult(request.repository_path, "main", False)
-    assert RepositoryService(FakeRepositoryPort(result)).sync(request).revision == "main"
+    result = RepositoryResult(request.repository_path, "main", False, "abc", "abc")
+    assert RepositoryService(FakeRepositoryPort(result)).sync(request) == result
+
+
+def test_sync_rejects_post_checkout_revision_mismatch(tmp_path: Path) -> None:
+    request = RepositoryRequest(tmp_path, tmp_path / "repo", "main")
+    mismatch = RepositoryResult(request.repository_path, "main", False, "abc", "def")
+
+    with pytest.raises(RevisionMismatchError, match="not checked out"):
+        RepositoryService(FakeRepositoryPort(mismatch)).sync(request)
 
 
 def test_execution_requires_requested_revision_at_head(tmp_path: Path) -> None:

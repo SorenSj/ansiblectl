@@ -44,6 +44,9 @@ For a clean repository, the initial Git sync runs fixed `git fetch --prune` and
 `git checkout --detach REVISION` argument vectors. It reports the repository
 and revision in the typed result; authentication remains external environment
 policy rather than a command argument.
+After checkout, the application inspects the repository again and requires the
+resolved requested commit to equal `HEAD`. CLI results include both immutable
+commit identifiers; a mismatch is an actionable failed sync.
 
 ## Verification
 
@@ -51,6 +54,7 @@ policy rather than a command argument.
 - A dirty worktree failure does not overwrite user changes.
 - Credentials are absent from rendered command diagnostics.
 - Revision mismatch prevents execution and recommends repository synchronisation.
+- Synchronisation verifies and reports the immutable post-checkout commit.
 
 ## Non-goals
 

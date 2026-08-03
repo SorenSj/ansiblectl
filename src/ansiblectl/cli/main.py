@@ -841,7 +841,9 @@ def _render_repository(
             json.dumps(
                 {
                     "dirty": repository.dirty,
+                    "head_revision": repository.head_revision,
                     "repository_path": str(repository.repository_path),
+                    "resolved_revision": repository.resolved_revision,
                     "revision": repository.revision,
                 },
                 sort_keys=True,
@@ -851,6 +853,10 @@ def _render_repository(
         return
     print(f"Repository: {repository.repository_path}", file=output)
     print(f"Revision: {repository.revision}", file=output)
+    if repository.resolved_revision:
+        print(f"Resolved revision: {repository.resolved_revision}", file=output)
+    if repository.head_revision:
+        print(f"HEAD revision: {repository.head_revision}", file=output)
     print(f"Dirty: {'yes' if repository.dirty else 'no'}", file=output)
 
 
