@@ -27,6 +27,9 @@ This specification defines the initial public and internal contract for this cap
 
 The release workflow consumes a clean tagged source revision and produces inspectable wheel and metadata artifacts.
 
+After a build, `dist/build-metadata.json` records the Git source revision and
+SHA-256 digest of `uv.lock`; publication credentials are not included.
+
 ## Verification
 
 - A clean checkout builds the same package metadata.
@@ -36,4 +39,3 @@ The release workflow consumes a clean tagged source revision and produces inspec
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-

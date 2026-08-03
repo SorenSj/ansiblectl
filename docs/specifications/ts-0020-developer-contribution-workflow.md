@@ -27,6 +27,10 @@ This specification defines the initial public and internal contract for this cap
 
 The contribution guide and pull-request template reference the same required checks and normative document hierarchy.
 
+The repository pull-request template captures traceability, verification, and
+the required owner, scope, rationale, and expiry/removal plan for any temporary
+exception.
+
 ## Verification
 
 - A documentation-only change is validated through the same link and metadata checks.
@@ -36,4 +40,3 @@ The contribution guide and pull-request template reference the same required che
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-
