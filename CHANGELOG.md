@@ -9,6 +9,7 @@ All notable changes to Ansiblectl are documented here.
 - Strict, bounded plugin provenance parsing with canonical domain-separated JSON payloads.
 - Ed25519 signing-key identification, signature verification, streaming artifact hashing, and
   manifest agreement before plugin import.
+- Exact provider-and-signing-key origin allowlists, including explicit local-origin trust.
 
 ## [0.3.0] - 2026-08-04
 

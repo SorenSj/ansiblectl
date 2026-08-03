@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
+from collections.abc import Mapping, Set
 from typing import BinaryIO
 
 from cryptography.exceptions import InvalidSignature
@@ -33,8 +33,9 @@ def verify_provenance(
     artifact: BinaryIO,
     descriptor: ProviderDescriptor,
     trusted_keys: Mapping[str, bytes],
+    trusted_origins: Mapping[tuple[str, str], Set[str]],
 ) -> None:
-    """Verify key, signature, bytes, and manifest agreement before plugin import."""
+    """Verify key, signature, bytes, manifest, and origin before plugin import."""
 
     public_bytes = trusted_keys.get(provenance.signing_key_id)
     if (
@@ -61,6 +62,11 @@ def verify_provenance(
         or provenance.sdk_compatibility != descriptor.sdk_compatibility
     ):
         raise PluginTrustError(PluginTrustReason.MANIFEST_PROVENANCE_MISMATCH)
+    allowed_origins = trusted_origins.get(
+        (provenance.provider_identity, provenance.signing_key_id), frozenset()
+    )
+    if provenance.origin not in allowed_origins:
+        raise PluginTrustError(PluginTrustReason.ORIGIN_UNTRUSTED)
 
 
 __all__ = ["signing_key_id", "verify_provenance"]

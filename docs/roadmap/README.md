@@ -80,7 +80,7 @@ Exit criteria:
 - [x] ADR-0038, ADR-0039, and TS-0022 define provenance, origin, signature, and unattended policy
   contracts before implementation.
 - [x] Canonical provenance parsing and fixed-vector Ed25519 verification are implemented.
-- [ ] Artifact digest, manifest agreement, trusted-key, and origin checks occur before code import.
+- [x] Artifact digest, manifest agreement, trusted-key, and origin checks occur before code import.
 - [ ] Unattended deny-overrides policy is deterministic and never prompts or persists approval.
 - [ ] Every stable decision reason has redacted human, JSON, and YAML contract tests.
 - [ ] Existing manifest discovery and interactive permission preflight remain compatible.
