@@ -40,7 +40,9 @@ The local adapter stores each non-empty captured stream below the workspace's
 private `.ansiblectl/runs` area. Execution identifiers are transformed into
 safe directory keys, output files use owner-only permissions, and CLI results
 expose file references without echoing raw Ansible output. Partial output from
-a timed-out process follows the same storage policy.
+a timed-out process follows the same storage policy. Runtime directories are
+resolved inside the workspace boundary before output is written, and existing
+output-file symlinks are never followed.
 
 Completed execution metadata is inspectable through an execution-history port.
 Records contain timestamp, identifier, classified status, exit code, elapsed
@@ -101,6 +103,7 @@ symlink escape is rejected before process invocation.
 - A timeout returns a classified failure and retains the execution identifier.
 - Arguments containing spaces or special characters are passed safely without shell interpolation.
 - Captured and partial timeout output is stored with owner-only permissions and returned by reference.
+- Output persistence rejects directory and file symlinks that could escape the workspace.
 - Execution history lists records newest first and resolves one exact execution identifier.
 - Host and tag targeting is passed as explicit arguments and retained in execution history.
 - An unconfirmed apply request reaches neither policy nor the execution adapter.

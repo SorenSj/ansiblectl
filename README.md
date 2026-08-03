@@ -112,7 +112,8 @@ uv run ansiblectl --workspace ~/automation/example \
 
 Ansiblectl isolates Ansible's controller-side temporary files below the
 workspace's owner-only `.ansiblectl/tmp` directory instead of relying on
-`~/.ansible/tmp`.
+`~/.ansible/tmp`. Captured process output remains below `.ansiblectl/runs`;
+symlinks cannot redirect those private logs outside the workspace.
 
 Validate workspace inputs, generate a private canonical inventory, and invoke
 Ansible with an explicit timeout and argument vector:

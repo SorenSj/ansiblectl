@@ -138,11 +138,14 @@ def _persist_outputs(
 
 def _output_directory(request: ExecutionRequest) -> Path:
     directory_key = hashlib.sha256(request.execution_id.encode("utf-8")).hexdigest()
-    private_root = request.working_directory / ".ansiblectl"
+    workspace_root = request.working_directory.resolve()
+    private_root = workspace_root / ".ansiblectl"
     runs_directory = private_root / "runs"
     output_directory = runs_directory / directory_key
     for directory in (private_root, runs_directory, output_directory):
         directory.mkdir(mode=0o700, exist_ok=True)
+        if not directory.resolve().is_relative_to(workspace_root):
+            raise OSError("Execution output path escaped the workspace boundary.")
         directory.chmod(0o700)
     return output_directory
 
@@ -151,10 +154,18 @@ def _write_stream(path: Path, stream: str | bytes | None) -> str | None:
     if not stream:
         return None
     content = stream.decode("utf-8", errors="replace") if isinstance(stream, bytes) else stream
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    no_follow = getattr(os, "O_NOFOLLOW", None)
+    if no_follow is None:
+        raise OSError("This platform cannot safely create execution output files.")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | no_follow
+    descriptor = os.open(path, flags, 0o600)
+    try:
+        os.fchmod(descriptor, 0o600)
+    except OSError:
+        os.close(descriptor)
+        raise
     with os.fdopen(descriptor, "w", encoding="utf-8") as output_file:
         output_file.write(content)
-    path.chmod(0o600)
     return str(path)
 
 

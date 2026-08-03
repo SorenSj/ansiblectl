@@ -1,5 +1,6 @@
 """Subprocess-adapter tests."""
 
+import hashlib
 import stat
 import subprocess
 from pathlib import Path
@@ -148,3 +149,50 @@ def test_adapter_omits_references_for_empty_output(
 
     assert result.stdout_reference is None
     assert result.stderr_reference is None
+
+
+def test_adapter_rejects_output_directory_symlink_escape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    outside = tmp_path.parent / "outside-runs"
+    outside.mkdir()
+    private_root = tmp_path / ".ansiblectl"
+    private_root.mkdir()
+    (private_root / "runs").symlink_to(outside, target_is_directory=True)
+
+    def completed(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess([], 0, stdout="must stay private\n")
+
+    monkeypatch.setattr(subprocess, "run", completed)
+
+    result = LocalExecutionAdapter().execute(
+        ExecutionRequest(("ansible-playbook", "site.yml"), tmp_path, {})
+    )
+
+    assert result.stdout_reference is None
+    assert result.diagnostic == "Execution output could not be persisted: OSError."
+    assert tuple(outside.iterdir()) == ()
+
+
+def test_adapter_does_not_follow_existing_output_file_symlink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "outside.log"
+    target.write_text("preserve me\n", encoding="utf-8")
+    request = ExecutionRequest(("ansible-playbook", "site.yml"), tmp_path, {})
+    directory_key = hashlib.sha256(request.execution_id.encode("utf-8")).hexdigest()
+    output_directory = tmp_path / ".ansiblectl/runs" / directory_key
+    output_directory.mkdir(parents=True)
+    (output_directory / "stdout.log").symlink_to(target)
+
+    def completed(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess([], 0, stdout="overwrite attempt\n")
+
+    monkeypatch.setattr(subprocess, "run", completed)
+
+    result = LocalExecutionAdapter().execute(request)
+
+    assert result.stdout_reference is None
+    assert result.diagnostic is not None
+    assert result.diagnostic.startswith("Execution output could not be persisted:")
+    assert target.read_text(encoding="utf-8") == "preserve me\n"
