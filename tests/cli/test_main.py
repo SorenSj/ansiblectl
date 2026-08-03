@@ -1,11 +1,14 @@
 """CLI contract tests."""
 
 from io import StringIO
+from pathlib import Path
 
 import pytest
 
 from ansiblectl.application.status import Status
-from ansiblectl.cli.main import EXIT_INVALID_INPUT, EXIT_SUCCESS, main
+from ansiblectl.cli.main import EXIT_EXPECTED_FAILURE, EXIT_INVALID_INPUT, EXIT_SUCCESS, main
+from ansiblectl.domain.errors import WorkspaceNotFoundError
+from ansiblectl.domain.workspace import Workspace
 
 
 class FakeStatusService:
@@ -44,3 +47,54 @@ def test_invalid_argument_uses_documented_invalid_input_exit_code(
     captured = capsys.readouterr()
     assert raised.value.code == EXIT_INVALID_INPUT
     assert "error:" in captured.err
+
+
+class FakeWorkspaceService:
+    def initialize(self, path: Path) -> Workspace:
+        return Workspace(
+            root=path.resolve(),
+            metadata_path=path.resolve() / ".ansiblectl/workspace.json",
+            schema_version=1,
+        )
+
+    def resolve(self, explicit_path: Path | None, current_directory: Path) -> Workspace:
+        if explicit_path is None:
+            raise WorkspaceNotFoundError("Run 'ansiblectl workspace init'.")
+        return self.initialize(explicit_path)
+
+
+def test_workspace_init_renders_the_injected_service_result(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(
+        ["--output-format", "json", "workspace", "init", str(tmp_path)],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert f'"root": "{tmp_path}"' in output.getvalue()
+
+
+def test_workspace_show_outside_a_workspace_is_actionable(tmp_path: Path) -> None:
+    error = StringIO()
+
+    result = main(
+        ["workspace", "show"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        stderr=error,
+        current_directory=tmp_path,
+    )
+
+    assert result == EXIT_EXPECTED_FAILURE
+    assert "workspace init" in error.getvalue()
+
+
+def test_workspace_init_uses_the_composition_root(tmp_path: Path) -> None:
+    output = StringIO()
+
+    result = main(["--output-format", "json", "workspace", "init", str(tmp_path)], stdout=output)
+
+    assert result == EXIT_SUCCESS
+    assert '"schema_version": 1' in output.getvalue()
+    assert (tmp_path / ".ansiblectl/workspace.json").is_file()

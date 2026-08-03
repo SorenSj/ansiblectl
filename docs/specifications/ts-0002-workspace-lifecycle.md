@@ -27,6 +27,20 @@ This specification defines the initial public and internal contract for this cap
 
 The workspace service accepts a path or selection policy and returns a validated Workspace model with canonical root and metadata locations.
 
+The initial workspace layout is deliberately minimal:
+
+```text
+<workspace-root>/
+└── .ansiblectl/
+    └── workspace.json
+```
+
+`workspace.json` contains exactly one field, `schema_version`, initially set to
+`1`. Discovery starts at the selected directory (or process directory when no
+explicit selection is given) and walks its parents until this metadata file is
+found. The `workspace init [PATH]` command creates this layout atomically; a
+second invocation returns the existing valid workspace without changing it.
+
 ## Verification
 
 - Initialising a new workspace creates only the documented layout.
@@ -36,4 +50,3 @@ The workspace service accepts a path or selection policy and returns a validated
 ## Non-goals
 
 This specification does not introduce unrelated delivery mechanisms, hosted services, or public APIs beyond the contract described above.
-

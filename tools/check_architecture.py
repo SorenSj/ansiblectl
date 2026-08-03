@@ -37,9 +37,13 @@ def find_violations(source_root: Path) -> list[Finding]:
         layer = _layer_for(path, package_root)
         if layer not in LAYER_RULES:
             continue
+        allowed_layers = LAYER_RULES[layer]
+        if layer == "cli" and path.name == "composition.py":
+            # The Architecture Handbook explicitly makes this module the composition root.
+            allowed_layers = allowed_layers | {"infrastructure"}
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for imported_layer in _imported_layers(tree):
-            if imported_layer != layer and imported_layer not in LAYER_RULES[layer]:
+            if imported_layer != layer and imported_layer not in allowed_layers:
                 findings.append(
                     Finding(
                         path=str(path.relative_to(source_root)),

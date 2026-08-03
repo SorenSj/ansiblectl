@@ -3,3 +3,15 @@
 
 class DomainError(Exception):
     """Base class for expected failures caused by invalid domain operations."""
+
+
+class WorkspaceError(DomainError):
+    """Base class for safe, actionable workspace failures."""
+
+
+class WorkspaceNotFoundError(WorkspaceError):
+    """Raised when workspace discovery cannot find valid metadata."""
+
+
+class WorkspaceValidationError(WorkspaceError):
+    """Raised when workspace metadata is malformed or unsupported."""

@@ -2,9 +2,17 @@
 
 from ansiblectl import __version__
 from ansiblectl.application.status import DefaultStatusService, StatusService
+from ansiblectl.application.workspace import WorkspaceService
+from ansiblectl.infrastructure.local_workspace_store import LocalWorkspaceStore
 
 
 def build_status_service() -> StatusService:
     """Create the status use case and its dependencies for a CLI invocation."""
 
     return DefaultStatusService(version=__version__)
+
+
+def build_workspace_service() -> WorkspaceService:
+    """Create the local workspace use cases for a CLI invocation."""
+
+    return WorkspaceService(store=LocalWorkspaceStore())

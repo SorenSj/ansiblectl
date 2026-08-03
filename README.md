@@ -15,6 +15,18 @@ uv run ansiblectl --help
 uv run ansiblectl status
 ```
 
+## Workspace quick start
+
+An ansiblectl workspace is an explicit local boundary for automation state.
+Initialise one before using project-scoped commands:
+
+```console
+uv run ansiblectl workspace init ~/automation/example
+uv run ansiblectl --workspace ~/automation/example workspace show
+```
+
+This creates only `.ansiblectl/workspace.json` beneath the selected workspace.
+
 ## Project governance
 
 The repository is the authoritative source for Ansiblectl's normative
