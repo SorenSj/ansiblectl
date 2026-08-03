@@ -18,7 +18,7 @@ gate.
 - Transactional regular-file writes and deletions with durable journals and reverse rollback.
 - Explicit recovery preview/application, owner locks, write-ahead intent, and retryable recovery.
 
-## Most recently completed milestone
+## Completed milestone
 
 ### v0.3.0 — Operational Reliability
 
@@ -65,7 +65,7 @@ Explicit non-goals:
 - Remote API, hosted control plane, or terminal UI.
 - Moving or recreating an existing release tag.
 
-## Active milestone
+## Most recently completed milestone
 
 ### v0.4.0 — Plugin trust and unattended policy
 
@@ -85,6 +85,14 @@ Exit criteria:
 - [x] Every stable decision reason has redacted human, JSON, and YAML contract tests.
 - [x] Existing manifest discovery and interactive permission preflight remain compatible.
 - [x] The complete quality, build, provenance, and release gates pass.
+- [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
+  [PR #10](https://github.com/SorenSj/ansiblectl/pull/10).
+- [x] The immutable v0.4.0 tag and
+  [tagged artifact workflow](https://github.com/SorenSj/ansiblectl/actions/runs/30863568837) pass
+  from merge commit `a523dee`.
+
+Readiness evidence was last reviewed on 2026-08-04. Version 0.4.0 is released, and its retained
+workflow artifact is named `ansiblectl-v0.4.0`; no existing release tag was moved or recreated.
 
 Explicit non-goals:
 
