@@ -38,6 +38,7 @@ safe diagnostic. It contains no raw process output.
 
 When present, `execution.completed` also carries a structured `targeting`
 object containing the host limit, selected tags, and skipped tags.
+The payload also identifies execution mode as `check` or `apply`.
 
 ## Verification
 

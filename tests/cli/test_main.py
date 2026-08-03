@@ -11,6 +11,7 @@ from ansiblectl.application.status import Status
 from ansiblectl.cli.main import EXIT_EXPECTED_FAILURE, EXIT_INVALID_INPUT, EXIT_SUCCESS, main
 from ansiblectl.domain.errors import ExecutionError, WorkspaceNotFoundError
 from ansiblectl.domain.execution import (
+    ExecutionMode,
     ExecutionRecord,
     ExecutionResult,
     ExecutionRetentionResult,
@@ -336,6 +337,30 @@ class FakeRunService:
             ExecutionResult("run-1", ExecutionStatus.COMPLETED, 0, 0.1, targeting=targeting),
         )
 
+    def run_apply(
+        self,
+        workspace_root: Path,
+        playbook_identifier: Path,
+        revision: str,
+        environment: object,
+        timeout_seconds: float,
+        policy_mode: EnforcementMode,
+        confirmed: bool,
+        targeting: ExecutionTargeting,
+    ) -> GovernedExecutionResult:
+        assert confirmed is True
+        return GovernedExecutionResult(
+            PolicyReport((), policy_mode),
+            ExecutionResult(
+                "run-apply",
+                ExecutionStatus.COMPLETED,
+                0,
+                0.1,
+                targeting=targeting,
+                mode=ExecutionMode.APPLY,
+            ),
+        )
+
 
 def test_run_check_renders_injected_execution_result(tmp_path: Path) -> None:
     output = StringIO()
@@ -446,6 +471,42 @@ def test_run_rejects_empty_targeting_before_service_invocation(tmp_path: Path) -
 
     assert result == EXIT_EXPECTED_FAILURE
     assert "targeting values" in error.getvalue()
+
+
+def test_run_apply_requires_confirmation_and_records_mode(tmp_path: Path) -> None:
+    error = StringIO()
+    arguments = [
+        "--workspace",
+        str(tmp_path),
+        "--output-format",
+        "json",
+        "run",
+        "--playbook",
+        "playbooks/site.yml",
+        "--revision",
+        "main",
+        "--apply",
+    ]
+
+    assert (
+        main(
+            arguments,
+            workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+            run_service=FakeRunService(),  # type: ignore[arg-type]
+            stderr=error,
+        )
+        == EXIT_INVALID_INPUT
+    )
+    output = StringIO()
+    result = main(
+        [*arguments, "--confirm"],
+        workspace_service=FakeWorkspaceService(),  # type: ignore[arg-type]
+        run_service=FakeRunService(),  # type: ignore[arg-type]
+        stdout=output,
+    )
+
+    assert result == EXIT_SUCCESS
+    assert json.loads(output.getvalue())["execution"]["mode"] == "apply"
 
 
 class DeniedRunService(FakeRunService):

@@ -4,13 +4,16 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+import pytest
 import yaml
 
 from ansiblectl.application.execution import ExecutionService
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.policy import PolicyService
 from ansiblectl.application.run import RunService
+from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.execution import (
+    ExecutionMode,
     ExecutionRequest,
     ExecutionResult,
     ExecutionStatus,
@@ -35,6 +38,17 @@ class RecordingExecutionPort:
         inventory_path = Path(request.argv[2])
         self.inventory = yaml.safe_load(inventory_path.read_text(encoding="utf-8"))
         return ExecutionResult(request.execution_id, ExecutionStatus.COMPLETED, 0, 0.1)
+
+
+class RecordingPolicy:
+    requests: list[EvaluationRequest]
+
+    def __init__(self) -> None:
+        self.requests = []
+
+    def evaluate(self, request: EvaluationRequest) -> tuple[PolicyFinding, ...]:
+        self.requests.append(request)
+        return ()
 
 
 @contextmanager
@@ -91,6 +105,48 @@ def test_run_prepares_check_mode_request_from_validated_inputs(tmp_path: Path) -
         "groups": {"web": ["web-1"]},
         "hosts": {"web-1": {"address": "192.0.2.10", "variables": {"ansible_port": 22}}},
     }
+
+
+def test_apply_requires_confirmation_before_execution(tmp_path: Path) -> None:
+    playbook = tmp_path / "site.yml"
+    playbook.write_text("---\n", encoding="utf-8")
+    port = RecordingExecutionPort()
+    policy = RecordingPolicy()
+    service = RunService(
+        InventoryService([FakeInventoryProvider()]),
+        ExecutionService(port),
+        PolicyService([policy]),
+        fake_materializer,
+    )
+
+    with pytest.raises(ExecutionError, match="explicit confirmation"):
+        service.run_apply(tmp_path, Path("site.yml"), "main", {}, 30, EnforcementMode.DENY, False)
+    assert port.request is None
+    assert policy.requests == []
+
+
+def test_confirmed_apply_omits_check_argument(tmp_path: Path) -> None:
+    playbook = tmp_path / "site.yml"
+    playbook.write_text("---\n", encoding="utf-8")
+    port = RecordingExecutionPort()
+    policy = RecordingPolicy()
+    service = RunService(
+        InventoryService([FakeInventoryProvider()]),
+        ExecutionService(port),
+        PolicyService([policy]),
+        fake_materializer,
+    )
+
+    result = service.run_apply(
+        tmp_path, Path("site.yml"), "main", {}, 30, EnforcementMode.DENY, True
+    )
+
+    assert result.execution is not None
+    request = port.request
+    assert request is not None
+    assert "--check" not in request.argv
+    assert request.mode is ExecutionMode.APPLY
+    assert policy.requests[0].operation == "run.apply"
 
 
 class DenyingPolicy:

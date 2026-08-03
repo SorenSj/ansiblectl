@@ -41,6 +41,7 @@ class ExecutionService:
                             "tags": list(request.targeting.tags),
                             "skip_tags": list(request.targeting.skip_tags),
                         },
+                        "mode": request.mode,
                     },
                 )
             )

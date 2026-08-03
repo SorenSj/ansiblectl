@@ -23,6 +23,13 @@ class ExecutionStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class ExecutionMode(StrEnum):
+    """Whether Ansible predicts or applies remote changes."""
+
+    CHECK = "check"
+    APPLY = "apply"
+
+
 @dataclass(frozen=True)
 class ExecutionTargeting:
     """Validated optional host and task selection for an execution."""
@@ -49,6 +56,7 @@ class ExecutionRequest:
     execution_id: str = field(default_factory=lambda: str(uuid4()))
     cancel_requested: bool = False
     targeting: ExecutionTargeting = field(default_factory=ExecutionTargeting)
+    mode: ExecutionMode = ExecutionMode.CHECK
 
     def __post_init__(self) -> None:
         if not self.argv or any(not argument for argument in self.argv):
@@ -67,6 +75,7 @@ class ExecutionRequest:
         selected_playbook: PlaybookReference,
         timeout_seconds: float | None = None,
         targeting: ExecutionTargeting | None = None,
+        mode: ExecutionMode = ExecutionMode.CHECK,
     ) -> ExecutionRequest:
         """Create a request that retains the validated canonical playbook and revision."""
 
@@ -77,6 +86,7 @@ class ExecutionRequest:
             timeout_seconds,
             selected_playbook,
             targeting=targeting or ExecutionTargeting(),
+            mode=mode,
         )
 
 
@@ -92,6 +102,7 @@ class ExecutionResult:
     stderr_reference: str | None = None
     diagnostic: str | None = None
     targeting: ExecutionTargeting = field(default_factory=ExecutionTargeting)
+    mode: ExecutionMode = ExecutionMode.CHECK
 
 
 @dataclass(frozen=True)
@@ -107,6 +118,7 @@ class ExecutionRecord:
     stderr_reference: str | None = None
     diagnostic: str | None = None
     targeting: ExecutionTargeting = field(default_factory=ExecutionTargeting)
+    mode: ExecutionMode = ExecutionMode.CHECK
 
 
 @dataclass(frozen=True)

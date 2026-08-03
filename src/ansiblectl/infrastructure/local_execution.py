@@ -33,6 +33,7 @@ class LocalExecutionAdapter:
                 elapsed_since(started_at),
                 diagnostic="Execution was cancelled before process start.",
                 targeting=request.targeting,
+                mode=request.mode,
             )
         try:
             completed = subprocess.run(
@@ -58,6 +59,7 @@ class LocalExecutionAdapter:
                 stderr_reference,
                 _join_diagnostics("Execution exceeded its configured timeout.", diagnostic),
                 request.targeting,
+                request.mode,
             )
         except OSError as error:
             return ExecutionResult(
@@ -67,6 +69,7 @@ class LocalExecutionAdapter:
                 elapsed_since(started_at),
                 diagnostic=f"Execution could not start: {error.__class__.__name__}.",
                 targeting=request.targeting,
+                mode=request.mode,
             )
         status = ExecutionStatus.COMPLETED if completed.returncode == 0 else ExecutionStatus.FAILED
         stdout_reference, stderr_reference, diagnostic = _persist_outputs(
@@ -81,6 +84,7 @@ class LocalExecutionAdapter:
             stderr_reference,
             diagnostic,
             request.targeting,
+            request.mode,
         )
 
 

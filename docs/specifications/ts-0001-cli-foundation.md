@@ -34,6 +34,10 @@ Ansible stdout or stderr content.
 `execution prune --keep <count>` previews retention. Destructive mutation
 requires the additional explicit `--apply` flag.
 
+Playbook execution requires exactly one of `run --check` or `run --apply`.
+Apply mode additionally requires `--confirm`; mismatched mode and confirmation
+flags fail as invalid input before workspace or application-service access.
+
 ## Verification
 
 - `ansiblectl --help` lists top-level commands and global options.

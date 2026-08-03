@@ -6,6 +6,7 @@ from pathlib import Path
 from ansiblectl.application.execution import ExecutionService, GovernedExecutionService
 from ansiblectl.domain.events import Event, EventBus
 from ansiblectl.domain.execution import (
+    ExecutionMode,
     ExecutionRequest,
     ExecutionResult,
     ExecutionStatus,
@@ -67,6 +68,7 @@ def test_execution_event_is_published_after_a_completed_port_call(tmp_path: Path
         tmp_path,
         {},
         targeting=ExecutionTargeting("web", ("deploy",), ("slow",)),
+        mode=ExecutionMode.APPLY,
     )
     result = ExecutionResult(request.execution_id, ExecutionStatus.COMPLETED, 0, 0.1)
     delivered: list[Event] = []
@@ -87,6 +89,7 @@ def test_execution_event_is_published_after_a_completed_port_call(tmp_path: Path
                 "stderr_reference": None,
                 "diagnostic": None,
                 "targeting": {"limit": "web", "tags": ["deploy"], "skip_tags": ["slow"]},
+                "mode": ExecutionMode.APPLY,
             },
         )
     ]

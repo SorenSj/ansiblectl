@@ -8,7 +8,8 @@ from pathlib import Path
 from ansiblectl.application.execution import ExecutionService, GovernedExecutionResult
 from ansiblectl.application.inventory import InventoryService
 from ansiblectl.application.policy import PolicyService
-from ansiblectl.domain.execution import ExecutionRequest, ExecutionTargeting
+from ansiblectl.domain.errors import ExecutionError
+from ansiblectl.domain.execution import ExecutionMode, ExecutionRequest, ExecutionTargeting
 from ansiblectl.domain.playbook import select_playbook
 from ansiblectl.domain.policy import EnforcementMode, EvaluationRequest
 
@@ -34,29 +35,78 @@ class RunService:
     ) -> GovernedExecutionResult:
         """Validate inputs and execute ansible-playbook with an ephemeral canonical inventory."""
 
+        return self._run(
+            workspace_root,
+            playbook_identifier,
+            revision,
+            environment,
+            timeout_seconds,
+            policy_mode,
+            targeting or ExecutionTargeting(),
+            ExecutionMode.CHECK,
+        )
+
+    def run_apply(
+        self,
+        workspace_root: Path,
+        playbook_identifier: Path,
+        revision: str,
+        environment: Mapping[str, str],
+        timeout_seconds: float,
+        policy_mode: EnforcementMode,
+        confirmed: bool,
+        targeting: ExecutionTargeting | None = None,
+    ) -> GovernedExecutionResult:
+        """Execute an explicitly confirmed, policy-governed Ansible apply."""
+
+        if not confirmed:
+            raise ExecutionError("Apply mode requires explicit confirmation.")
+        return self._run(
+            workspace_root,
+            playbook_identifier,
+            revision,
+            environment,
+            timeout_seconds,
+            policy_mode,
+            targeting or ExecutionTargeting(),
+            ExecutionMode.APPLY,
+        )
+
+    def _run(
+        self,
+        workspace_root: Path,
+        playbook_identifier: Path,
+        revision: str,
+        environment: Mapping[str, str],
+        timeout_seconds: float,
+        policy_mode: EnforcementMode,
+        targeting: ExecutionTargeting,
+        mode: ExecutionMode,
+    ) -> GovernedExecutionResult:
+
         selected = select_playbook(workspace_root, playbook_identifier, revision)
         resolved_inventory = self.inventory.resolve()
         report = self.policy.evaluate(
-            EvaluationRequest("run.check", str(selected.path)), policy_mode
+            EvaluationRequest(f"run.{mode.value}", str(selected.path)), policy_mode
         )
         if not report.allowed:
             return GovernedExecutionResult(report, None)
-        selected_targeting = targeting or ExecutionTargeting()
         with self.materialize_inventory(resolved_inventory.canonical()) as inventory_path:
             request = ExecutionRequest.for_playbook(
                 (
                     "ansible-playbook",
                     "--inventory",
                     str(inventory_path),
-                    "--check",
-                    *_targeting_arguments(selected_targeting),
+                    *(("--check",) if mode is ExecutionMode.CHECK else ()),
+                    *_targeting_arguments(targeting),
                     str(selected.path),
                 ),
                 workspace_root.resolve(),
                 environment,
                 selected,
                 timeout_seconds,
-                selected_targeting,
+                targeting,
+                mode,
             )
             return GovernedExecutionResult(report, self.execution.execute(request))
 

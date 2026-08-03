@@ -119,7 +119,7 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Manifest path in the workspace; repeat for multiple plugins.",
     )
-    run = subcommands.add_parser("run", help="Run a validated playbook in Ansible check mode.")
+    run = subcommands.add_parser("run", help="Run a validated playbook through Ansible.")
     run.add_argument("--playbook", type=Path, required=True, help="Playbook path in the workspace.")
     run.add_argument("--revision", required=True, help="Explicit repository revision.")
     run.add_argument(
@@ -128,7 +128,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("inventory/hosts.yml"),
         help="Inventory YAML path in the workspace.",
     )
-    run.add_argument("--check", action="store_true", required=True, help="Use Ansible check mode.")
+    run_mode = run.add_mutually_exclusive_group(required=True)
+    run_mode.add_argument("--check", action="store_true", help="Predict changes in check mode.")
+    run_mode.add_argument("--apply", action="store_true", help="Apply changes after confirmation.")
+    run.add_argument(
+        "--confirm", action="store_true", help="Explicitly confirm an apply-mode execution."
+    )
     run.add_argument("--timeout", type=float, default=300.0, help="Positive timeout in seconds.")
     run.add_argument("--limit", help="Ansible host pattern to target.")
     run.add_argument(
@@ -269,6 +274,9 @@ def main(
             return EXIT_EXPECTED_FAILURE
         _render_plugins(descriptors, options.output_format, stdout)
     elif arguments.command == "run":
+        if arguments.apply != arguments.confirm:
+            print("Run error: --apply and --confirm must be used together.", file=stderr)
+            return EXIT_INVALID_INPUT
         workspace_service_instance = workspace_service or build_workspace_service()
         try:
             workspace = workspace_service_instance.resolve(
@@ -282,14 +290,20 @@ def main(
                 _tag_values(arguments.tags),
                 _tag_values(arguments.skip_tags),
             )
-            run_result = run_service_instance.run_check(
+            run_arguments = (
                 workspace.root,
                 arguments.playbook,
                 arguments.revision,
                 execution_environment(),
                 arguments.timeout,
                 arguments.policy_mode,
-                targeting,
+            )
+            run_result = (
+                run_service_instance.run_apply(
+                    *run_arguments, confirmed=arguments.confirm, targeting=targeting
+                )
+                if arguments.apply
+                else run_service_instance.run_check(*run_arguments, targeting=targeting)
             )
         except WorkspaceError as error:
             print(f"Workspace error: {error}", file=stderr)
@@ -469,6 +483,7 @@ def _render_run_result(
             "stderr_reference": execution.stderr_reference,
             "stdout_reference": execution.stdout_reference,
             "targeting": _targeting_record(execution.targeting),
+            "mode": execution.mode.value,
         }
     )
     if output_format == "json":
@@ -490,6 +505,7 @@ def _render_run_result(
     if execution is not None:
         print(f"Execution: {execution.execution_id}", file=output)
         print(f"Status: {execution.status.value}", file=output)
+        print(f"Mode: {execution.mode.value}", file=output)
         if execution.stdout_reference:
             print(f"Stdout: {execution.stdout_reference}", file=output)
         if execution.stderr_reference:
@@ -515,6 +531,7 @@ def _render_execution_records(
         print(f"Execution: {record.execution_id}", file=output)
         print(f"Timestamp: {record.timestamp}", file=output)
         print(f"Status: {record.status.value}", file=output)
+        print(f"Mode: {record.mode.value}", file=output)
         if record.stdout_reference:
             print(f"Stdout: {record.stdout_reference}", file=output)
         if record.stderr_reference:
@@ -535,6 +552,7 @@ def _execution_record(record: ExecutionRecord) -> dict[str, object]:
         "stdout_reference": record.stdout_reference,
         "timestamp": record.timestamp,
         "targeting": _targeting_record(record.targeting),
+        "mode": record.mode.value,
     }
 
 

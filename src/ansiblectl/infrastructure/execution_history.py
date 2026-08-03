@@ -13,6 +13,7 @@ from typing import Any
 
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.execution import (
+    ExecutionMode,
     ExecutionRecord,
     ExecutionRetentionResult,
     ExecutionStatus,
@@ -150,6 +151,7 @@ def _parse_record(data: Any) -> ExecutionRecord | None:
         stderr_reference=_optional_string(fields, "stderr_reference"),
         diagnostic=_optional_string(fields, "diagnostic"),
         targeting=_targeting(fields.get("targeting")),
+        mode=ExecutionMode(_optional_string(fields, "mode") or ExecutionMode.CHECK),
     )
 
 

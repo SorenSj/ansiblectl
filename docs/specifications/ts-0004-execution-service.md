@@ -52,6 +52,11 @@ limit, task tags, and skipped task tags. The application layer emits these as
 separate argument-vector elements, and completed execution events retain the
 selection for later inspection. Targeting values are never shell commands.
 
+Apply mode requires an explicit application-layer confirmation before input
+resolution, policy evaluation, inventory materialization, or adapter invocation.
+Confirmed apply requests are evaluated as `run.apply`; check requests are
+evaluated as `run.check`. Execution events and history retain the selected mode.
+
 ## Verification
 
 - A fake execution port can verify a request without invoking a process.
@@ -60,6 +65,8 @@ selection for later inspection. Targeting values are never shell commands.
 - Captured and partial timeout output is stored with owner-only permissions and returned by reference.
 - Execution history lists records newest first and resolves one exact execution identifier.
 - Host and tag targeting is passed as explicit arguments and retained in execution history.
+- An unconfirmed apply request reaches neither policy nor the execution adapter.
+- A confirmed apply request omits `--check` and remains subject to the policy gate.
 
 ## Non-goals
 
