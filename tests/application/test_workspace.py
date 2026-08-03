@@ -7,6 +7,7 @@ import pytest
 
 from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.domain.errors import WorkspaceNotFoundError
+from ansiblectl.domain.events import Event, EventBus
 from ansiblectl.domain.workspace import Workspace
 
 
@@ -54,3 +55,17 @@ def test_initialize_canonicalizes_the_explicit_target(tmp_path: Path) -> None:
 
     assert WorkspaceService(store).initialize(root) == workspace
     assert store.initialized == [root.resolve()]
+
+
+def test_initialization_event_is_published_after_workspace_creation(tmp_path: Path) -> None:
+    root = tmp_path / "workspace"
+    workspace = Workspace(
+        root=root.resolve(), metadata_path=root / ".ansiblectl/workspace.json", schema_version=1
+    )
+    delivered: list[Event] = []
+
+    WorkspaceService(
+        FakeWorkspaceStore(workspaces={root.resolve(): workspace}), EventBus([delivered.append])
+    ).initialize(root)
+
+    assert delivered == [Event("workspace.initialized", {"workspace": str(root.resolve())})]

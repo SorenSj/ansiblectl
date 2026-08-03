@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ansiblectl.domain.errors import WorkspaceNotFoundError
+from ansiblectl.domain.events import Event, EventBus
 from ansiblectl.domain.workspace import Workspace, WorkspaceStore
 
 
@@ -14,11 +15,15 @@ class WorkspaceService:
     """Coordinate workspace selection and lifecycle through an explicit port."""
 
     store: WorkspaceStore
+    events: EventBus | None = None
 
     def initialize(self, path: Path) -> Workspace:
         """Initialise a workspace at an explicit target path."""
 
-        return self.store.initialize(path.resolve())
+        workspace = self.store.initialize(path.resolve())
+        if self.events is not None:
+            self.events.publish(Event("workspace.initialized", {"workspace": str(workspace.root)}))
+        return workspace
 
     def resolve(self, explicit_path: Path | None, current_directory: Path) -> Workspace:
         """Resolve an explicit workspace or discover one by walking upward."""

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ansiblectl.application.execution import ExecutionService, GovernedExecutionService
+from ansiblectl.domain.events import Event, EventBus
 from ansiblectl.domain.execution import ExecutionRequest, ExecutionResult, ExecutionStatus
 from ansiblectl.domain.policy import EnforcementMode, EvaluationRequest, PolicyFinding
 
@@ -53,3 +54,24 @@ def test_deny_policy_prevents_execution_port_invocation(tmp_path: Path) -> None:
     assert result.execution is None
     assert result.report.allowed is False
     assert port.calls == 0
+
+
+def test_execution_event_is_published_after_a_completed_port_call(tmp_path: Path) -> None:
+    request = ExecutionRequest(("ansible-playbook", "site.yml"), tmp_path, {})
+    result = ExecutionResult(request.execution_id, ExecutionStatus.COMPLETED, 0, 0.1)
+    delivered: list[Event] = []
+
+    assert (
+        ExecutionService(FakeExecutionPort(result), EventBus([delivered.append])).execute(request)
+        == result
+    )
+    assert delivered == [
+        Event(
+            "execution.completed",
+            {
+                "execution_id": request.execution_id,
+                "status": ExecutionStatus.COMPLETED,
+                "exit_code": 0,
+            },
+        )
+    ]

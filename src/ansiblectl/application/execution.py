@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from ansiblectl.domain.events import Event, EventBus
 from ansiblectl.domain.execution import ExecutionPort, ExecutionRequest, ExecutionResult
 from ansiblectl.domain.policy import (
     EnforcementMode,
@@ -17,11 +18,24 @@ class ExecutionService:
     """Submit a prepared request through an explicit execution port."""
 
     port: ExecutionPort
+    events: EventBus | None = None
 
     def execute(self, request: ExecutionRequest) -> ExecutionResult:
         """Execute the prepared request without adapter-specific logic."""
 
-        return self.port.execute(request)
+        result = self.port.execute(request)
+        if self.events is not None:
+            self.events.publish(
+                Event(
+                    "execution.completed",
+                    {
+                        "execution_id": result.execution_id,
+                        "status": result.status,
+                        "exit_code": result.exit_code,
+                    },
+                )
+            )
+        return result
 
 
 @dataclass(frozen=True)
@@ -38,6 +52,7 @@ class GovernedExecutionService:
 
     port: ExecutionPort
     policies: list[Policy]
+    events: EventBus | None = None
 
     def execute(
         self,
@@ -48,4 +63,5 @@ class GovernedExecutionService:
         report = evaluate(self.policies, evaluation_request, mode)
         if not report.allowed:
             return GovernedExecutionResult(report, None)
-        return GovernedExecutionResult(report, self.port.execute(request))
+        execution = ExecutionService(self.port, self.events).execute(request)
+        return GovernedExecutionResult(report, execution)
