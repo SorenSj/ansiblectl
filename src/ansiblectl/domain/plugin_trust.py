@@ -91,6 +91,123 @@ class PluginProvenance:
         )
 
 
+@dataclass(frozen=True)
+class PluginTrustDecision:
+    """Complete redaction-safe public result of one trust evaluation."""
+
+    provider_identity: str
+    plugin_version: str
+    artifact_digest: str
+    signing_key_id: str
+    origin: str
+    requested_permissions: tuple[str, ...]
+    granted_permissions: tuple[str, ...]
+    denied_permissions: tuple[str, ...]
+    trusted: bool
+    reasons: tuple[PluginTrustReason, ...] = ()
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        permissions = (
+            self.requested_permissions,
+            self.granted_permissions,
+            self.denied_permissions,
+        )
+        if (
+            self.schema_version != 1
+            or not isinstance(self.trusted, bool)
+            or not _IDENTITY.fullmatch(self.provider_identity)
+            or not self.plugin_version
+            or len(self.plugin_version) > 128
+            or not _DIGEST.fullmatch(self.artifact_digest)
+            or not _KEY_ID.fullmatch(self.signing_key_id)
+            or _normalized_origin(self.origin) != self.origin
+            or any(
+                not isinstance(values, tuple)
+                or tuple(sorted(set(values))) != values
+                or any(not isinstance(value, str) or not value for value in values)
+                for values in permissions
+            )
+            or not isinstance(self.reasons, tuple)
+            or any(not isinstance(reason, PluginTrustReason) for reason in self.reasons)
+        ):
+            raise ValueError("Plugin trust decision fields must use the public canonical schema.")
+        requested = set(self.requested_permissions)
+        if self.trusted:
+            valid_outcome = (
+                not self.reasons
+                and self.granted_permissions == self.requested_permissions
+                and not self.denied_permissions
+            )
+        else:
+            valid_outcome = (
+                len(self.reasons) == 1
+                and not self.granted_permissions
+                and set(self.denied_permissions) == requested
+            )
+        if not valid_outcome:
+            raise ValueError("Plugin trust decision outcome must be internally consistent.")
+
+    @classmethod
+    def allowed(
+        cls, provenance: PluginProvenance, requested_permissions: tuple[str, ...]
+    ) -> PluginTrustDecision:
+        """Create a successful decision without retaining private inputs."""
+
+        requested = tuple(sorted(set(requested_permissions)))
+        return cls(
+            provenance.provider_identity,
+            provenance.plugin_version,
+            provenance.artifact_digest,
+            provenance.signing_key_id,
+            provenance.origin,
+            requested,
+            requested,
+            (),
+            True,
+        )
+
+    @classmethod
+    def denied(
+        cls,
+        provenance: PluginProvenance,
+        requested_permissions: tuple[str, ...],
+        reason: PluginTrustReason,
+    ) -> PluginTrustDecision:
+        """Create one fail-closed decision with the first stable reason only."""
+
+        requested = tuple(sorted(set(requested_permissions)))
+        return cls(
+            provenance.provider_identity,
+            provenance.plugin_version,
+            provenance.artifact_digest,
+            provenance.signing_key_id,
+            provenance.origin,
+            requested,
+            (),
+            requested,
+            False,
+            (reason,),
+        )
+
+    def to_payload(self) -> dict[str, object]:
+        """Return the versioned JSON/YAML-safe contract."""
+
+        return {
+            "schema_version": self.schema_version,
+            "provider_identity": self.provider_identity,
+            "plugin_version": self.plugin_version,
+            "artifact_digest": self.artifact_digest,
+            "signing_key_id": self.signing_key_id,
+            "origin": self.origin,
+            "requested_permissions": list(self.requested_permissions),
+            "granted_permissions": list(self.granted_permissions),
+            "denied_permissions": list(self.denied_permissions),
+            "trusted": self.trusted,
+            "reasons": [reason.value for reason in self.reasons],
+        }
+
+
 def parse_provenance(data: bytes) -> PluginProvenance:
     """Parse bounded JSON and reject non-canonical or ambiguous fields."""
 
@@ -196,6 +313,7 @@ __all__ = [
     "MAX_PROVENANCE_BYTES",
     "PROVENANCE_DOMAIN",
     "PluginProvenance",
+    "PluginTrustDecision",
     "PluginTrustError",
     "PluginTrustReason",
     "canonical_payload",

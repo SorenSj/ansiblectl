@@ -11,6 +11,7 @@ All notable changes to Ansiblectl are documented here.
   manifest agreement before plugin import.
 - Exact provider-and-signing-key origin allowlists, including explicit local-origin trust.
 - Pure unattended plugin-policy evaluation with deny precedence and local restriction ceilings.
+- Redaction-safe human, JSON, and YAML trust-decision contracts for every stable reason.
 
 ## [0.3.0] - 2026-08-04
 
