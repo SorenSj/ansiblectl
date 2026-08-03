@@ -1,9 +1,17 @@
 """Public plugin logger contract."""
 
+from collections.abc import Mapping
 from typing import Protocol
-
-from ansiblectl.domain.logging import LogEvent
 
 
 class PluginLogger(Protocol):
-    def emit(self, event: LogEvent) -> None: ...
+    """The SDK-only contract through which plugins emit structured log events."""
+
+    def emit(
+        self,
+        *,
+        level: str,
+        name: str,
+        fields: Mapping[str, object] | None = None,
+        correlation_id: str | None = None,
+    ) -> None: ...
