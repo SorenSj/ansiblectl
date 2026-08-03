@@ -51,6 +51,9 @@ byte digest, findings, and validator name/version. This command does not invoke
 Ansible or claim syntax validation; explicit syntax/lint validation remains a
 separate opt-in capability.
 
+The reported digest can be supplied to `execution list --playbook-digest` as
+an exact, read-only filter for records that used those validated playbook bytes.
+
 Passing `--syntax-check` explicitly invokes `ansible-playbook --syntax-check`
 through the execution port with shell execution disabled, an allowlisted
 environment, and a positive timeout. The result reports classified status,
@@ -67,6 +70,7 @@ raw validator output is not embedded in CLI results.
 - Execution metadata reports `playbooks/site.yml`, not an absolute workspace path.
 - Selection validation reports tool provenance without executing the playbook.
 - Explicit syntax validation reports Ansible provenance and private diagnostic references.
+- A validated playbook digest selects matching execution-history records exactly.
 
 ## Non-goals
 

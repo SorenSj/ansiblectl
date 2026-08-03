@@ -149,6 +149,9 @@ matching records without changing retention.
 Copy the canonical digest from `inventory show` or `inventory validate` into
 `execution list --inventory-digest sha256:...` to find only executions that
 used that exact resolved inventory representation.
+Likewise, copy the digest from `playbook validate` or `run --preflight` into
+`execution list --playbook-digest sha256:...` to match the exact validated
+playbook bytes.
 
 Ansiblectl isolates Ansible's controller-side temporary files below the
 workspace's owner-only `.ansiblectl/tmp` directory instead of relying on

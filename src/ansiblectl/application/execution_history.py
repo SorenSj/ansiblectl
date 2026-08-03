@@ -22,6 +22,7 @@ class ExecutionHistoryService:
         status: ExecutionStatus | None = None,
         mode: ExecutionMode | None = None,
         inventory_digest: str | None = None,
+        playbook_digest: str | None = None,
         limit: int | None = None,
     ) -> tuple[ExecutionRecord, ...]:
         records = self.port.list()
@@ -38,6 +39,12 @@ class ExecutionHistoryService:
                 raise ExecutionError("Inventory digest filter must be a lowercase sha256: value.")
             records = tuple(
                 record for record in records if record.inventory_digest == inventory_digest
+            )
+        if playbook_digest is not None:
+            if not _is_canonical_sha256(playbook_digest):
+                raise ExecutionError("Playbook digest filter must be a lowercase sha256: value.")
+            records = tuple(
+                record for record in records if record.playbook_digest == playbook_digest
             )
         if limit is not None:
             if limit <= 0:
