@@ -7,7 +7,11 @@ from dataclasses import dataclass, field
 
 from ansiblectl.domain.redaction import redact
 
-PUBLIC_EVENTS = {"execution.completed", "workspace.initialized"}
+PUBLIC_EVENTS = {
+    "event.delivery.abandoned",
+    "execution.completed",
+    "workspace.initialized",
+}
 
 
 @dataclass(frozen=True)

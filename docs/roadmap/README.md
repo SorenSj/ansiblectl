@@ -116,7 +116,7 @@ Exit criteria:
 - [x] A schema-versioned SQLite outbox safely appends immutable redacted envelopes.
 - [x] Consumer claims, acknowledgements, and stale-worker rejection preserve strict ordering.
 - [x] Restart, crash-window, multiprocess, corruption, and symlink tests pass.
-- [ ] Retry, abandon, inspection, and retention are deterministic and redaction-safe.
+- [x] Retry, abandon, inspection, and retention are deterministic and redaction-safe.
 - [ ] Existing in-process subscribers and execution-history retention remain compatible.
 - [ ] The complete quality, build, provenance, and release gates pass.
 
