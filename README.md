@@ -326,6 +326,12 @@ trimming, caching, or fallback. Material is used only for the immediate request 
 in workspace configuration, command output, logs, events, retry state, or durable state. Missing,
 malformed, unsafe, or unsupported material fails before DNS or network activity.
 
+Schema version 5 can opt into a timestamp-bound v2 signature by combining `signature_secret` with
+`signature_version: 2`. Each attempt sends fixed `X-Ansiblectl-Timestamp` and
+`X-Ansiblectl-Signature: v2=...` headers. Receivers should validate the authenticated Unix-second
+timestamp against a bounded clock-skew policy and separately deduplicate the event identifier;
+timestamps alone do not provide exactly-once delivery or replay state.
+
 Private receivers require endpoint schema version 2 and a separately named policy in
 `.ansiblectl/webhook-network-policies.yaml`:
 

@@ -15,7 +15,7 @@ from ansiblectl.domain.secrets import SecretMaterial, SecretReference
 from ansiblectl.domain.webhook_network_policy import WebhookNetworkPolicy
 from ansiblectl.domain.webhook_tls_trust import WebhookTlsTrustPolicy
 
-WEBHOOK_CONFIGURATION_SCHEMA_VERSION = 4
+WEBHOOK_CONFIGURATION_SCHEMA_VERSION = 5
 MAX_WEBHOOK_TIMEOUT_SECONDS = 60
 MAX_WEBHOOK_PAYLOAD_BYTES = 262_144
 MAX_WEBHOOK_BATCH_EVENTS = 100
@@ -31,6 +31,7 @@ _ENDPOINT_FIELDS = {
 _ENDPOINT_FIELDS_V2 = _ENDPOINT_FIELDS | {"network_policy"}
 _ENDPOINT_FIELDS_V3 = _ENDPOINT_FIELDS_V2 | {"tls_trust_policy"}
 _ENDPOINT_FIELDS_V4 = _ENDPOINT_FIELDS_V3 | {"signature_secret"}
+_ENDPOINT_FIELDS_V5 = _ENDPOINT_FIELDS_V4 | {"signature_version"}
 
 
 @dataclass(frozen=True, repr=False)
@@ -48,13 +49,14 @@ class WebhookEndpoint:
     network_policy: WebhookNetworkPolicy | None = None
     tls_trust_policy: WebhookTlsTrustPolicy | None = None
     signature_secret: SecretReference | None = None
+    signature_version: int | None = None
     schema_version: int = WEBHOOK_CONFIGURATION_SCHEMA_VERSION
 
     def __repr__(self) -> str:
         return (
             "WebhookEndpoint(endpoint_id=<redacted>, url=<redacted>, "
             "network_policy=<redacted>, tls_trust_policy=<redacted>, "
-            "signature_secret=<redacted>)"
+            "signature_secret=<redacted>, signature_version=<redacted>)"
         )
 
 
@@ -102,6 +104,12 @@ class WebhookTransport(Protocol):
     ) -> int: ...
 
 
+class WebhookClock(Protocol):
+    """Supply one canonical UTC Unix second for a request attempt."""
+
+    def now_unix_seconds(self) -> int: ...
+
+
 def parse_webhook_endpoints(
     values: Mapping[str, object],
     origin: str,
@@ -114,9 +122,9 @@ def parse_webhook_endpoints(
     if unknown:
         raise ConfigurationError(f"Unknown webhook field '{sorted(unknown)[0]}' in {origin}.")
     schema_version = values.get("schema_version")
-    if schema_version not in {1, 2, 3, WEBHOOK_CONFIGURATION_SCHEMA_VERSION}:
+    if schema_version not in {1, 2, 3, 4, WEBHOOK_CONFIGURATION_SCHEMA_VERSION}:
         raise ConfigurationError(
-            f"Webhook schema_version in {origin} must be 1, 2, 3, or "
+            f"Webhook schema_version in {origin} must be 1, 2, 3, 4, or "
             f"{WEBHOOK_CONFIGURATION_SCHEMA_VERSION}."
         )
     assert isinstance(schema_version, int)
@@ -181,8 +189,10 @@ def _parse_endpoint(
         allowed_fields = _ENDPOINT_FIELDS_V2
     elif schema_version == 3:
         allowed_fields = _ENDPOINT_FIELDS_V3
-    else:
+    elif schema_version == 4:
         allowed_fields = _ENDPOINT_FIELDS_V4
+    else:
+        allowed_fields = _ENDPOINT_FIELDS_V5
     unknown = set(values) - allowed_fields
     if unknown:
         raise ConfigurationError(
@@ -208,6 +218,9 @@ def _parse_endpoint(
     signature_secret = _parse_secret_reference(
         values.get("signature_secret"), endpoint_id, "signature_secret"
     )
+    signature_version = _parse_signature_version(
+        values.get("signature_version"), signature_secret, endpoint_id, schema_version
+    )
     connect_timeout = _positive_timeout(
         values.get("connect_timeout_seconds", 10), endpoint_id, "connect_timeout_seconds"
     )
@@ -230,6 +243,7 @@ def _parse_endpoint(
         network_policy=network_policy,
         tls_trust_policy=tls_trust_policy,
         signature_secret=signature_secret,
+        signature_version=signature_version,
         schema_version=schema_version,
     )
 
@@ -349,12 +363,34 @@ def _positive_timeout(value: object, endpoint_id: str, field: str) -> int:
     return value
 
 
+def _parse_signature_version(
+    value: object,
+    signature_secret: SecretReference | None,
+    endpoint_id: str,
+    schema_version: int,
+) -> int | None:
+    if schema_version < 5:
+        return None
+    if signature_secret is None:
+        if value is not None:
+            raise ConfigurationError(
+                f"Webhook endpoint '{endpoint_id}' signature_version requires signature_secret."
+            )
+        return None
+    if not isinstance(value, int) or isinstance(value, bool) or value != 2:
+        raise ConfigurationError(
+            f"Webhook endpoint '{endpoint_id}' signature_version must be integer 2."
+        )
+    return value
+
+
 __all__ = [
     "MAX_WEBHOOK_PAYLOAD_BYTES",
     "MAX_WEBHOOK_BATCH_EVENTS",
     "MAX_WEBHOOK_TIMEOUT_SECONDS",
     "WEBHOOK_CONFIGURATION_SCHEMA_VERSION",
     "WebhookAddressResolver",
+    "WebhookClock",
     "WebhookDestination",
     "WebhookEndpoint",
     "WebhookRequest",

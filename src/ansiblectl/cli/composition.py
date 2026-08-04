@@ -54,6 +54,7 @@ from ansiblectl.infrastructure.plugin_manifests import (
     discover_manifests,
 )
 from ansiblectl.infrastructure.secret_router import SecretProviderRouter
+from ansiblectl.infrastructure.system_webhook_clock import SystemWebhookClock
 from ansiblectl.infrastructure.transactional_filesystem import TransactionalFilesystem
 from ansiblectl.infrastructure.webhook_configuration import load_webhook_endpoints
 from ansiblectl.infrastructure.webhook_delivery import HttpsWebhookDeliveryAdapter
@@ -178,6 +179,7 @@ def build_webhook_delivery_service(workspace_root: Path, endpoint_id: str) -> Ev
                 "file": WorkspaceFileSecretProvider(workspace_root),
             }
         ),
+        SystemWebhookClock(),
     )
     return EventDeliveryService(
         SqliteEventOutbox(workspace_root),
