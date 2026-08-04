@@ -323,7 +323,7 @@ Explicit non-goals:
 - Leaf/SPKI pinning, client certificates, mutual TLS, private keys, hardware tokens, or PKCS#11.
 - Redirects, proxies, background workers, inbound APIs, hosted control planes, or remote commands.
 
-## Most recently completed milestone
+## Completed milestone
 
 ### v0.11.0 — Signed webhook delivery
 
@@ -364,7 +364,7 @@ Explicit non-goals:
 - Sender timestamps, nonce persistence, replay windows, exactly-once delivery, or receiver state.
 - Background workers, inbound APIs, hosted control planes, remote commands, or a TUI.
 
-## Active milestone
+## Most recently completed milestone
 
 ### v0.12.0 — Workspace file secret resolution
 
@@ -391,7 +391,12 @@ Exit criteria:
 - [x] The complete local quality, build, provenance, and release gates pass.
 - [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
   [release PR #55](https://github.com/SorenSj/ansiblectl/pull/55).
-- [ ] The immutable v0.12.0 tag and tagged artifact workflow pass from the release merge commit.
+- [x] The immutable v0.12.0 tag and
+  [tagged artifact workflow](https://github.com/SorenSj/ansiblectl/actions/runs/30874436512) pass
+  from merge commit `1867018`.
+
+Readiness evidence was last reviewed on 2026-08-04. Version 0.12.0 is released, and its retained
+workflow artifact is named `ansiblectl-v0.12.0`; no existing release tag was moved or recreated.
 
 Explicit non-goals:
 
