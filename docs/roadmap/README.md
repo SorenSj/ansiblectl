@@ -458,7 +458,7 @@ Exit criteria:
   compatibility, failure, and redaction contracts before implementation.
 - [x] Schema v6 selects a paired file-backed client identity while schemas 1 through 5 retain exact
   behavior.
-- [ ] Certificate chains and unencrypted private keys are bounded, parsed, paired, and validated
+- [x] Certificate chains and unencrypted private keys are bounded, parsed, paired, and validated
   before DNS or TLS activity.
 - [ ] The HTTPS transport consumes request-local identity material without filesystem persistence,
   ambient identity discovery, or anonymous fallback.

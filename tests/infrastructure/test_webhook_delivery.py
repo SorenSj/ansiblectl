@@ -17,6 +17,7 @@ from ansiblectl.domain.webhooks import (
 from ansiblectl.infrastructure.secret_router import SecretProviderRouter
 from ansiblectl.infrastructure.webhook_delivery import (
     AUTHENTICATION_UNAVAILABLE,
+    CLIENT_IDENTITY_UNAVAILABLE,
     DESTINATION_DENIED,
     PAYLOAD_TOO_LARGE,
     REMOTE_REJECTED,
@@ -91,7 +92,11 @@ class MappingSecrets:
 
 
 def endpoint(
-    *, authenticated: bool = False, signed: bool = False, timestamped: bool = False
+    *,
+    authenticated: bool = False,
+    signed: bool = False,
+    timestamped: bool = False,
+    client_identity: bool = False,
 ) -> WebhookEndpoint:
     definition: dict[str, object] = {
         "url": "https://hooks.example.test/events",
@@ -104,8 +109,11 @@ def endpoint(
     if timestamped:
         definition["signature_secret"] = "env:WEBHOOK_SIGNING_KEY"
         definition["signature_version"] = 2
+    if client_identity:
+        definition["client_certificate_secret"] = "file:WEBHOOK_CLIENT_CERTIFICATE"
+        definition["client_private_key_secret"] = "file:WEBHOOK_CLIENT_PRIVATE_KEY"
     document = {
-        "schema_version": 5 if timestamped else 4 if signed else 1,
+        "schema_version": 6 if client_identity else 5 if timestamped else 4 if signed else 1,
         "endpoints": {"audit": definition},
     }
     return parse_webhook_endpoints(document, "test")["audit"]
@@ -510,6 +518,52 @@ def test_adapter_rejects_unavailable_or_malformed_authentication_before_io(value
     assert missing.failure_reason == AUTHENTICATION_UNAVAILABLE
     assert transport.calls == []
     assert resolver.calls == 0
+
+
+def test_client_identity_failure_resolves_all_material_before_clock_dns_or_transport() -> None:
+    secrets = MappingSecrets(
+        {
+            "WEBHOOK_TOKEN": "bearer-token",
+            "WEBHOOK_SIGNING_KEY": "0123456789abcdef0123456789abcdef",
+            "WEBHOOK_CLIENT_CERTIFICATE": "sentinel-invalid-certificate",
+            "WEBHOOK_CLIENT_PRIVATE_KEY": "sentinel-invalid-private-key",
+        }
+    )
+    clock = Clock([1_722_816_000])
+    resolver = Resolver()
+    transport = Transport()
+
+    outcome = HttpsWebhookDeliveryAdapter(
+        endpoint(authenticated=True, timestamped=True, client_identity=True),
+        resolver,
+        transport,
+        secrets,
+        clock,
+    ).deliver(envelope())
+
+    assert outcome.failure_reason == CLIENT_IDENTITY_UNAVAILABLE
+    assert [reference.key for reference in secrets.calls] == [
+        "WEBHOOK_TOKEN",
+        "WEBHOOK_SIGNING_KEY",
+        "WEBHOOK_CLIENT_CERTIFICATE",
+        "WEBHOOK_CLIENT_PRIVATE_KEY",
+    ]
+    assert clock.calls == 0
+    assert resolver.calls == 0
+    assert transport.calls == []
+
+
+def test_missing_client_identity_provider_fails_before_dns() -> None:
+    resolver = Resolver()
+    transport = Transport()
+
+    outcome = HttpsWebhookDeliveryAdapter(
+        endpoint(client_identity=True), resolver, transport
+    ).deliver(envelope())
+
+    assert outcome.failure_reason == CLIENT_IDENTITY_UNAVAILABLE
+    assert resolver.calls == 0
+    assert transport.calls == []
 
 
 def test_adapter_rejects_oversized_payload_before_resolution_or_transport() -> None:
