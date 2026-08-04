@@ -10,6 +10,7 @@ from types import MappingProxyType
 from typing import Protocol
 from urllib.parse import urlsplit
 
+from ansiblectl.domain.durable_events import MAX_DURABLE_EVENT_DELIVERY_BYTES
 from ansiblectl.domain.errors import ConfigurationError
 from ansiblectl.domain.secrets import SecretMaterial, SecretReference
 from ansiblectl.domain.webhook_network_policy import WebhookNetworkPolicy
@@ -17,7 +18,7 @@ from ansiblectl.domain.webhook_tls_trust import WebhookTlsTrustPolicy
 
 WEBHOOK_CONFIGURATION_SCHEMA_VERSION = 6
 MAX_WEBHOOK_TIMEOUT_SECONDS = 60
-MAX_WEBHOOK_PAYLOAD_BYTES = 262_144
+MAX_WEBHOOK_PAYLOAD_BYTES = MAX_DURABLE_EVENT_DELIVERY_BYTES
 MAX_WEBHOOK_BATCH_EVENTS = 100
 _ENDPOINT_ID_PATTERN = re.compile(r"[a-z][a-z0-9._-]{0,127}")
 _DNS_LABEL_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")

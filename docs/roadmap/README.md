@@ -495,8 +495,8 @@ Exit criteria:
 - [x] ADR-0050 and TS-0033 define selection, layout, canonical bytes, custody, atomicity, replay,
   lifecycle, compatibility, failure, and redaction contracts before implementation.
 - [x] Canonical archive identifiers and filenames reject every alternate path representation.
-- [ ] One immutable mode-0600 file is durably installed per event without partial final content.
-- [ ] Exact existing content is an idempotent success; mismatched or unsafe content fails closed.
+- [x] One immutable mode-0600 file is durably installed per event without partial final content.
+- [x] Exact existing content is an idempotent success; mismatched or unsafe content fails closed.
 - [ ] Real crash and multiprocess tests prove the install/ack boundary and same-event races.
 - [ ] Adversarial tests prove archive paths, identifiers, metadata, payloads, and exceptions remain
   absent from public and durable diagnostic surfaces.
