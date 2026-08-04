@@ -25,7 +25,9 @@ endpoints remain valid. Schema versions 1 through 5 reject both fields and retai
 configuration and request behavior.
 
 Bearer authentication, signature v1 or v2, private-network policy, and platform or exclusive CA
-trust remain independently selectable. Client identity does not replace any selected mechanism.
+trust remain independently selectable. A signed schema v6 endpoint MUST set `signature_version` to
+the integer `1` or `2`; the field is invalid without `signature_secret`, and no implicit version or
+fallback is selected. Client identity does not replace any selected mechanism.
 
 ## Material and validation contract
 

@@ -462,9 +462,9 @@ Exit criteria:
   before DNS or TLS activity.
 - [x] The HTTPS transport consumes request-local identity material without filesystem persistence,
   ambient identity discovery, or anonymous fallback.
-- [ ] Client identity composes with bearer, signature v1/v2, network policy, and server CA trust.
-- [ ] Adversarial tests prove identity material and metadata never reach public or durable surfaces.
-- [ ] The complete local quality, build, provenance, and release gates pass.
+- [x] Client identity composes with bearer, signature v1/v2, network policy, and server CA trust.
+- [x] Adversarial tests prove identity material and metadata never reach public or durable surfaces.
+- [x] The complete local quality, build, provenance, and release gates pass.
 - [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
 - [ ] The immutable v0.14.0 tag and tagged artifact workflow pass from the release merge commit.
 

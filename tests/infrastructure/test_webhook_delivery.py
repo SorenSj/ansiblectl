@@ -8,13 +8,17 @@ import pytest
 from ansiblectl.domain.durable_events import DurableEventEnvelope
 from ansiblectl.domain.event_delivery import DeliveryOutcomeState
 from ansiblectl.domain.secrets import SecretMaterial, SecretReference
+from ansiblectl.domain.webhook_network_policy import parse_webhook_network_policies
+from ansiblectl.domain.webhook_tls_trust import WebhookTlsTrustPolicy
 from ansiblectl.domain.webhooks import (
     WebhookDestination,
     WebhookEndpoint,
     WebhookRequest,
     parse_webhook_endpoints,
 )
+from ansiblectl.infrastructure import webhook_delivery as delivery_module
 from ansiblectl.infrastructure.secret_router import SecretProviderRouter
+from ansiblectl.infrastructure.webhook_client_identity import WebhookClientIdentity
 from ansiblectl.infrastructure.webhook_delivery import (
     AUTHENTICATION_UNAVAILABLE,
     CLIENT_IDENTITY_UNAVAILABLE,
@@ -261,6 +265,83 @@ def test_adapter_signs_timestamp_and_exact_body_with_fixed_v2_vector() -> None:
     assert request.headers["X-Ansiblectl-Signature"] == (
         "v2=f0d22c4f3df989ad73de48c92f2f4eb8c15c3b79d4726d6ba7bb914cf2189c9c"
     )
+
+
+@pytest.mark.parametrize("signature_version", [1, 2])
+def test_client_identity_composes_with_all_independent_controls(
+    signature_version: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    policies = parse_webhook_network_policies(
+        {
+            "schema_version": 1,
+            "policies": {"receiver": {"allowed_cidrs": ["10.20.0.0/16"]}},
+        },
+        "policy",
+    )
+    trust = WebhookTlsTrustPolicy("private-ca", b"sentinel-server-ca")
+    configured = parse_webhook_endpoints(
+        {
+            "schema_version": 6,
+            "endpoints": {
+                "audit": {
+                    "url": "https://hooks.example.test/events",
+                    "allowed_hostnames": ["hooks.example.test"],
+                    "bearer_secret": "env:WEBHOOK_TOKEN",
+                    "signature_secret": "file:WEBHOOK_SIGNING_KEY",
+                    "signature_version": signature_version,
+                    "network_policy": "receiver",
+                    "tls_trust_policy": "private-ca",
+                    "client_certificate_secret": "file:WEBHOOK_CLIENT_CERTIFICATE",
+                    "client_private_key_secret": "file:WEBHOOK_CLIENT_PRIVATE_KEY",
+                }
+            },
+        },
+        "workspace",
+        policies,
+        {"private-ca": trust},
+    )["audit"]
+    identity = WebhookClientIdentity(b"canonical-certificate", b"canonical-private-key")
+
+    def validate(certificate: SecretMaterial, private_key: SecretMaterial) -> WebhookClientIdentity:
+        assert certificate.reveal_for_operation() == "certificate-material"
+        assert private_key.reveal_for_operation() == "private-key-material"
+        return identity
+
+    monkeypatch.setattr(delivery_module, "validate_webhook_client_identity", validate)
+    secrets = MappingSecrets(
+        {
+            "WEBHOOK_TOKEN": "bearer-material",
+            "WEBHOOK_SIGNING_KEY": "0123456789abcdef0123456789abcdef",
+            "WEBHOOK_CLIENT_CERTIFICATE": "certificate-material",
+            "WEBHOOK_CLIENT_PRIVATE_KEY": "private-key-material",
+        }
+    )
+    resolver = Resolver(("10.20.1.8",))
+    transport = Transport()
+    clock = Clock([1_786_144_800])
+
+    outcome = HttpsWebhookDeliveryAdapter(configured, resolver, transport, secrets, clock).deliver(
+        envelope()
+    )
+
+    assert outcome.state is DeliveryOutcomeState.DELIVERED
+    assert [str(reference) for reference in secrets.calls] == [
+        "env:WEBHOOK_TOKEN",
+        "file:WEBHOOK_SIGNING_KEY",
+        "file:WEBHOOK_CLIENT_CERTIFICATE",
+        "file:WEBHOOK_CLIENT_PRIVATE_KEY",
+    ]
+    assert resolver.calls == 1
+    assert clock.calls == (1 if signature_version == 2 else 0)
+    sent_endpoint, destination, request = transport.calls[0]
+    assert sent_endpoint.network_policy is policies["receiver"]
+    assert sent_endpoint.tls_trust_policy is trust
+    assert destination.addresses == ("10.20.1.8",)
+    assert request.bearer_material is not None
+    assert request.bearer_material.reveal_for_operation() == "bearer-material"
+    assert request.client_identity is identity
+    assert request.headers["X-Ansiblectl-Signature"].startswith(f"v{signature_version}=")
+    assert ("X-Ansiblectl-Timestamp" in request.headers) is (signature_version == 2)
 
 
 @pytest.mark.parametrize(
