@@ -364,7 +364,7 @@ Explicit non-goals:
 - Sender timestamps, nonce persistence, replay windows, exactly-once delivery, or receiver state.
 - Background workers, inbound APIs, hosted control planes, remote commands, or a TUI.
 
-## Most recently completed milestone
+## Completed milestone
 
 ### v0.12.0 — Workspace file secret resolution
 
@@ -406,7 +406,7 @@ Explicit non-goals:
   keychains, vaults, or remote secret services.
 - Background workers, inbound APIs, hosted control planes, remote commands, or a TUI.
 
-## Active milestone
+## Most recently completed milestone
 
 ### v0.13.0 — Timestamp-bound webhook signatures
 
@@ -429,7 +429,12 @@ Exit criteria:
 - [x] The complete local quality, build, provenance, and release gates pass.
 - [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
   [release PR #61](https://github.com/SorenSj/ansiblectl/pull/61).
-- [ ] The immutable v0.13.0 tag and tagged artifact workflow pass from the release merge commit.
+- [x] The immutable v0.13.0 tag and
+  [tagged artifact workflow](https://github.com/SorenSj/ansiblectl/actions/runs/30875735676) pass
+  from merge commit `8207982`.
+
+Readiness evidence was last reviewed on 2026-08-04. Version 0.13.0 is released, and its retained
+workflow artifact is named `ansiblectl-v0.13.0`; no existing release tag was moved or recreated.
 
 Explicit non-goals:
 
