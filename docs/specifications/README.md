@@ -39,3 +39,4 @@ Architecture Handbook and applicable ADRs.
 | [TS-0031](ts-0031-timestamp-bound-webhook-signatures.md) | Timestamp-Bound Webhook Signatures | Normative |
 | [TS-0032](ts-0032-mutual-tls-webhook-client-identity.md) | Mutual TLS Webhook Client Identity | Normative |
 | [TS-0033](ts-0033-workspace-event-archive.md) | Workspace Event Archive | Normative |
+| [TS-0034](ts-0034-workspace-unix-socket-delivery.md) | Workspace Unix Socket Delivery | Normative |
