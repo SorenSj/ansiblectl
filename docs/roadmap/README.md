@@ -532,7 +532,7 @@ Exit criteria:
 
 - [x] ADR-0051 and TS-0034 define selection, custody, peer identity, framing, acknowledgement,
   lifecycle, compatibility, failure, and redaction contracts before implementation.
-- [ ] Canonical identifiers and fixed socket targets reject every alternate path representation and
+- [x] Canonical identifiers and fixed socket targets reject every alternate path representation and
   overlong platform address.
 - [ ] Private directory, socket metadata, and connected same-user peer validation fail closed under
   replacement and capability faults.

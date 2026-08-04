@@ -319,6 +319,15 @@ uv run ansiblectl --workspace ~/automation/example \
   event deliver local-audit --archive audit.primary --max-events 10
 ```
 
+For a bounded same-user local receiver, bind an owner-only stream socket at
+`.ansiblectl/events/sockets/IDENTIFIER.sock`, implement the length-prefixed canonical event and
+exact `ACK EVENT_ID` protocol, then select its logical identifier:
+
+```console
+uv run ansiblectl --workspace ~/automation/example \
+  event deliver local-process --socket audit.receiver --max-events 10
+```
+
 The command follows no redirects and performs no polling, background scheduling, automatic
 abandonment, or automatic retention. Authentication and signing accept canonical `env:NAME` or
 `file:NAME` references. Environment names may contain up to 128 uppercase ASCII letters, digits,

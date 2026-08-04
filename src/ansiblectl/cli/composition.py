@@ -28,6 +28,7 @@ from ansiblectl.domain.event_archive import WorkspaceEventArchive
 from ansiblectl.domain.event_delivery import DeliveryRetryProfile
 from ansiblectl.domain.events import EventBus
 from ansiblectl.domain.inventory import InventoryError
+from ansiblectl.domain.unix_socket_delivery import WorkspaceUnixSocket
 from ansiblectl.domain.workspace import (
     WORKSPACE_DIRECTORY,
     WORKSPACE_METADATA_FILENAME,
@@ -58,6 +59,7 @@ from ansiblectl.infrastructure.plugin_manifests import (
 from ansiblectl.infrastructure.secret_router import SecretProviderRouter
 from ansiblectl.infrastructure.system_webhook_clock import SystemWebhookClock
 from ansiblectl.infrastructure.transactional_filesystem import TransactionalFilesystem
+from ansiblectl.infrastructure.unix_socket_delivery import WorkspaceUnixSocketDeliveryAdapter
 from ansiblectl.infrastructure.webhook_configuration import load_webhook_endpoints
 from ansiblectl.infrastructure.webhook_delivery import HttpsWebhookDeliveryAdapter
 from ansiblectl.infrastructure.webhook_network_policy_configuration import (
@@ -198,6 +200,18 @@ def build_event_archive_delivery_service(
     return EventDeliveryService(
         SqliteEventOutbox(workspace_root),
         WorkspaceEventArchiveDeliveryAdapter(workspace_root, WorkspaceEventArchive(archive_id)),
+        DeliveryRetryProfile(max_attempts=3, retry_delays=(10, 30), lease_seconds=30),
+    )
+
+
+def build_unix_socket_delivery_service(
+    workspace_root: Path, socket_id: str
+) -> EventDeliveryService:
+    """Compose one private same-user Unix socket with the existing delivery runner."""
+
+    return EventDeliveryService(
+        SqliteEventOutbox(workspace_root),
+        WorkspaceUnixSocketDeliveryAdapter(workspace_root, WorkspaceUnixSocket(socket_id)),
         DeliveryRetryProfile(max_attempts=3, retry_delays=(10, 30), lease_seconds=30),
     )
 
