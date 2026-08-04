@@ -16,6 +16,8 @@ All notable changes to Ansiblectl are documented here.
 - An address-bound standard-library HTTPS transport using validated IP literals with the original
   hostname for platform TLS verification, bounded response reads, and no proxy, redirect, or retry
   behavior.
+- A foreground `event deliver` command that selects one named workspace endpoint, enforces a
+  100-event maximum, and renders the existing payload-free delivery result in text, JSON, or YAML.
 
 ## [0.6.0] - 2026-08-04
 

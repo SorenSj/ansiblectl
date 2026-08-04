@@ -5,6 +5,7 @@ from pathlib import Path
 
 from ansiblectl import __version__
 from ansiblectl.application.configuration import ConfigurationService
+from ansiblectl.application.event_delivery import EventDeliveryService
 from ansiblectl.application.event_operations import EventOperationsService
 from ansiblectl.application.execution import ExecutionService
 from ansiblectl.application.execution_history import ExecutionHistoryService
@@ -22,7 +23,8 @@ from ansiblectl.application.standard_policies import (
 from ansiblectl.application.state import StateService
 from ansiblectl.application.status import DefaultStatusService, StatusService
 from ansiblectl.application.workspace import WorkspaceService
-from ansiblectl.domain.errors import ExecutionError
+from ansiblectl.domain.errors import ConfigurationError, ExecutionError
+from ansiblectl.domain.event_delivery import DeliveryRetryProfile
 from ansiblectl.domain.events import EventBus
 from ansiblectl.domain.inventory import InventoryError
 from ansiblectl.domain.workspace import (
@@ -39,6 +41,10 @@ from ansiblectl.infrastructure.event_outbox_subscriber import (
 from ansiblectl.infrastructure.execution_history import JsonLinesExecutionHistory
 from ansiblectl.infrastructure.generated_inventory import materialize_inventory
 from ansiblectl.infrastructure.git_repository import GitRepositoryAdapter
+from ansiblectl.infrastructure.https_webhook_transport import (
+    BoundHttpsWebhookTransport,
+    SocketAddressResolver,
+)
 from ansiblectl.infrastructure.json_logging import EventLogSubscriber, JsonLinesLogSink
 from ansiblectl.infrastructure.local_execution import LocalExecutionAdapter
 from ansiblectl.infrastructure.local_workspace_store import LocalWorkspaceStore
@@ -47,6 +53,8 @@ from ansiblectl.infrastructure.plugin_manifests import (
     discover_manifests,
 )
 from ansiblectl.infrastructure.transactional_filesystem import TransactionalFilesystem
+from ansiblectl.infrastructure.webhook_configuration import load_webhook_endpoints
+from ansiblectl.infrastructure.webhook_delivery import HttpsWebhookDeliveryAdapter
 from ansiblectl.infrastructure.workspace_state import WorkspaceStateStore
 from ansiblectl.infrastructure.yaml_configuration import LocalConfigurationSourceProvider
 from ansiblectl.infrastructure.yaml_inventory import YamlInventoryProvider
@@ -140,6 +148,23 @@ def build_event_operations_service(workspace_root: Path) -> EventOperationsServi
     """Create durable-event operator use cases for one workspace."""
 
     return EventOperationsService(SqliteEventOutbox(workspace_root))
+
+
+def build_webhook_delivery_service(workspace_root: Path, endpoint_id: str) -> EventDeliveryService:
+    """Compose one exact unauthenticated webhook endpoint with the bounded runner."""
+
+    endpoints = load_webhook_endpoints(workspace_root)
+    endpoint = endpoints.get(endpoint_id)
+    if endpoint is None:
+        raise ConfigurationError("The selected webhook endpoint is not configured.")
+    adapter = HttpsWebhookDeliveryAdapter(
+        endpoint, SocketAddressResolver(), BoundHttpsWebhookTransport()
+    )
+    return EventDeliveryService(
+        SqliteEventOutbox(workspace_root),
+        adapter,
+        DeliveryRetryProfile(max_attempts=3, retry_delays=(10, 30), lease_seconds=30),
+    )
 
 
 def execution_environment(workspace_root: Path) -> dict[str, str]:

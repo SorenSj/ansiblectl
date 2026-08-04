@@ -288,6 +288,30 @@ uv run ansiblectl --workspace ~/automation/example event retention
 uv run ansiblectl --workspace ~/automation/example event retention --apply
 ```
 
+Configure an outbound HTTPS endpoint privately in `.ansiblectl/webhooks.yaml`. The URL hostname
+must also appear in its explicit allowlist:
+
+```yaml
+schema_version: 1
+endpoints:
+  audit:
+    url: https://hooks.example.test/events
+    allowed_hostnames: [hooks.example.test]
+    connect_timeout_seconds: 10
+    read_timeout_seconds: 30
+```
+
+Run one foreground delivery batch with a positive bound of at most 100 events:
+
+```console
+uv run ansiblectl --workspace ~/automation/example \
+  event deliver audit --endpoint audit --max-events 10
+```
+
+The command follows no redirects and performs no polling, background scheduling, automatic
+abandonment, or automatic retention. Authenticated endpoints remain fail-closed until an approved
+production secret-provider adapter is composed.
+
 ## Project governance
 
 The repository is the authoritative source for Ansiblectl's normative

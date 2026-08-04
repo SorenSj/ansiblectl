@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from ansiblectl.application.event_delivery import EventDeliveryService
 from ansiblectl.application.standard_policies import (
     ApplyRequiresCleanRepositoryPolicy,
     ApplyRequiresLimitPolicy,
@@ -13,10 +14,11 @@ from ansiblectl.cli.composition import (
     build_configuration_service,
     build_run_service,
     build_state_service,
+    build_webhook_delivery_service,
     build_workspace_service,
     execution_environment,
 )
-from ansiblectl.domain.errors import ExecutionError
+from ansiblectl.domain.errors import ConfigurationError, ExecutionError
 from ansiblectl.domain.workspace import Workspace
 from ansiblectl.infrastructure.event_outbox import SqliteEventOutbox
 from ansiblectl.infrastructure.event_outbox_subscriber import EventOutboxSubscriber
@@ -95,3 +97,23 @@ def test_state_service_uses_workspace_scoped_store(tmp_path: Path) -> None:
 
     assert isinstance(service.port, WorkspaceStateStore)
     assert service.inspect() == ()
+
+
+def test_webhook_delivery_composition_selects_one_exact_endpoint(tmp_path: Path) -> None:
+    private = tmp_path / ".ansiblectl"
+    private.mkdir()
+    (private / "webhooks.yaml").write_text(
+        """schema_version: 1
+endpoints:
+  primary:
+    url: https://hooks.example.test/events
+    allowed_hostnames: [hooks.example.test]
+""",
+        encoding="utf-8",
+    )
+
+    service = build_webhook_delivery_service(tmp_path, "primary")
+
+    assert isinstance(service, EventDeliveryService)
+    with pytest.raises(ConfigurationError, match="not configured"):
+        build_webhook_delivery_service(tmp_path, "missing")

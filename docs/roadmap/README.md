@@ -184,7 +184,7 @@ Exit criteria:
 - [x] Canonical bounded requests and stable response classifications preserve v0.6 retry ownership.
 - [x] Secret material remains confined to immediate request construction and never reaches public or
   durable surfaces.
-- [ ] The bounded CLI command is schema-aligned, foreground-only, and exact-targeted.
+- [x] The bounded CLI command is schema-aligned, foreground-only, and exact-targeted.
 - [ ] Existing v0.5 databases and v0.6 CLI, SDK, event, history, and runner contracts remain compatible.
 - [ ] The complete quality, build, provenance, and release gates pass.
 
