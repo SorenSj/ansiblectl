@@ -585,9 +585,9 @@ Exit criteria:
   restoration across normal, error, interrupt, and signal exits.
 - [x] Forbidden output, diagnostics, paths, targeting, revisions, digests, payloads, secrets, and
   exceptions remain absent from every public and durable surface.
-- [ ] Existing CLI, machine output, services, SDK, history, events, delivery adapters, and exit-code
+- [x] Existing CLI, machine output, services, SDK, history, events, delivery adapters, and exit-code
   compatibility remain exact.
-- [ ] The complete local quality, build, provenance, and release gates pass.
+- [x] The complete local quality, build, provenance, and release gates pass.
 - [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
 - [ ] The immutable v0.17.0 tag and tagged artifact workflow pass from the release merge commit.
 
