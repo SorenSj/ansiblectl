@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import re
 from collections.abc import Mapping
@@ -67,6 +68,13 @@ class DurableEventEnvelope:
             "operation_id": self.operation_id,
             "payload": _thaw_json(self.payload),
         }
+
+    def to_canonical_bytes(self) -> bytes:
+        """Return the exact transport-neutral canonical delivery representation."""
+
+        return json.dumps(
+            self.to_payload(), sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode("utf-8")
 
 
 @dataclass(frozen=True)
