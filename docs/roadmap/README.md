@@ -406,6 +406,37 @@ Explicit non-goals:
   keychains, vaults, or remote secret services.
 - Background workers, inbound APIs, hosted control planes, remote commands, or a TUI.
 
+## Active milestone
+
+### v0.13.0 — Timestamp-bound webhook signatures
+
+- Opt-in signature v2 authenticating canonical Unix seconds and the exact request body.
+- Endpoint schema version 5 with fixed timestamp and signature headers.
+- One injected clock read per attempt after secret validation and before network activity.
+- Receiver-verifiable freshness without sender nonce state or exactly-once claims.
+
+Exit criteria:
+
+- [x] ADR-0048 and TS-0031 define schema, clock, timestamp, canonical bytes, headers, retry,
+  compatibility, lifecycle, failure, and redaction contracts before implementation.
+- [ ] Schema v5 selects signature v2 while schemas 1 through 4 retain exact behavior.
+- [ ] Fixed vectors prove timestamp bounds, canonical encoding, domain separation, and HMAC bytes.
+- [ ] All secret and clock validation precedes DNS with no v1, alternate-clock, or unsigned fallback.
+- [ ] Retries retain event/body/idempotency identity while reading a new timestamp per attempt.
+- [ ] V2 composes with bearer authentication, env/file custody, network policy, and TLS trust.
+- [ ] Adversarial tests prove sensitive and request-local signing state never reaches public or
+  durable surfaces.
+- [ ] The complete local quality, build, provenance, and release gates pass.
+- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [ ] The immutable v0.13.0 tag and tagged artifact workflow pass from the release merge commit.
+
+Explicit non-goals:
+
+- Sender nonce persistence, receiver state, replay caches, exactly-once delivery, or clock service
+  management.
+- Configurable headers, time formats, precision, algorithms, skew, body transforms, or fallbacks.
+- Background workers, inbound APIs, hosted control planes, remote commands, or a TUI.
+
 ### Future — Additional delivery surfaces
 
 - Additional outbound transports only after each transport's trust and lifecycle contract is accepted.
