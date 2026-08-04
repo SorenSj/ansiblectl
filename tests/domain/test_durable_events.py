@@ -31,6 +31,13 @@ def test_envelope_defensively_copies_payload_and_exposes_complete_schema() -> No
         "operation_id": None,
         "payload": {"execution_id": "one", "targeting": {"tags": ["one"]}},
     }
+    assert envelope.to_canonical_bytes() == (
+        b'{"event_id":"00000000Z80000000000000000","name":"execution.completed",'
+        b'"occurred_at":"2026-08-04T00:00:00.000000Z","operation_id":null,'
+        b'"payload":{"execution_id":"one","targeting":{"tags":["one"]}},'
+        b'"schema_version":1,"sequence":1}'
+    )
+    assert not envelope.to_canonical_bytes().endswith(b"\n")
 
 
 @pytest.mark.parametrize(

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 from dataclasses import dataclass
 
 from ansiblectl.domain.durable_events import DurableEventEnvelope
@@ -46,9 +45,7 @@ class HttpsWebhookDeliveryAdapter:
     clock: WebhookClock | None = None
 
     def deliver(self, envelope: DurableEventEnvelope) -> DeliveryOutcome:
-        body = json.dumps(
-            envelope.to_payload(), sort_keys=True, separators=(",", ":"), ensure_ascii=True
-        ).encode("utf-8")
+        body = envelope.to_canonical_bytes()
         if len(body) > MAX_WEBHOOK_PAYLOAD_BYTES:
             return DeliveryOutcome.failure(PAYLOAD_TOO_LARGE)
         bearer = None
