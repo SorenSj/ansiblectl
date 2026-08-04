@@ -121,6 +121,7 @@ class DashboardTerminalSession:
         ] = {}
         self._active = False
         self._registered = False
+        self._interrupt_pending = False
         self._resize_pending = False
         self._wake_read_fd: int | None = None
         self._wake_write_fd: int | None = None
@@ -176,6 +177,8 @@ class DashboardTerminalSession:
                 if self._wake_read_fd in readable:
                     with _suppress_terminal_errors():
                         os.read(self._wake_read_fd, MAX_DASHBOARD_INPUT_BYTES)
+                    if self._interrupt_pending:
+                        return DashboardLoopResult(ExitCode.INTERRUPTED, state)
                     continue
                 action = parse_dashboard_input(os.read(self._stdin_fd, MAX_DASHBOARD_INPUT_BYTES))
                 if action is DashboardAction.QUIT:
@@ -250,7 +253,10 @@ class DashboardTerminalSession:
             ) from error
 
     def _interrupt(self, _number: int, _frame: FrameType | None) -> None:
-        raise KeyboardInterrupt
+        self._interrupt_pending = True
+        if self._wake_write_fd is not None:
+            with _suppress_terminal_errors():
+                os.write(self._wake_write_fd, b"i")
 
     def _resize(self, _number: int, _frame: FrameType | None) -> None:
         self._resize_pending = True
