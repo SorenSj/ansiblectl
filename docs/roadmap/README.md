@@ -181,7 +181,7 @@ Exit criteria:
   compatibility contracts before implementation.
 - [ ] Endpoint parsing and address-bound connection policy prevent redirect, downgrade, and SSRF
   escape paths.
-- [ ] Canonical bounded requests and stable response classifications preserve v0.6 retry ownership.
+- [x] Canonical bounded requests and stable response classifications preserve v0.6 retry ownership.
 - [ ] Secret material remains confined to immediate request construction and never reaches public or
   durable surfaces.
 - [ ] The bounded CLI command is schema-aligned, foreground-only, and exact-targeted.
