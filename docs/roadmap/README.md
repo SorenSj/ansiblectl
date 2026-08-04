@@ -298,9 +298,9 @@ Exit criteria:
   compatibility, and redaction contracts before implementation.
 - [x] Strict trust-policy and bundle loading rejects traversal, unsafe files, permissions, ownership,
   ambiguity, excess bounds, foreign blocks, duplicate certificates, and invalid CA semantics.
-- [ ] Endpoint schema version 3 binds at most one immutable trust snapshot while versions 1 and 2
+- [x] Endpoint schema version 3 binds at most one immutable trust snapshot while versions 1 and 2
   retain platform trust and reject the new field.
-- [ ] Exclusive contexts load no platform roots and retain `CERT_REQUIRED`, hostname checking,
+- [x] Exclusive contexts load no platform roots and retain `CERT_REQUIRED`, hostname checking,
   original-hostname SNI, and validated-address binding.
 - [ ] Failures never fall back and expose no policy, path, certificate, or TLS detail.
 - [ ] Existing v0.5 databases and v0.6-v0.9 CLI, SDK, event, history, secret, endpoint,

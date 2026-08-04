@@ -59,6 +59,9 @@ from ansiblectl.infrastructure.webhook_delivery import HttpsWebhookDeliveryAdapt
 from ansiblectl.infrastructure.webhook_network_policy_configuration import (
     load_webhook_network_policies,
 )
+from ansiblectl.infrastructure.webhook_tls_trust_configuration import (
+    load_webhook_tls_trust_policies,
+)
 from ansiblectl.infrastructure.workspace_state import WorkspaceStateStore
 from ansiblectl.infrastructure.yaml_configuration import LocalConfigurationSourceProvider
 from ansiblectl.infrastructure.yaml_inventory import YamlInventoryProvider
@@ -158,7 +161,8 @@ def build_webhook_delivery_service(workspace_root: Path, endpoint_id: str) -> Ev
     """Compose one exact webhook endpoint with bounded environment-secret access."""
 
     policies = load_webhook_network_policies(workspace_root)
-    endpoints = load_webhook_endpoints(workspace_root, policies)
+    tls_trust_policies = load_webhook_tls_trust_policies(workspace_root)
+    endpoints = load_webhook_endpoints(workspace_root, policies, tls_trust_policies)
     endpoint = endpoints.get(endpoint_id)
     if endpoint is None:
         raise ConfigurationError("The selected webhook endpoint is not configured.")

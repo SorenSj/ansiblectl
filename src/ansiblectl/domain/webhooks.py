@@ -13,8 +13,9 @@ from urllib.parse import urlsplit
 from ansiblectl.domain.errors import ConfigurationError
 from ansiblectl.domain.secrets import SecretMaterial, SecretReference
 from ansiblectl.domain.webhook_network_policy import WebhookNetworkPolicy
+from ansiblectl.domain.webhook_tls_trust import WebhookTlsTrustPolicy
 
-WEBHOOK_CONFIGURATION_SCHEMA_VERSION = 2
+WEBHOOK_CONFIGURATION_SCHEMA_VERSION = 3
 MAX_WEBHOOK_TIMEOUT_SECONDS = 60
 MAX_WEBHOOK_PAYLOAD_BYTES = 262_144
 MAX_WEBHOOK_BATCH_EVENTS = 100
@@ -28,6 +29,7 @@ _ENDPOINT_FIELDS = {
     "url",
 }
 _ENDPOINT_FIELDS_V2 = _ENDPOINT_FIELDS | {"network_policy"}
+_ENDPOINT_FIELDS_V3 = _ENDPOINT_FIELDS_V2 | {"tls_trust_policy"}
 
 
 @dataclass(frozen=True, repr=False)
@@ -43,10 +45,14 @@ class WebhookEndpoint:
     connect_timeout_seconds: int
     read_timeout_seconds: int
     network_policy: WebhookNetworkPolicy | None = None
+    tls_trust_policy: WebhookTlsTrustPolicy | None = None
     schema_version: int = WEBHOOK_CONFIGURATION_SCHEMA_VERSION
 
     def __repr__(self) -> str:
-        return "WebhookEndpoint(endpoint_id=<redacted>, url=<redacted>, network_policy=<redacted>)"
+        return (
+            "WebhookEndpoint(endpoint_id=<redacted>, url=<redacted>, "
+            "network_policy=<redacted>, tls_trust_policy=<redacted>)"
+        )
 
 
 @dataclass(frozen=True)
@@ -97,6 +103,7 @@ def parse_webhook_endpoints(
     values: Mapping[str, object],
     origin: str,
     policies: Mapping[str, WebhookNetworkPolicy] | None = None,
+    tls_trust_policies: Mapping[str, WebhookTlsTrustPolicy] | None = None,
 ) -> Mapping[str, WebhookEndpoint]:
     """Parse one versioned endpoint document into immutable typed endpoints."""
 
@@ -104,9 +111,9 @@ def parse_webhook_endpoints(
     if unknown:
         raise ConfigurationError(f"Unknown webhook field '{sorted(unknown)[0]}' in {origin}.")
     schema_version = values.get("schema_version")
-    if schema_version not in {1, WEBHOOK_CONFIGURATION_SCHEMA_VERSION}:
+    if schema_version not in {1, 2, WEBHOOK_CONFIGURATION_SCHEMA_VERSION}:
         raise ConfigurationError(
-            f"Webhook schema_version in {origin} must be 1 or "
+            f"Webhook schema_version in {origin} must be 1, 2, or "
             f"{WEBHOOK_CONFIGURATION_SCHEMA_VERSION}."
         )
     assert isinstance(schema_version, int)
@@ -122,7 +129,12 @@ def parse_webhook_endpoints(
                 f"Webhook endpoint '{endpoint_id}' in {origin} must be a mapping."
             )
         parsed[endpoint_id] = _parse_endpoint(
-            endpoint_id, definition, origin, schema_version, policies or {}
+            endpoint_id,
+            definition,
+            origin,
+            schema_version,
+            policies or {},
+            tls_trust_policies or {},
         )
     return MappingProxyType(parsed)
 
@@ -158,8 +170,14 @@ def _parse_endpoint(
     origin: str,
     schema_version: int,
     policies: Mapping[str, WebhookNetworkPolicy],
+    tls_trust_policies: Mapping[str, WebhookTlsTrustPolicy],
 ) -> WebhookEndpoint:
-    allowed_fields = _ENDPOINT_FIELDS if schema_version == 1 else _ENDPOINT_FIELDS_V2
+    if schema_version == 1:
+        allowed_fields = _ENDPOINT_FIELDS
+    elif schema_version == 2:
+        allowed_fields = _ENDPOINT_FIELDS_V2
+    else:
+        allowed_fields = _ENDPOINT_FIELDS_V3
     unknown = set(values) - allowed_fields
     if unknown:
         raise ConfigurationError(
@@ -189,6 +207,9 @@ def _parse_endpoint(
         values.get("read_timeout_seconds", 30), endpoint_id, "read_timeout_seconds"
     )
     network_policy = _resolve_network_policy(values.get("network_policy"), policies, origin)
+    tls_trust_policy = _resolve_tls_trust_policy(
+        values.get("tls_trust_policy"), tls_trust_policies, origin
+    )
     return WebhookEndpoint(
         endpoint_id=endpoint_id,
         url=url,
@@ -199,6 +220,7 @@ def _parse_endpoint(
         connect_timeout_seconds=connect_timeout,
         read_timeout_seconds=read_timeout,
         network_policy=network_policy,
+        tls_trust_policy=tls_trust_policy,
         schema_version=schema_version,
     )
 
@@ -212,6 +234,20 @@ def _resolve_network_policy(
         return None
     if not isinstance(value, str) or value not in policies:
         raise ConfigurationError(f"Webhook network policy reference in {origin} is not configured.")
+    return policies[value]
+
+
+def _resolve_tls_trust_policy(
+    value: object,
+    policies: Mapping[str, WebhookTlsTrustPolicy],
+    origin: str,
+) -> WebhookTlsTrustPolicy | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or value not in policies:
+        raise ConfigurationError(
+            f"Webhook TLS trust policy reference in {origin} is not configured."
+        )
     return policies[value]
 
 

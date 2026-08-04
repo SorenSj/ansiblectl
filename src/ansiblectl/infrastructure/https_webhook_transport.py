@@ -61,8 +61,8 @@ class _BoundHttpsConnection(http.client.HTTPSConnection):
         *,
         connect_timeout: int,
         read_timeout: int,
+        context: ssl.SSLContext,
     ) -> None:
-        context = ssl.create_default_context()
         super().__init__(
             destination.hostname,
             destination.port,
@@ -94,14 +94,27 @@ class _BoundHttpsConnection(http.client.HTTPSConnection):
 def _make_connection(
     endpoint: WebhookEndpoint, destination: WebhookDestination
 ) -> WebhookHttpsConnection:
+    context = _make_tls_context(endpoint)
     return cast(
         WebhookHttpsConnection,
         _BoundHttpsConnection(
             destination,
             connect_timeout=endpoint.connect_timeout_seconds,
             read_timeout=endpoint.read_timeout_seconds,
+            context=context,
         ),
     )
+
+
+def _make_tls_context(endpoint: WebhookEndpoint) -> ssl.SSLContext:
+    policy = endpoint.tls_trust_policy
+    if policy is None:
+        return ssl.create_default_context()
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.verify_mode = ssl.CERT_REQUIRED
+    context.check_hostname = True
+    context.load_verify_locations(cadata=policy.ca_pem.decode("ascii"))
+    return context
 
 
 @dataclass(frozen=True)
