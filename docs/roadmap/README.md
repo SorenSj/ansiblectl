@@ -65,7 +65,7 @@ Explicit non-goals:
 - Remote API, hosted control plane, or terminal UI.
 - Moving or recreating an existing release tag.
 
-## Most recently completed milestone
+## Completed milestone
 
 ### v0.4.0 — Plugin trust and unattended policy
 
@@ -100,7 +100,7 @@ Explicit non-goals:
 - Online key discovery, trust on first use, automatic revocation, or transparency-log availability.
 - Hosted policy management, remote API, or plugin execution sandboxing.
 
-## Active milestone
+## Most recently completed milestone
 
 ### v0.5.0 — Durable event outbox
 
@@ -119,6 +119,14 @@ Exit criteria:
 - [x] Retry, abandon, inspection, and retention are deterministic and redaction-safe.
 - [x] Existing in-process subscribers and execution-history retention remain compatible.
 - [x] The complete quality, build, provenance, and release gates pass.
+- [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
+  [PR #18](https://github.com/SorenSj/ansiblectl/pull/18).
+- [x] The immutable v0.5.0 tag and
+  [tagged artifact workflow](https://github.com/SorenSj/ansiblectl/actions/runs/30865734374) pass
+  from merge commit `37d49d4`.
+
+Readiness evidence was last reviewed on 2026-08-04. Version 0.5.0 is released, and its retained
+workflow artifact is named `ansiblectl-v0.5.0`; no existing release tag was moved or recreated.
 
 Explicit non-goals:
 
