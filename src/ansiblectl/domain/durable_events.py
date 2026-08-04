@@ -7,6 +7,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Protocol
 
 from ansiblectl.domain.events import PUBLIC_EVENTS
 
@@ -121,6 +122,41 @@ class DurableEventRetentionResult:
     applied: bool
 
 
+@dataclass(frozen=True)
+class DurableConsumerRegistrationResult:
+    """Safe result from idempotently registering one consumer."""
+
+    consumer_id: str
+    start_sequence: int
+    applied: bool
+
+
+@dataclass(frozen=True)
+class DurableEventRetryResult:
+    """Safe result from retrying one exact blocked event."""
+
+    consumer_id: str
+    sequence: int
+    event_id: str
+    applied: bool = True
+
+
+class DurableEventOperationsPort(Protocol):
+    """Persistence boundary for payload-free durable-event operations."""
+
+    def register_consumer(self, consumer_id: str, *, start_sequence: int = 1) -> bool: ...
+
+    def inspect_consumers(self) -> tuple[DurableConsumerStatus, ...]: ...
+
+    def retry(self, consumer_id: str, *, sequence: int, event_id: str) -> None: ...
+
+    def abandon(
+        self, consumer_id: str, *, sequence: int, event_id: str, apply: bool = False
+    ) -> DurableEventActionResult: ...
+
+    def retain(self, *, apply: bool = False) -> DurableEventRetentionResult: ...
+
+
 def validate_consumer_id(consumer_id: object) -> str:
     """Return a canonical public consumer identifier or reject it."""
 
@@ -154,10 +190,13 @@ def _thaw_json(value: object) -> object:
 
 
 __all__ = [
+    "DurableConsumerRegistrationResult",
     "DurableConsumerStatus",
     "DurableEventActionResult",
     "DurableEventClaim",
     "DurableEventEnvelope",
     "DurableEventRetentionResult",
+    "DurableEventRetryResult",
+    "DurableEventOperationsPort",
     "validate_consumer_id",
 ]

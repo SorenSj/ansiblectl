@@ -10,6 +10,8 @@ All notable changes to Ansiblectl are documented here.
   contracts without introducing a remote transport or background service.
 - A transport-neutral one-step and bounded-batch delivery service with typed outcomes,
   deterministic retry profiles, exception redaction, and stale-worker fencing.
+- Payload-free durable-event operator commands for idempotent consumer registration and
+  inspection, exact retry and abandon targets, and preview-first shared-prefix retention.
 
 ## [0.5.0] - 2026-08-04
 

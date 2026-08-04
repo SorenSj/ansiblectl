@@ -5,6 +5,7 @@ from pathlib import Path
 
 from ansiblectl import __version__
 from ansiblectl.application.configuration import ConfigurationService
+from ansiblectl.application.event_operations import EventOperationsService
 from ansiblectl.application.execution import ExecutionService
 from ansiblectl.application.execution_history import ExecutionHistoryService
 from ansiblectl.application.filesystem import FilesystemRecoveryService
@@ -133,6 +134,12 @@ def build_execution_history_service(workspace_root: Path) -> ExecutionHistorySer
     """Create read-only inspection of safe workspace execution records."""
 
     return ExecutionHistoryService(JsonLinesExecutionHistory(workspace_root))
+
+
+def build_event_operations_service(workspace_root: Path) -> EventOperationsService:
+    """Create durable-event operator use cases for one workspace."""
+
+    return EventOperationsService(SqliteEventOutbox(workspace_root))
 
 
 def execution_environment(workspace_root: Path) -> dict[str, str]:
