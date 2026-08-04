@@ -14,6 +14,8 @@ All notable changes to Ansiblectl are documented here.
   rejection backed by the workspace SQLite outbox.
 - Subprocess crash-window and multiprocess verification plus fail-closed SQLite integrity and
   symlink boundary checks for durable event state.
+- Deterministic bounded delivery retries, exact operator retry and abandon actions, payload-free
+  consumer inspection, and preview-first shared-prefix retention.
 
 ## [0.4.0] - 2026-08-04
 

@@ -89,6 +89,38 @@ class DurableEventClaim:
             raise ValueError("Durable event claim must contain an event envelope.")
 
 
+@dataclass(frozen=True)
+class DurableConsumerStatus:
+    """Payload-free consumer delivery state safe for operator inspection."""
+
+    consumer_id: str
+    event_count: int
+    pending_count: int
+    lowest_pending_sequence: int | None
+    attempt_count: int
+    next_attempt_at: str | None
+    state: str
+
+
+@dataclass(frozen=True)
+class DurableEventActionResult:
+    """Safe preview or applied result for one exact operator action."""
+
+    consumer_id: str
+    sequence: int
+    event_id: str
+    applied: bool
+
+
+@dataclass(frozen=True)
+class DurableEventRetentionResult:
+    """Safe summary of a shared acknowledged-prefix retention plan."""
+
+    through_sequence: int | None
+    event_count: int
+    applied: bool
+
+
 def validate_consumer_id(consumer_id: object) -> str:
     """Return a canonical public consumer identifier or reject it."""
 
@@ -121,4 +153,11 @@ def _thaw_json(value: object) -> object:
     return value
 
 
-__all__ = ["DurableEventClaim", "DurableEventEnvelope", "validate_consumer_id"]
+__all__ = [
+    "DurableConsumerStatus",
+    "DurableEventActionResult",
+    "DurableEventClaim",
+    "DurableEventEnvelope",
+    "DurableEventRetentionResult",
+    "validate_consumer_id",
+]

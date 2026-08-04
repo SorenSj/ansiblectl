@@ -27,10 +27,14 @@ This specification defines the initial public and internal contract for this cap
 
 The event service publishes a typed event to registered SDK subscribers and records safe delivery diagnostics.
 
-The initial public event names are `execution.completed` and
-`workspace.initialized`. Payloads are redacted before subscribers receive them;
-subscriber exceptions are recorded by event name and exception class without
-changing the completed use-case result.
+The public event names are `execution.completed`, `workspace.initialized`, and
+`event.delivery.abandoned`. Payloads are redacted before subscribers receive them; subscriber
+exceptions are recorded by event name and exception class without changing the completed use-case
+result.
+
+The `event.delivery.abandoned` payload contains only the canonical consumer identifier, event
+identifier, and sequence that an operator explicitly abandoned. It never includes the delivery
+failure, adapter output, credentials, or workspace paths.
 
 The `execution.completed` payload contains the execution identifier, status,
 exit code, elapsed time, optional stdout and stderr references, and an optional
