@@ -24,6 +24,7 @@ from ansiblectl.application.state import StateService
 from ansiblectl.application.status import DefaultStatusService, StatusService
 from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.domain.errors import ConfigurationError, ExecutionError
+from ansiblectl.domain.event_archive import WorkspaceEventArchive
 from ansiblectl.domain.event_delivery import DeliveryRetryProfile
 from ansiblectl.domain.events import EventBus
 from ansiblectl.domain.inventory import InventoryError
@@ -34,6 +35,7 @@ from ansiblectl.domain.workspace import (
     Workspace,
 )
 from ansiblectl.infrastructure.environment_secrets import EnvironmentSecretProvider
+from ansiblectl.infrastructure.event_archive_delivery import WorkspaceEventArchiveDeliveryAdapter
 from ansiblectl.infrastructure.event_outbox import SqliteEventOutbox
 from ansiblectl.infrastructure.event_outbox_subscriber import (
     EventOutboxSubscriber,
@@ -184,6 +186,18 @@ def build_webhook_delivery_service(workspace_root: Path, endpoint_id: str) -> Ev
     return EventDeliveryService(
         SqliteEventOutbox(workspace_root),
         adapter,
+        DeliveryRetryProfile(max_attempts=3, retry_delays=(10, 30), lease_seconds=30),
+    )
+
+
+def build_event_archive_delivery_service(
+    workspace_root: Path, archive_id: str
+) -> EventDeliveryService:
+    """Compose one canonical workspace event archive with the existing delivery runner."""
+
+    return EventDeliveryService(
+        SqliteEventOutbox(workspace_root),
+        WorkspaceEventArchiveDeliveryAdapter(workspace_root, WorkspaceEventArchive(archive_id)),
         DeliveryRetryProfile(max_attempts=3, retry_delays=(10, 30), lease_seconds=30),
     )
 

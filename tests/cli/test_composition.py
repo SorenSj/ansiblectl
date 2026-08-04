@@ -12,6 +12,7 @@ from ansiblectl.application.standard_policies import (
 )
 from ansiblectl.cli.composition import (
     build_configuration_service,
+    build_event_archive_delivery_service,
     build_run_service,
     build_state_service,
     build_webhook_delivery_service,
@@ -20,6 +21,7 @@ from ansiblectl.cli.composition import (
 )
 from ansiblectl.domain.errors import ConfigurationError, ExecutionError
 from ansiblectl.domain.workspace import Workspace
+from ansiblectl.infrastructure.event_archive_delivery import WorkspaceEventArchiveDeliveryAdapter
 from ansiblectl.infrastructure.event_outbox import SqliteEventOutbox
 from ansiblectl.infrastructure.event_outbox_subscriber import EventOutboxSubscriber
 from ansiblectl.infrastructure.json_logging import EventLogSubscriber, JsonLinesLogSink
@@ -124,6 +126,17 @@ endpoints:
     assert isinstance(service.adapter.secrets.providers["file"], WorkspaceFileSecretProvider)
     with pytest.raises(ConfigurationError, match="not configured"):
         build_webhook_delivery_service(tmp_path, "missing")
+
+
+def test_event_archive_composition_selects_only_one_logical_archive(tmp_path: Path) -> None:
+    service = build_event_archive_delivery_service(tmp_path, "audit.primary")
+
+    assert isinstance(service, EventDeliveryService)
+    assert isinstance(service.adapter, WorkspaceEventArchiveDeliveryAdapter)
+    assert service.adapter.archive.archive_id == "audit.primary"
+    assert service.adapter.workspace_root == tmp_path
+    with pytest.raises(ValueError, match="not canonical"):
+        build_event_archive_delivery_service(tmp_path, "../private/archive")
 
 
 def test_webhook_delivery_composition_binds_private_policy_once(tmp_path: Path) -> None:
