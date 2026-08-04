@@ -177,6 +177,19 @@ uv run ansiblectl --workspace ~/automation/example execution summary
 The versioned result counts records by classified status, check/apply mode, and
 stable operation identifier.
 
+Open the local read-only dashboard from an interactive foreground terminal with
+one explicit workspace:
+
+```console
+uv run ansiblectl --workspace ~/automation/example dashboard
+```
+
+The dashboard shows only bounded safe execution metadata and payload-free
+consumer status. Use Tab or left/right arrows to select a panel, `j`/`k` or
+up/down arrows to move, `r` to refresh one complete snapshot, and `q` or Escape
+to quit. It does not run playbooks, perform delivery actions, display captured
+output or event payloads, discover other workspaces, or refresh automatically.
+
 Ansiblectl isolates Ansible's controller-side temporary files below the
 workspace's owner-only `.ansiblectl/tmp` directory instead of relying on
 `~/.ansible/tmp`. Captured process output remains below `.ansiblectl/runs`;
