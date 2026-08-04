@@ -118,7 +118,7 @@ Exit criteria:
 - [x] Restart, crash-window, multiprocess, corruption, and symlink tests pass.
 - [x] Retry, abandon, inspection, and retention are deterministic and redaction-safe.
 - [x] Existing in-process subscribers and execution-history retention remain compatible.
-- [ ] The complete quality, build, provenance, and release gates pass.
+- [x] The complete quality, build, provenance, and release gates pass.
 
 Explicit non-goals:
 
