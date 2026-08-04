@@ -316,6 +316,32 @@ the named non-empty value is resolved for the immediate request and is never pla
 configuration, command output, logs, events, retry state, or durable state. Missing or malformed
 material fails before DNS or network activity.
 
+Private receivers require endpoint schema version 2 and a separately named policy in
+`.ansiblectl/webhook-network-policies.yaml`:
+
+```yaml
+schema_version: 1
+policies:
+  automation-receivers:
+    allowed_cidrs: [10.20.0.0/16, fd12:3456::/48]
+```
+
+The endpoint references the policy by name; CIDRs are never accepted on the command line:
+
+```yaml
+schema_version: 2
+endpoints:
+  audit:
+    url: https://hooks.internal.example/events
+    allowed_hostnames: [hooks.internal.example]
+    network_policy: automation-receivers
+```
+
+Every DNS answer must belong to the named ranges. Mixed, loopback, link-local, metadata,
+carrier-grade NAT, mapped, malformed, or out-of-policy answers fail before connection. HTTPS still
+uses the platform trust store and the original hostname; the policy grants reachability, not server
+identity trust.
+
 ## Project governance
 
 The repository is the authoritative source for Ansiblectl's normative

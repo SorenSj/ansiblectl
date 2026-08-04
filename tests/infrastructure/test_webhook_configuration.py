@@ -6,6 +6,9 @@ import pytest
 
 from ansiblectl.domain.errors import ConfigurationError
 from ansiblectl.infrastructure.webhook_configuration import load_webhook_endpoints
+from ansiblectl.infrastructure.webhook_network_policy_configuration import (
+    load_webhook_network_policies,
+)
 
 
 def test_missing_configuration_has_no_implicit_endpoints(tmp_path: Path) -> None:
@@ -47,3 +50,31 @@ def test_loader_rejects_symlink_escape_and_non_mapping_yaml(tmp_path: Path) -> N
     (private / "webhooks.yaml").write_text("- invalid\n", encoding="utf-8")
     with pytest.raises(ConfigurationError, match="YAML mapping"):
         load_webhook_endpoints(tmp_path)
+
+
+def test_loader_binds_schema_two_endpoint_to_workspace_policy(tmp_path: Path) -> None:
+    private = tmp_path / ".ansiblectl"
+    private.mkdir()
+    (private / "webhook-network-policies.yaml").write_text(
+        """schema_version: 1
+policies:
+  receiver:
+    allowed_cidrs: [10.20.0.0/16]
+""",
+        encoding="utf-8",
+    )
+    (private / "webhooks.yaml").write_text(
+        """schema_version: 2
+endpoints:
+  audit:
+    url: https://hooks.example.test/events
+    allowed_hostnames: [hooks.example.test]
+    network_policy: receiver
+""",
+        encoding="utf-8",
+    )
+
+    policies = load_webhook_network_policies(tmp_path)
+    endpoint = load_webhook_endpoints(tmp_path, policies)["audit"]
+
+    assert endpoint.network_policy is policies["receiver"]

@@ -5,10 +5,14 @@ from pathlib import Path
 import yaml
 
 from ansiblectl.domain.errors import ConfigurationError
+from ansiblectl.domain.webhook_network_policy import WebhookNetworkPolicy
 from ansiblectl.domain.webhooks import WebhookEndpoint, parse_webhook_endpoints
 
 
-def load_webhook_endpoints(workspace_root: Path) -> dict[str, WebhookEndpoint]:
+def load_webhook_endpoints(
+    workspace_root: Path,
+    policies: dict[str, WebhookNetworkPolicy] | None = None,
+) -> dict[str, WebhookEndpoint]:
     """Load the private workspace endpoint document, or return no endpoints."""
 
     root = workspace_root.resolve()
@@ -23,7 +27,7 @@ def load_webhook_endpoints(workspace_root: Path) -> dict[str, WebhookEndpoint]:
         raise ConfigurationError("Webhook configuration could not be parsed safely.") from error
     if not isinstance(values, dict):
         raise ConfigurationError("Webhook configuration must be a YAML mapping.")
-    return dict(parse_webhook_endpoints(values, str(path)))
+    return dict(parse_webhook_endpoints(values, str(path), policies))
 
 
 __all__ = ["load_webhook_endpoints"]

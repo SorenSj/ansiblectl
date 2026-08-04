@@ -258,13 +258,13 @@ Exit criteria:
   compatibility, and redaction contracts before implementation.
 - [x] Strict private-policy parsing rejects unsafe files, ambiguous networks, overlaps, excess
   bounds, unknown fields, and unsupported schemas.
-- [ ] Endpoint schema version 2 binds at most one named policy while version 1 remains global-only.
-- [ ] Every resolved address must be allowed, and the connector uses only that validated tuple.
-- [ ] Loopback, link-local, metadata, mapped, carrier-grade NAT, reserved, and mixed answers remain
+- [x] Endpoint schema version 2 binds at most one named policy while version 1 remains global-only.
+- [x] Every resolved address must be allowed, and the connector uses only that validated tuple.
+- [x] Loopback, link-local, metadata, mapped, carrier-grade NAT, reserved, and mixed answers remain
   denied without leaking destination or policy detail.
-- [ ] Existing v0.5 databases and v0.6-v0.8 CLI, SDK, event, history, secret, endpoint, runner, and
+- [x] Existing v0.5 databases and v0.6-v0.8 CLI, SDK, event, history, secret, endpoint, runner, and
   transport contracts remain compatible.
-- [ ] The complete local quality, build, provenance, and release gates pass.
+- [x] The complete local quality, build, provenance, and release gates pass.
 - [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
 - [ ] The immutable v0.9.0 tag and tagged artifact workflow pass from the reviewed merge commit.
 
