@@ -53,6 +53,7 @@ from ansiblectl.infrastructure.plugin_manifests import (
     discover_manifest_directory,
     discover_manifests,
 )
+from ansiblectl.infrastructure.secret_router import SecretProviderRouter
 from ansiblectl.infrastructure.transactional_filesystem import TransactionalFilesystem
 from ansiblectl.infrastructure.webhook_configuration import load_webhook_endpoints
 from ansiblectl.infrastructure.webhook_delivery import HttpsWebhookDeliveryAdapter
@@ -62,6 +63,7 @@ from ansiblectl.infrastructure.webhook_network_policy_configuration import (
 from ansiblectl.infrastructure.webhook_tls_trust_configuration import (
     load_webhook_tls_trust_policies,
 )
+from ansiblectl.infrastructure.workspace_file_secrets import WorkspaceFileSecretProvider
 from ansiblectl.infrastructure.workspace_state import WorkspaceStateStore
 from ansiblectl.infrastructure.yaml_configuration import LocalConfigurationSourceProvider
 from ansiblectl.infrastructure.yaml_inventory import YamlInventoryProvider
@@ -158,7 +160,7 @@ def build_event_operations_service(workspace_root: Path) -> EventOperationsServi
 
 
 def build_webhook_delivery_service(workspace_root: Path, endpoint_id: str) -> EventDeliveryService:
-    """Compose one exact webhook endpoint with bounded environment-secret access."""
+    """Compose one exact webhook endpoint with bounded secret access."""
 
     policies = load_webhook_network_policies(workspace_root)
     tls_trust_policies = load_webhook_tls_trust_policies(workspace_root)
@@ -170,7 +172,12 @@ def build_webhook_delivery_service(workspace_root: Path, endpoint_id: str) -> Ev
         endpoint,
         SocketAddressResolver(),
         BoundHttpsWebhookTransport(),
-        EnvironmentSecretProvider(os.environ),
+        SecretProviderRouter(
+            {
+                "env": EnvironmentSecretProvider(os.environ),
+                "file": WorkspaceFileSecretProvider(workspace_root),
+            }
+        ),
     )
     return EventDeliveryService(
         SqliteEventOutbox(workspace_root),

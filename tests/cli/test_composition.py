@@ -20,11 +20,12 @@ from ansiblectl.cli.composition import (
 )
 from ansiblectl.domain.errors import ConfigurationError, ExecutionError
 from ansiblectl.domain.workspace import Workspace
-from ansiblectl.infrastructure.environment_secrets import EnvironmentSecretProvider
 from ansiblectl.infrastructure.event_outbox import SqliteEventOutbox
 from ansiblectl.infrastructure.event_outbox_subscriber import EventOutboxSubscriber
 from ansiblectl.infrastructure.json_logging import EventLogSubscriber, JsonLinesLogSink
+from ansiblectl.infrastructure.secret_router import SecretProviderRouter
 from ansiblectl.infrastructure.webhook_delivery import HttpsWebhookDeliveryAdapter
+from ansiblectl.infrastructure.workspace_file_secrets import WorkspaceFileSecretProvider
 from ansiblectl.infrastructure.workspace_state import WorkspaceStateStore
 from ansiblectl.infrastructure.yaml_configuration import LocalConfigurationSourceProvider
 
@@ -118,7 +119,9 @@ endpoints:
 
     assert isinstance(service, EventDeliveryService)
     assert isinstance(service.adapter, HttpsWebhookDeliveryAdapter)
-    assert isinstance(service.adapter.secrets, EnvironmentSecretProvider)
+    assert isinstance(service.adapter.secrets, SecretProviderRouter)
+    assert set(service.adapter.secrets.providers) == {"env", "file"}
+    assert isinstance(service.adapter.secrets.providers["file"], WorkspaceFileSecretProvider)
     with pytest.raises(ConfigurationError, match="not configured"):
         build_webhook_delivery_service(tmp_path, "missing")
 
