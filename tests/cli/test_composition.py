@@ -13,10 +13,13 @@ from ansiblectl.cli.composition import (
     build_configuration_service,
     build_run_service,
     build_state_service,
+    build_workspace_service,
     execution_environment,
 )
 from ansiblectl.domain.errors import ExecutionError
 from ansiblectl.domain.workspace import Workspace
+from ansiblectl.infrastructure.event_outbox import SqliteEventOutbox
+from ansiblectl.infrastructure.event_outbox_subscriber import EventOutboxSubscriber
 from ansiblectl.infrastructure.json_logging import EventLogSubscriber, JsonLinesLogSink
 from ansiblectl.infrastructure.workspace_state import WorkspaceStateStore
 from ansiblectl.infrastructure.yaml_configuration import LocalConfigurationSourceProvider
@@ -30,12 +33,26 @@ def test_run_service_wires_execution_events_to_workspace_log(tmp_path: Path) -> 
     assert isinstance(subscriber, EventLogSubscriber)
     assert isinstance(subscriber.sink, JsonLinesLogSink)
     assert subscriber.sink.path == tmp_path / ".ansiblectl" / "logs" / "events.jsonl"
+    outbox_subscriber = service.execution.events.subscribers[1]
+    assert isinstance(outbox_subscriber, EventOutboxSubscriber)
+    assert isinstance(outbox_subscriber.outbox, SqliteEventOutbox)
     assert len(service.policy.policies) == 2
     assert isinstance(service.policy.policies[0], ApplyRequiresLimitPolicy)
     assert isinstance(service.policy.policies[1], ApplyRequiresCleanRepositoryPolicy)
     assert service.repository is not None
     assert service.configuration is not None
     assert isinstance(service.configuration.source_provider, LocalConfigurationSourceProvider)
+
+
+def test_workspace_initialization_writes_path_free_durable_event(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "workspace"
+
+    build_workspace_service().initialize(workspace_root)
+
+    events = SqliteEventOutbox(workspace_root).read_all()
+    assert len(events) == 1
+    assert events[0].name == "workspace.initialized"
+    assert events[0].payload == {}
 
 
 def test_execution_environment_uses_private_workspace_local_temp(

@@ -117,7 +117,7 @@ Exit criteria:
 - [x] Consumer claims, acknowledgements, and stale-worker rejection preserve strict ordering.
 - [x] Restart, crash-window, multiprocess, corruption, and symlink tests pass.
 - [x] Retry, abandon, inspection, and retention are deterministic and redaction-safe.
-- [ ] Existing in-process subscribers and execution-history retention remain compatible.
+- [x] Existing in-process subscribers and execution-history retention remain compatible.
 - [ ] The complete quality, build, provenance, and release gates pass.
 
 Explicit non-goals:

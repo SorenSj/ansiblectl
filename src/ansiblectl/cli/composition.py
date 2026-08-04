@@ -30,6 +30,11 @@ from ansiblectl.domain.workspace import (
     WORKSPACE_SCHEMA_VERSION,
     Workspace,
 )
+from ansiblectl.infrastructure.event_outbox import SqliteEventOutbox
+from ansiblectl.infrastructure.event_outbox_subscriber import (
+    EventOutboxSubscriber,
+    WorkspaceEventOutboxSubscriber,
+)
 from ansiblectl.infrastructure.execution_history import JsonLinesExecutionHistory
 from ansiblectl.infrastructure.generated_inventory import materialize_inventory
 from ansiblectl.infrastructure.git_repository import GitRepositoryAdapter
@@ -55,7 +60,9 @@ def build_status_service() -> StatusService:
 def build_workspace_service() -> WorkspaceService:
     """Create the local workspace use cases for a CLI invocation."""
 
-    return WorkspaceService(store=LocalWorkspaceStore())
+    return WorkspaceService(
+        store=LocalWorkspaceStore(), events=EventBus([WorkspaceEventOutboxSubscriber()])
+    )
 
 
 def build_configuration_service(workspace: Workspace) -> ConfigurationService:
@@ -97,19 +104,15 @@ def build_plugin_discovery_service() -> PluginDiscoveryService:
 def build_playbook_validation_service(workspace_root: Path) -> PlaybookValidationService:
     """Create selection validation with explicit tool provenance."""
 
-    event_log = JsonLinesLogSink(workspace_root)
-    events = EventBus([EventLogSubscriber(event_log)])
     return PlaybookValidationService(
         validator_version=__version__,
-        syntax_port=ExecutionService(LocalExecutionAdapter(), events),
+        syntax_port=ExecutionService(LocalExecutionAdapter(), _workspace_event_bus(workspace_root)),
     )
 
 
 def build_run_service(workspace_root: Path, inventory_source: Path | None = None) -> RunService:
     """Create check-mode Ansible execution from concrete local adapters."""
 
-    event_log = JsonLinesLogSink(workspace_root)
-    events = EventBus([EventLogSubscriber(event_log)])
     root = workspace_root.resolve()
     workspace = Workspace(
         root,
@@ -118,7 +121,7 @@ def build_run_service(workspace_root: Path, inventory_source: Path | None = None
     )
     return RunService(
         inventory=build_inventory_service(workspace_root, inventory_source),
-        execution=ExecutionService(LocalExecutionAdapter(), events),
+        execution=ExecutionService(LocalExecutionAdapter(), _workspace_event_bus(workspace_root)),
         policy=PolicyService([ApplyRequiresLimitPolicy(), ApplyRequiresCleanRepositoryPolicy()]),
         materialize_inventory=materialize_inventory,
         repository=build_repository_service(),
@@ -177,10 +180,19 @@ def build_inventory_validation_service(
 ) -> InventoryValidationService:
     """Create native Ansible inventory validation with private execution evidence."""
 
-    event_log = JsonLinesLogSink(workspace_root)
-    events = EventBus([EventLogSubscriber(event_log)])
     return InventoryValidationService(
         build_inventory_service(workspace_root, source),
-        ExecutionService(LocalExecutionAdapter(), events),
+        ExecutionService(LocalExecutionAdapter(), _workspace_event_bus(workspace_root)),
         materialize_inventory,
+    )
+
+
+def _workspace_event_bus(workspace_root: Path) -> EventBus:
+    """Compose independent audit-history and durable-delivery subscribers."""
+
+    return EventBus(
+        [
+            EventLogSubscriber(JsonLinesLogSink(workspace_root)),
+            EventOutboxSubscriber(SqliteEventOutbox(workspace_root)),
+        ]
     )
