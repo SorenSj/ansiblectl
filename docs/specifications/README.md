@@ -30,3 +30,4 @@ Architecture Handbook and applicable ADRs.
 | [TS-0022](ts-0022-plugin-trust-verification.md) | Plugin Trust Verification | Normative |
 | [TS-0023](ts-0023-durable-event-delivery.md) | Durable Event Delivery | Normative |
 | [TS-0024](ts-0024-local-event-delivery-operations.md) | Local Event Delivery Operations | Normative |
+| [TS-0025](ts-0025-outbound-https-webhook-delivery.md) | Outbound HTTPS Webhook Delivery | Normative |

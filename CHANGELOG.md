@@ -4,6 +4,11 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- ADR-0042 and TS-0025 defining the v0.7 outbound HTTPS webhook adapter, fail-closed
+  destination policy, secret-reference authentication, and bounded foreground CLI contract.
+
 ## [0.6.0] - 2026-08-04
 
 ### Added
