@@ -15,6 +15,7 @@ from ansiblectl.domain.events import PUBLIC_EVENTS
 _ULID_PATTERN = re.compile(r"[0-7][0-9A-HJKMNP-TV-Z]{25}")
 _UTC_TIMESTAMP_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z")
 _CONSUMER_ID_PATTERN = re.compile(r"[a-z][a-z0-9._-]{0,127}")
+MAX_DURABLE_EVENT_DELIVERY_BYTES = 262_144
 
 
 @dataclass(frozen=True)
@@ -206,5 +207,6 @@ __all__ = [
     "DurableEventRetentionResult",
     "DurableEventRetryResult",
     "DurableEventOperationsPort",
+    "MAX_DURABLE_EVENT_DELIVERY_BYTES",
     "validate_consumer_id",
 ]
