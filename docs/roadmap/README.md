@@ -113,7 +113,7 @@ Exit criteria:
 
 - [x] ADR-0040 and TS-0023 define durability, ordering, acknowledgement, retry, and retention
   before implementation.
-- [ ] A schema-versioned SQLite outbox safely appends immutable redacted envelopes.
+- [x] A schema-versioned SQLite outbox safely appends immutable redacted envelopes.
 - [ ] Consumer claims, acknowledgements, and stale-worker rejection preserve strict ordering.
 - [ ] Restart, crash-window, multiprocess, corruption, and symlink tests pass.
 - [ ] Retry, abandon, inspection, and retention are deterministic and redaction-safe.

@@ -8,6 +8,8 @@ All notable changes to Ansiblectl are documented here.
 
 - ADR-0040 and TS-0023 defining the v0.5 durable event outbox, ordered at-least-once delivery,
   deterministic retry, operator recovery, and safe retention contracts.
+- Schema-versioned SQLite event outbox with immutable redacted envelopes and atomic sequence
+  allocation.
 
 ## [0.4.0] - 2026-08-04
 
