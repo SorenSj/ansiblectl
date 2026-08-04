@@ -56,3 +56,4 @@ New decisions supersede earlier ADRs; accepted ADRs are not silently rewritten.
 | [0049](0049-mutual-tls-webhook-client-identity.md) | Mutual TLS Webhook Client Identity | Accepted |
 | [0050](0050-workspace-event-archive.md) | Workspace Event Archive | Accepted |
 | [0051](0051-workspace-unix-socket-delivery.md) | Workspace Unix Socket Delivery | Accepted |
+| [0052](0052-read-only-local-terminal-dashboard.md) | Read-Only Local Terminal Dashboard | Accepted |
