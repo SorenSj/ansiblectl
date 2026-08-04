@@ -52,3 +52,4 @@ New decisions supersede earlier ADRs; accepted ADRs are not silently rewritten.
 | [0045](0045-exclusive-webhook-ca-trust.md) | Exclusive Webhook CA Trust | Accepted |
 | [0046](0046-signed-webhook-delivery.md) | Signed Webhook Delivery | Accepted |
 | [0047](0047-workspace-file-secret-provider.md) | Workspace File Secret Provider | Accepted |
+| [0048](0048-timestamp-bound-webhook-signatures.md) | Timestamp-Bound Webhook Signatures | Accepted |

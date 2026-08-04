@@ -36,3 +36,4 @@ Architecture Handbook and applicable ADRs.
 | [TS-0028](ts-0028-exclusive-webhook-ca-trust.md) | Exclusive Webhook CA Trust | Normative |
 | [TS-0029](ts-0029-signed-webhook-delivery.md) | Signed Webhook Delivery | Normative |
 | [TS-0030](ts-0030-workspace-file-secret-provider.md) | Workspace File Secret Provider | Normative |
+| [TS-0031](ts-0031-timestamp-bound-webhook-signatures.md) | Timestamp-Bound Webhook Signatures | Normative |
