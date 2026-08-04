@@ -76,6 +76,12 @@ class WebhookDestination:
     addresses: tuple[str, ...]
 
 
+class WebhookClientIdentityMaterial(Protocol):
+    """Opaque request-local client identity consumed only by a TLS transport."""
+
+    def reveal_for_transport(self) -> tuple[bytes, bytes]: ...
+
+
 @dataclass(frozen=True, repr=False)
 class WebhookRequest:
     """One bounded request whose representation omits body and credential material."""
@@ -83,6 +89,7 @@ class WebhookRequest:
     body: bytes
     headers: Mapping[str, str]
     bearer_material: SecretMaterial | None = None
+    client_identity: WebhookClientIdentityMaterial | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "headers", MappingProxyType(dict(self.headers)))
@@ -90,7 +97,8 @@ class WebhookRequest:
     def __repr__(self) -> str:
         return (
             f"WebhookRequest(body=<redacted:{len(self.body)} bytes>, "
-            f"headers={tuple(self.headers)}, bearer_material=<redacted>)"
+            f"headers={tuple(self.headers)}, bearer_material=<redacted>, "
+            "client_identity=<redacted>)"
         )
 
 
@@ -440,6 +448,7 @@ __all__ = [
     "WEBHOOK_CONFIGURATION_SCHEMA_VERSION",
     "WebhookAddressResolver",
     "WebhookClock",
+    "WebhookClientIdentityMaterial",
     "WebhookDestination",
     "WebhookEndpoint",
     "WebhookRequest",

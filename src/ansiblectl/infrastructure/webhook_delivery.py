@@ -19,8 +19,10 @@ from ansiblectl.domain.webhooks import (
     WebhookTransport,
     resolve_webhook_destination,
 )
+from ansiblectl.infrastructure.webhook_client_identity import validate_webhook_client_identity
 
 AUTHENTICATION_UNAVAILABLE = "AUTHENTICATION_UNAVAILABLE"
+CLIENT_IDENTITY_UNAVAILABLE = "CLIENT_IDENTITY_UNAVAILABLE"
 DESTINATION_DENIED = "DESTINATION_DENIED"
 PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
 REMOTE_REJECTED = "REMOTE_REJECTED"
@@ -60,8 +62,7 @@ class HttpsWebhookDeliveryAdapter:
                     return DeliveryOutcome.failure(AUTHENTICATION_UNAVAILABLE)
             except Exception:
                 return DeliveryOutcome.failure(AUTHENTICATION_UNAVAILABLE)
-        signature = None
-        timestamp = None
+        signing_key = None
         if self.endpoint.signature_secret is not None:
             if self.secrets is None:
                 return DeliveryOutcome.failure(SIGNING_UNAVAILABLE)
@@ -75,6 +76,22 @@ class HttpsWebhookDeliveryAdapter:
                     ord(char) < 32 or 127 <= ord(char) <= 159 for char in signing_value
                 ):
                     return DeliveryOutcome.failure(SIGNING_UNAVAILABLE)
+            except Exception:
+                return DeliveryOutcome.failure(SIGNING_UNAVAILABLE)
+        client_identity = None
+        if self.endpoint.client_certificate_secret is not None:
+            if self.secrets is None or self.endpoint.client_private_key_secret is None:
+                return DeliveryOutcome.failure(CLIENT_IDENTITY_UNAVAILABLE)
+            try:
+                certificate = self.secrets.resolve(self.endpoint.client_certificate_secret)
+                private_key = self.secrets.resolve(self.endpoint.client_private_key_secret)
+                client_identity = validate_webhook_client_identity(certificate, private_key)
+            except Exception:
+                return DeliveryOutcome.failure(CLIENT_IDENTITY_UNAVAILABLE)
+        signature = None
+        timestamp = None
+        if signing_key is not None:
+            try:
                 if self.endpoint.signature_version == 2:
                     if self.clock is None:
                         return DeliveryOutcome.failure(SIGNING_UNAVAILABLE)
@@ -110,7 +127,7 @@ class HttpsWebhookDeliveryAdapter:
             headers["X-Ansiblectl-Signature"] = signature
         if timestamp is not None:
             headers["X-Ansiblectl-Timestamp"] = timestamp
-        request = WebhookRequest(body, headers, bearer)
+        request = WebhookRequest(body, headers, bearer, client_identity)
         try:
             status = self.transport.post(self.endpoint, destination, request)
         except Exception:
@@ -126,6 +143,7 @@ class HttpsWebhookDeliveryAdapter:
 
 __all__ = [
     "AUTHENTICATION_UNAVAILABLE",
+    "CLIENT_IDENTITY_UNAVAILABLE",
     "DESTINATION_DENIED",
     "HttpsWebhookDeliveryAdapter",
     "PAYLOAD_TOO_LARGE",
