@@ -342,11 +342,11 @@ Exit criteria:
 
 - [x] ADR-0046 and TS-0029 define endpoint, key, canonical bytes, algorithm, header, lifecycle,
   retry, compatibility, and redaction contracts before implementation.
-- [ ] Endpoint schema version 4 binds at most one signing-secret reference while versions 1 through
+- [x] Endpoint schema version 4 binds at most one signing-secret reference while versions 1 through
   3 retain exact behavior and reject the new field.
-- [ ] Fixed vectors prove domain separation, exact-body HMAC-SHA-256, full lowercase digest, and
+- [x] Fixed vectors prove domain separation, exact-body HMAC-SHA-256, full lowercase digest, and
   fixed header construction.
-- [ ] Signing and required secret validation complete before DNS with no unsigned or alternate-key
+- [x] Signing and required secret validation complete before DNS with no unsigned or alternate-key
   fallback.
 - [ ] Signature values, secret references, keys, HMAC state, provider details, and exception text
   remain absent from every public and durable surface.
