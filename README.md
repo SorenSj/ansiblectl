@@ -297,6 +297,7 @@ endpoints:
   audit:
     url: https://hooks.example.test/events
     allowed_hostnames: [hooks.example.test]
+    bearer_secret: env:ANSIBLECTL_WEBHOOK_TOKEN
     connect_timeout_seconds: 10
     read_timeout_seconds: 30
 ```
@@ -304,13 +305,16 @@ endpoints:
 Run one foreground delivery batch with a positive bound of at most 100 events:
 
 ```console
-uv run ansiblectl --workspace ~/automation/example \
+ANSIBLECTL_WEBHOOK_TOKEN='<injected-by-your-secret-manager>' \
+  uv run ansiblectl --workspace ~/automation/example \
   event deliver audit --endpoint audit --max-events 10
 ```
 
 The command follows no redirects and performs no polling, background scheduling, automatic
-abandonment, or automatic retention. Authenticated endpoints remain fail-closed until an approved
-production secret-provider adapter is composed.
+abandonment, or automatic retention. Authentication accepts only canonical `env:NAME` references;
+the named non-empty value is resolved for the immediate request and is never placed in workspace
+configuration, command output, logs, events, retry state, or durable state. Missing or malformed
+material fails before DNS or network activity.
 
 ## Project governance
 

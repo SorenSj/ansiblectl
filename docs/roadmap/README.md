@@ -218,15 +218,15 @@ Exit criteria:
 
 - [x] ADR-0043 and TS-0026 define provider identity, key syntax, lookup, lifecycle, composition,
   failure, and redaction contracts before implementation.
-- [ ] Canonical key validation and exact injected-mapping lookup are implemented.
-- [ ] Missing, empty, malformed, and invalid material fails with one stable redacted error.
-- [ ] Authenticated webhook delivery composes the provider while unauthenticated delivery remains
+- [x] Canonical key validation and exact injected-mapping lookup are implemented.
+- [x] Missing, empty, malformed, and invalid material fails with one stable redacted error.
+- [x] Authenticated webhook delivery composes the provider while unauthenticated delivery remains
   independent of environment contents.
-- [ ] Adversarial tests prove keys and values never reach output, logs, exceptions, events, retry
+- [x] Adversarial tests prove keys and values never reach output, logs, exceptions, events, retry
   state, history, configuration results, or durable state.
-- [ ] Existing v0.5 databases and v0.6/v0.7 CLI, SDK, event, history, endpoint, and runner contracts
+- [x] Existing v0.5 databases and v0.6/v0.7 CLI, SDK, event, history, endpoint, and runner contracts
   remain compatible.
-- [ ] The complete quality, build, provenance, and release gates pass.
+- [x] The complete local quality, build, provenance, and release gates pass.
 - [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
 - [ ] The immutable v0.8.0 tag and tagged artifact workflow pass from the reviewed merge commit.
 

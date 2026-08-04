@@ -40,10 +40,6 @@ class HttpsWebhookDeliveryAdapter:
         ).encode("utf-8")
         if len(body) > MAX_WEBHOOK_PAYLOAD_BYTES:
             return DeliveryOutcome.failure(PAYLOAD_TOO_LARGE)
-        try:
-            destination = resolve_webhook_destination(self.endpoint, self.resolver)
-        except Exception:
-            return DeliveryOutcome.failure(DESTINATION_DENIED)
         bearer = None
         if self.endpoint.bearer_secret is not None:
             if self.secrets is None:
@@ -55,6 +51,10 @@ class HttpsWebhookDeliveryAdapter:
                     return DeliveryOutcome.failure(AUTHENTICATION_UNAVAILABLE)
             except Exception:
                 return DeliveryOutcome.failure(AUTHENTICATION_UNAVAILABLE)
+        try:
+            destination = resolve_webhook_destination(self.endpoint, self.resolver)
+        except Exception:
+            return DeliveryOutcome.failure(DESTINATION_DENIED)
         request = WebhookRequest(
             body,
             {

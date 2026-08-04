@@ -33,6 +33,7 @@ from ansiblectl.domain.workspace import (
     WORKSPACE_SCHEMA_VERSION,
     Workspace,
 )
+from ansiblectl.infrastructure.environment_secrets import EnvironmentSecretProvider
 from ansiblectl.infrastructure.event_outbox import SqliteEventOutbox
 from ansiblectl.infrastructure.event_outbox_subscriber import (
     EventOutboxSubscriber,
@@ -151,14 +152,17 @@ def build_event_operations_service(workspace_root: Path) -> EventOperationsServi
 
 
 def build_webhook_delivery_service(workspace_root: Path, endpoint_id: str) -> EventDeliveryService:
-    """Compose one exact unauthenticated webhook endpoint with the bounded runner."""
+    """Compose one exact webhook endpoint with bounded environment-secret access."""
 
     endpoints = load_webhook_endpoints(workspace_root)
     endpoint = endpoints.get(endpoint_id)
     if endpoint is None:
         raise ConfigurationError("The selected webhook endpoint is not configured.")
     adapter = HttpsWebhookDeliveryAdapter(
-        endpoint, SocketAddressResolver(), BoundHttpsWebhookTransport()
+        endpoint,
+        SocketAddressResolver(),
+        BoundHttpsWebhookTransport(),
+        EnvironmentSecretProvider(os.environ),
     )
     return EventDeliveryService(
         SqliteEventOutbox(workspace_root),

@@ -27,8 +27,10 @@ from ansiblectl.infrastructure.webhook_delivery import (
 class Resolver:
     def __init__(self, addresses: tuple[str, ...] = ("8.8.8.8",)) -> None:
         self.addresses = addresses
+        self.calls = 0
 
     def resolve(self, hostname: str, port: int) -> tuple[str, ...]:
+        self.calls += 1
         return self.addresses
 
 
@@ -172,16 +174,18 @@ def test_adapter_resolves_bearer_material_immediately_without_repr_leakage() -> 
 @pytest.mark.parametrize("value", ["", "unsafe\rvalue", "unsafe\nvalue"])
 def test_adapter_rejects_unavailable_or_malformed_authentication_before_io(value: str) -> None:
     transport = Transport()
+    resolver = Resolver()
     outcome = HttpsWebhookDeliveryAdapter(
-        endpoint(authenticated=True), Resolver(), transport, Secrets(value)
+        endpoint(authenticated=True), resolver, transport, Secrets(value)
     ).deliver(envelope())
     missing = HttpsWebhookDeliveryAdapter(
-        endpoint(authenticated=True), Resolver(), transport
+        endpoint(authenticated=True), resolver, transport
     ).deliver(envelope())
 
     assert outcome.failure_reason == AUTHENTICATION_UNAVAILABLE
     assert missing.failure_reason == AUTHENTICATION_UNAVAILABLE
     assert transport.calls == []
+    assert resolver.calls == 0
 
 
 def test_adapter_rejects_oversized_payload_before_resolution_or_transport() -> None:
