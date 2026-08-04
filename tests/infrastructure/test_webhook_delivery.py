@@ -1,6 +1,7 @@
 """Canonical bounded HTTPS webhook adapter tests."""
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pytest
 
@@ -13,6 +14,7 @@ from ansiblectl.domain.webhooks import (
     WebhookRequest,
     parse_webhook_endpoints,
 )
+from ansiblectl.infrastructure.secret_router import SecretProviderRouter
 from ansiblectl.infrastructure.webhook_delivery import (
     AUTHENTICATION_UNAVAILABLE,
     DESTINATION_DENIED,
@@ -23,6 +25,7 @@ from ansiblectl.infrastructure.webhook_delivery import (
     TRANSPORT_FAILURE,
     HttpsWebhookDeliveryAdapter,
 )
+from ansiblectl.infrastructure.workspace_file_secrets import WorkspaceFileSecretProvider
 
 
 class Resolver:
@@ -240,6 +243,53 @@ def test_bearer_and_signing_secrets_are_resolved_once_before_dns() -> None:
     assert "bearer-credential" not in representation
     assert "0123456789abcdef" not in representation
     assert request.headers["X-Ansiblectl-Signature"] not in representation
+
+
+def test_private_file_bearer_and_signing_material_resolve_before_dns(tmp_path: Path) -> None:
+    private = tmp_path / ".ansiblectl"
+    private.mkdir(mode=0o700)
+    private.chmod(0o700)
+    secrets_directory = private / "secrets"
+    secrets_directory.mkdir(mode=0o700)
+    secrets_directory.chmod(0o700)
+    for name, value in {
+        "WEBHOOK_TOKEN": "bearer-credential",
+        "WEBHOOK_SIGNING_KEY": "0123456789abcdef0123456789abcdef",
+    }.items():
+        candidate = secrets_directory / name
+        candidate.write_text(value, encoding="utf-8")
+        candidate.chmod(0o600)
+    configured = parse_webhook_endpoints(
+        {
+            "schema_version": 4,
+            "endpoints": {
+                "audit": {
+                    "url": "https://hooks.example.test/events",
+                    "allowed_hostnames": ["hooks.example.test"],
+                    "bearer_secret": "file:WEBHOOK_TOKEN",
+                    "signature_secret": "file:WEBHOOK_SIGNING_KEY",
+                }
+            },
+        },
+        "test",
+    )["audit"]
+    resolver = Resolver()
+    transport = Transport()
+    provider = WorkspaceFileSecretProvider(tmp_path)
+
+    outcome = HttpsWebhookDeliveryAdapter(
+        configured,
+        resolver,
+        transport,
+        SecretProviderRouter({"file": provider}),
+    ).deliver(envelope())
+
+    assert outcome.state is DeliveryOutcomeState.DELIVERED
+    assert resolver.calls == 1
+    request = transport.calls[0][2]
+    assert request.bearer_material is not None
+    assert request.bearer_material.reveal_for_operation() == "bearer-credential"
+    assert request.headers["X-Ansiblectl-Signature"].startswith("v1=")
 
 
 def test_unchanged_event_and_key_produce_same_signature_per_retry_attempt() -> None:

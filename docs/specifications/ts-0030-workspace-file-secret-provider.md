@@ -33,8 +33,8 @@ or fallback. Public results and errors identify neither the candidate nor its co
 One resolution performs descriptor-relative, no-follow access and validates the opened objects.
 Before material is returned, all of the following MUST hold:
 
-1. `.ansiblectl/secrets` is a real directory, not a symbolic link, owned by the effective user,
-   and grants no group or other permission bits.
+1. `.ansiblectl` and `.ansiblectl/secrets` are real directories, not symbolic links, owned by the
+   effective user, and grant no group or other permission bits.
 2. `NAME` is opened without following symbolic links and is a regular file owned by the effective
    user, with link count exactly one and no group or other permission bits.
 3. The file and directory are on the same device, and their identity remains the identity checked

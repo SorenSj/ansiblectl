@@ -377,16 +377,16 @@ Exit criteria:
 
 - [x] ADR-0047 and TS-0030 define namespace, filesystem custody, material, routing, lifecycle,
   compatibility, and redaction contracts before implementation.
-- [ ] Strict name validation and fixed `.ansiblectl/secrets/NAME` resolution are implemented.
-- [ ] Directory and file ownership, permissions, type, link, device, race, and capability checks
+- [x] Strict name validation and fixed `.ansiblectl/secrets/NAME` resolution are implemented.
+- [x] Directory and file ownership, permissions, type, link, device, race, and capability checks
   fail closed before material use.
-- [ ] Exact bounded material and provider routing operate without enumeration, fallback, trimming,
+- [x] Exact bounded material and provider routing operate without enumeration, fallback, trimming,
   caching, mutation, or persistence.
-- [ ] Bearer and signing composition resolves all required material before network I/O and retains
+- [x] Bearer and signing composition resolves all required material before network I/O and retains
   existing retry semantics.
-- [ ] Adversarial tests prove keys, paths, material, metadata, and exception details never reach
+- [x] Adversarial tests prove keys, paths, material, metadata, and exception details never reach
   public or durable surfaces.
-- [ ] Existing endpoint schemas, `env` references, databases, CLI, SDK, event, history, network,
+- [x] Existing endpoint schemas, `env` references, databases, CLI, SDK, event, history, network,
   TLS, runner, and transport contracts remain compatible.
 - [ ] The complete local quality, build, provenance, and release gates pass.
 - [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.

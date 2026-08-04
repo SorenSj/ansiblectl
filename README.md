@@ -311,10 +311,20 @@ ANSIBLECTL_WEBHOOK_TOKEN='<injected-by-your-secret-manager>' \
 ```
 
 The command follows no redirects and performs no polling, background scheduling, automatic
-abandonment, or automatic retention. Authentication accepts only canonical `env:NAME` references;
-the named non-empty value is resolved for the immediate request and is never placed in workspace
-configuration, command output, logs, events, retry state, or durable state. Missing or malformed
-material fails before DNS or network activity.
+abandonment, or automatic retention. Authentication and signing accept canonical `env:NAME` or
+`file:NAME` references. Environment names may contain up to 128 uppercase ASCII letters, digits,
+and underscores; file names use the same alphabet with a 64-character bound.
+
+File references resolve only `.ansiblectl/secrets/NAME`. Provision `.ansiblectl` and its `secrets`
+directory with mode `0700`, and each secret as an owner-only, single-link regular file with mode
+`0600`. Content must be non-empty UTF-8 of at most 8 KiB without a terminal newline or other
+control character. The secrets directory is excluded by the repository `.gitignore`; operators
+must also exclude it from backups and securely manage provisioning, rotation, and deletion.
+
+The selected provider is resolved exactly once per reference and attempt without enumeration,
+trimming, caching, or fallback. Material is used only for the immediate request and is never placed
+in workspace configuration, command output, logs, events, retry state, or durable state. Missing,
+malformed, unsafe, or unsupported material fails before DNS or network activity.
 
 Private receivers require endpoint schema version 2 and a separately named policy in
 `.ansiblectl/webhook-network-policies.yaml`:
