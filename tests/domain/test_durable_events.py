@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from ansiblectl.domain.durable_events import DurableEventEnvelope
+from ansiblectl.domain.durable_events import DurableEventClaim, DurableEventEnvelope
 
 
 def test_envelope_defensively_copies_payload_and_exposes_complete_schema() -> None:
@@ -60,3 +60,30 @@ def test_envelope_rejects_noncanonical_or_unsafe_fields(changes: dict[str, Any])
 
     with pytest.raises(ValueError):
         replace(envelope, **changes)
+
+
+def test_claim_requires_canonical_identity_and_contains_envelope() -> None:
+    envelope = DurableEventEnvelope(
+        "00000000Z80000000000000000",
+        1,
+        "execution.completed",
+        "2026-08-04T00:00:00.000000Z",
+        None,
+        {},
+    )
+    claim = DurableEventClaim(
+        "webhook.primary",
+        "00000000Z90000000000000000",
+        "2026-08-04T00:00:30.000000Z",
+        envelope,
+    )
+
+    assert claim.envelope is envelope
+    for changes in (
+        {"consumer_id": "Webhook Primary"},
+        {"claim_token": "invalid"},
+        {"lease_expires_at": "2026-08-04"},
+        {"envelope": object()},
+    ):
+        with pytest.raises(ValueError):
+            replace(claim, **changes)

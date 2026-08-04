@@ -12,6 +12,7 @@ from ansiblectl.domain.events import PUBLIC_EVENTS
 
 _ULID_PATTERN = re.compile(r"[0-7][0-9A-HJKMNP-TV-Z]{25}")
 _UTC_TIMESTAMP_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z")
+_CONSUMER_ID_PATTERN = re.compile(r"[a-z][a-z0-9._-]{0,127}")
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,35 @@ class DurableEventEnvelope:
         }
 
 
+@dataclass(frozen=True)
+class DurableEventClaim:
+    """One time-bounded right to acknowledge a consumer's next event."""
+
+    consumer_id: str
+    claim_token: str
+    lease_expires_at: str
+    envelope: DurableEventEnvelope
+
+    def __post_init__(self) -> None:
+        validate_consumer_id(self.consumer_id)
+        if not isinstance(self.claim_token, str) or not _ULID_PATTERN.fullmatch(self.claim_token):
+            raise ValueError("Durable event claim token must be a canonical ULID.")
+        if not isinstance(self.lease_expires_at, str) or not _UTC_TIMESTAMP_PATTERN.fullmatch(
+            self.lease_expires_at
+        ):
+            raise ValueError("Durable event claim expiry must be canonical UTC with microseconds.")
+        if not isinstance(self.envelope, DurableEventEnvelope):
+            raise ValueError("Durable event claim must contain an event envelope.")
+
+
+def validate_consumer_id(consumer_id: object) -> str:
+    """Return a canonical public consumer identifier or reject it."""
+
+    if not isinstance(consumer_id, str) or not _CONSUMER_ID_PATTERN.fullmatch(consumer_id):
+        raise ValueError("Durable event consumer ID is not canonical.")
+    return consumer_id
+
+
 def _freeze_json(value: object) -> object:
     if value is None or isinstance(value, (str, bool, int)):
         return value
@@ -91,4 +121,4 @@ def _thaw_json(value: object) -> object:
     return value
 
 
-__all__ = ["DurableEventEnvelope"]
+__all__ = ["DurableEventClaim", "DurableEventEnvelope", "validate_consumer_id"]
