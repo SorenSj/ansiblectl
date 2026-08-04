@@ -481,6 +481,37 @@ Explicit non-goals:
 - Receiver authorization, anonymous fallback, proxies, redirects, TLS downgrade, or new transports.
 - Background workers, inbound APIs, hosted control planes, remote commands, or a TUI.
 
+## Active milestone
+
+### v0.15.0 — Workspace event archive
+
+- Local delivery to immutable, workspace-private canonical event files.
+- Exact idempotent replay across the archive-write/outbox-ack crash boundary.
+- Descriptor-relative custody with no arbitrary paths, symlinks, or ambient output destinations.
+- Stable redacted failure under filesystem, concurrency, and capacity faults.
+
+Exit criteria:
+
+- [x] ADR-0050 and TS-0033 define selection, layout, canonical bytes, custody, atomicity, replay,
+  lifecycle, compatibility, failure, and redaction contracts before implementation.
+- [ ] Canonical archive identifiers and filenames reject every alternate path representation.
+- [ ] One immutable mode-0600 file is durably installed per event without partial final content.
+- [ ] Exact existing content is an idempotent success; mismatched or unsafe content fails closed.
+- [ ] Real crash and multiprocess tests prove the install/ack boundary and same-event races.
+- [ ] Adversarial tests prove archive paths, identifiers, metadata, payloads, and exceptions remain
+  absent from public and durable diagnostic surfaces.
+- [ ] Existing webhook delivery and outbox compatibility remain exact.
+- [ ] The complete local quality, build, provenance, and release gates pass.
+- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [ ] The immutable v0.15.0 tag and tagged artifact workflow pass from the release merge commit.
+
+Explicit non-goals:
+
+- JSONL append, mutable aggregate files, compression, rotation, retention scheduling, or indexing.
+- Arbitrary paths, stdout or shell piping, templates, commands, plugins, syslog, or cloud storage.
+- Exactly-once delivery, network filesystems, multi-host writers, background services, inbound APIs,
+  hosted control planes, remote commands, or a TUI.
+
 ### Future — Additional delivery surfaces
 
 - Additional outbound transports only after each transport's trust and lifecycle contract is accepted.
