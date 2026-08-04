@@ -306,7 +306,8 @@ Exit criteria:
 - [x] Existing v0.5 databases and v0.6-v0.9 CLI, SDK, event, history, secret, endpoint,
   network-policy, runner, and transport contracts remain compatible.
 - [x] The complete local quality, build, provenance, and release gates pass.
-- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
+  [PR #45](https://github.com/SorenSj/ansiblectl/pull/45).
 - [ ] The immutable v0.10.0 tag and tagged artifact workflow pass from the reviewed merge commit.
 
 Explicit non-goals:
