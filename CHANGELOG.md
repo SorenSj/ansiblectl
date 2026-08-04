@@ -4,6 +4,33 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-04
+
+### Added
+
+- ADR-0046 and TS-0029 defining deterministic HMAC authentication for canonical outbound webhook
+  bodies without adding inbound control or arbitrary headers.
+- Webhook endpoint schema version 4 with one optional signing-secret reference through the existing
+  environment-secret provider boundary.
+- A fixed `X-Ansiblectl-Signature` header containing a complete lowercase HMAC-SHA-256 digest over
+  a versioned domain separator and the exact transmitted JSON body.
+
+### Changed
+
+- Bounded signing-key resolution and validation now complete before DNS while existing unsigned
+  schema versions 1 through 3 retain their exact behavior.
+- Unchanged events and effective keys produce stable signatures across intentional at-least-once
+  delivery attempts, leaving event-id deduplication and freshness policy to receivers.
+
+### Security
+
+- Missing, malformed, undersized, oversized, control-containing, or exceptional signing material
+  fails with `SIGNING_UNAVAILABLE` before network activity and never falls back to unsigned delivery.
+- Signing remains independent from bearer authentication, private-network policy, and exclusive TLS
+  trust, allowing all positive controls to be composed together.
+- Secret references, key material, signature values, HMAC state, provider details, and exceptions
+  remain absent from public results, representations, logs, history, events, and durable retry state.
+
 ## [0.10.0] - 2026-08-04
 
 ### Added
