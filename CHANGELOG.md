@@ -4,6 +4,34 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-04
+
+### Added
+
+- ADR-0044 and TS-0027 defining named, CIDR-bounded private webhook network policies without a
+  general private-network bypass.
+- A strict immutable policy model for canonical RFC 1918 and IPv6 unique-local ranges with bounded
+  policy and network counts.
+- Safe workspace policy loading with no-follow file access, regular-file and size checks, strict
+  UTF-8, unique YAML keys, and rejection of aliases, anchors, and explicit tags.
+- Webhook endpoint schema version 2 with one exact immutable network-policy binding; schema version
+  1 remains supported and global-only.
+
+### Changed
+
+- Webhook destination validation now supports explicitly approved private addresses while requiring
+  every DNS answer to satisfy the same selected policy.
+- Operator documentation includes separate private-policy and endpoint-binding examples.
+
+### Security
+
+- Mixed, loopback, link-local, metadata, carrier-grade NAT, reserved, mapped, malformed,
+  noncanonical, and out-of-policy address answers fail closed before connection.
+- Policy identifiers, CIDRs, resolved addresses, hostnames, URLs, and resolver details remain absent
+  from public and durable delivery surfaces.
+- Connections remain bound to the validated immutable address tuple while TLS verifies the original
+  DNS hostname through the platform trust store.
+
 ## [0.8.0] - 2026-08-04
 
 ### Added
