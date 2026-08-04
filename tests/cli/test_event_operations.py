@@ -1,9 +1,16 @@
 """Durable-event operator CLI contract tests."""
 
 import json
+import os
+import shutil
+import socket
+import tempfile
+import threading
+from collections.abc import Iterator
 from io import StringIO
 from pathlib import Path
 
+import pytest
 import yaml
 
 from ansiblectl.application.event_operations import EventOperationsService
@@ -18,6 +25,15 @@ from ansiblectl.domain.event_delivery import DeliveryRunResult, DeliveryRunState
 from ansiblectl.domain.events import Event
 from ansiblectl.domain.workspace import Workspace
 from ansiblectl.infrastructure.event_outbox import SqliteEventOutbox
+
+
+@pytest.fixture
+def short_workspace() -> Iterator[Path]:
+    root = Path(tempfile.mkdtemp(prefix="ac-cli-", dir="/tmp"))
+    try:
+        yield root
+    finally:
+        shutil.rmtree(root)
 
 
 class WorkspaceService:
@@ -291,3 +307,74 @@ def test_delivery_command_archives_one_event_without_exposing_archive_identity(
     assert archived.is_file()
     assert b"sentinel-private-payload" in archived.read_bytes()
     assert payload["data"]["delivered_count"] == 1
+
+
+def test_delivery_command_sends_one_event_to_exact_logical_socket_without_exposing_identity(
+    short_workspace: Path,
+) -> None:
+    build_workspace_service().initialize(short_workspace)
+    outbox = SqliteEventOutbox(short_workspace)
+    outbox.append(
+        Event("workspace.initialized", {"project_name": "sentinel-private-socket-payload"}),
+        event_id="00000000Z80000000000000000",
+        occurred_at="2026-08-04T00:00:00.000000Z",
+    )
+    outbox.register_consumer("local-process", start_sequence=2)
+    socket_path = short_workspace / ".ansiblectl/events/sockets/private.audit.sock"
+    socket_path.parent.mkdir(mode=0o700)
+    listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    listener.bind(os.fspath(socket_path))
+    socket_path.chmod(0o600)
+    listener.listen(1)
+    received: list[bytes] = []
+
+    def receive() -> None:
+        connection, _ = listener.accept()
+        with connection:
+            prefix = _receive_exact(connection, 4)
+            size = int.from_bytes(prefix, "big")
+            body = _receive_exact(connection, size)
+            received.append(body)
+            assert connection.recv(1) == b""
+            connection.sendall(b"ACK 00000000Z80000000000000000\n")
+
+    receiver = threading.Thread(target=receive)
+    receiver.start()
+    output = StringIO()
+    try:
+        result = cli(
+            [
+                "--workspace",
+                str(short_workspace),
+                "--output",
+                "json",
+                "event",
+                "deliver",
+                "local-process",
+                "--socket",
+                "private.audit",
+                "--max-events",
+                "1",
+            ],
+            stdout=output,
+        )
+    finally:
+        receiver.join(timeout=5)
+        listener.close()
+    payload = json.loads(output.getvalue())
+    assert not receiver.is_alive()
+    assert result == EXIT_SUCCESS
+    assert payload["data"]["state"] == "delivered"
+    assert payload["data"]["delivered_count"] == 1
+    assert "private.audit" not in output.getvalue()
+    assert b"sentinel-private-socket-payload" in received[0]
+
+
+def _receive_exact(connection: socket.socket, size: int) -> bytes:
+    content = bytearray()
+    while len(content) < size:
+        chunk = connection.recv(size - len(content))
+        if not chunk:
+            break
+        content.extend(chunk)
+    return bytes(content)

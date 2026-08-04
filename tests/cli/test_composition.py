@@ -15,6 +15,7 @@ from ansiblectl.cli.composition import (
     build_event_archive_delivery_service,
     build_run_service,
     build_state_service,
+    build_unix_socket_delivery_service,
     build_webhook_delivery_service,
     build_workspace_service,
     execution_environment,
@@ -26,6 +27,7 @@ from ansiblectl.infrastructure.event_outbox import SqliteEventOutbox
 from ansiblectl.infrastructure.event_outbox_subscriber import EventOutboxSubscriber
 from ansiblectl.infrastructure.json_logging import EventLogSubscriber, JsonLinesLogSink
 from ansiblectl.infrastructure.secret_router import SecretProviderRouter
+from ansiblectl.infrastructure.unix_socket_delivery import WorkspaceUnixSocketDeliveryAdapter
 from ansiblectl.infrastructure.webhook_delivery import HttpsWebhookDeliveryAdapter
 from ansiblectl.infrastructure.workspace_file_secrets import WorkspaceFileSecretProvider
 from ansiblectl.infrastructure.workspace_state import WorkspaceStateStore
@@ -137,6 +139,17 @@ def test_event_archive_composition_selects_only_one_logical_archive(tmp_path: Pa
     assert service.adapter.workspace_root == tmp_path
     with pytest.raises(ValueError, match="not canonical"):
         build_event_archive_delivery_service(tmp_path, "../private/archive")
+
+
+def test_unix_socket_composition_selects_only_one_logical_socket(tmp_path: Path) -> None:
+    service = build_unix_socket_delivery_service(tmp_path, "audit.primary")
+
+    assert isinstance(service, EventDeliveryService)
+    assert isinstance(service.adapter, WorkspaceUnixSocketDeliveryAdapter)
+    assert service.adapter.selection.socket_id == "audit.primary"
+    assert service.adapter.workspace_root == tmp_path
+    with pytest.raises(ValueError, match="not canonical"):
+        build_unix_socket_delivery_service(tmp_path, "../private/socket")
 
 
 def test_webhook_delivery_composition_binds_private_policy_once(tmp_path: Path) -> None:

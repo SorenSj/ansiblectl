@@ -52,6 +52,7 @@ from ansiblectl.cli.composition import (
     build_run_service,
     build_state_service,
     build_status_service,
+    build_unix_socket_delivery_service,
     build_webhook_delivery_service,
     build_workspace_service,
     execution_environment,
@@ -694,6 +695,9 @@ def build_parser() -> argparse.ArgumentParser:
     delivery_target.add_argument(
         "--archive", help="Canonical logical workspace archive identifier."
     )
+    delivery_target.add_argument(
+        "--socket", help="Canonical logical workspace Unix socket identifier."
+    )
     event_deliver.add_argument(
         "--max-events", type=int, required=True, help="Positive delivery bound, at most 100."
     )
@@ -1322,6 +1326,8 @@ def main(
                     delivery = build_event_archive_delivery_service(
                         workspace.root, arguments.archive
                     )
+                elif arguments.socket is not None:
+                    delivery = build_unix_socket_delivery_service(workspace.root, arguments.socket)
                 else:
                     delivery = build_webhook_delivery_service(workspace.root, arguments.endpoint)
                 _render_event_delivery(
