@@ -16,6 +16,7 @@ from typing import TextIO
 import yaml
 
 from ansiblectl.application.configuration import ConfigurationService
+from ansiblectl.application.event_delivery import EventDeliveryService
 from ansiblectl.application.event_operations import EventOperationsService
 from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.execution_history import ExecutionHistoryService, ExecutionSummary
@@ -50,6 +51,7 @@ from ansiblectl.cli.composition import (
     build_run_service,
     build_state_service,
     build_status_service,
+    build_webhook_delivery_service,
     build_workspace_service,
     execution_environment,
 )
@@ -77,6 +79,7 @@ from ansiblectl.domain.errors import (
     ValidationError,
     WorkspaceError,
 )
+from ansiblectl.domain.event_delivery import DeliveryRunResult
 from ansiblectl.domain.execution import (
     ExecutionMode,
     ExecutionRecord,
@@ -98,6 +101,7 @@ from ansiblectl.domain.policy import EnforcementMode
 from ansiblectl.domain.repository import RepositoryError, RepositoryRequest, RepositoryResult
 from ansiblectl.domain.results import CommandResult, CommandWarning
 from ansiblectl.domain.state import StateInvalidationResult
+from ansiblectl.domain.webhooks import MAX_WEBHOOK_BATCH_EVENTS
 from ansiblectl.domain.workspace import Workspace
 
 EXIT_SUCCESS = 0
@@ -108,7 +112,7 @@ EXIT_UNEXPECTED_FAILURE = 1
 _COMMANDS: dict[str, frozenset[str]] = {
     "config": frozenset({"show"}),
     "execution": frozenset({"list", "prune", "show", "summary"}),
-    "event": frozenset({"consumer", "retention"}),
+    "event": frozenset({"consumer", "deliver", "retention"}),
     "inventory": frozenset({"show", "validate"}),
     "playbook": frozenset({"validate"}),
     "plugin": frozenset({"discover", "list", "permissions", "validate"}),
@@ -377,6 +381,8 @@ def _legacy_result_changed(command_name: str, payload: object) -> bool:
         return payload.get("applied") is True and isinstance(removed, list) and bool(removed)
     if command_name in {"event consumer", "event retention"}:
         return payload.get("applied") is True
+    if command_name == "event deliver":
+        return isinstance(payload.get("delivered_count"), int) and payload["delivered_count"] > 0
     return False
 
 
@@ -678,6 +684,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     event = subcommands.add_parser("event", help="Operate durable public-event delivery safely.")
     event_commands = event.add_subparsers(dest="event_command", required=True)
+    event_deliver = event_commands.add_parser(
+        "deliver", help="Deliver a bounded number of events to one configured HTTPS endpoint."
+    )
+    event_deliver.add_argument("consumer", help="Canonical registered consumer identifier.")
+    event_deliver.add_argument("--endpoint", required=True, help="Exact configured endpoint name.")
+    event_deliver.add_argument(
+        "--max-events", type=int, required=True, help="Positive delivery bound, at most 100."
+    )
     consumer = event_commands.add_parser("consumer", help="Manage durable event consumers.")
     consumer_commands = consumer.add_subparsers(dest="consumer_command", required=True)
     consumer_register = consumer_commands.add_parser(
@@ -729,6 +743,7 @@ def main(
     run_service: RunService | None = None,
     execution_history_service: ExecutionHistoryService | None = None,
     event_operations_service: EventOperationsService | None = None,
+    event_delivery_service: EventDeliveryService | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
     current_directory: Path | None = None,
@@ -1293,38 +1308,59 @@ def main(
             workspace = workspace_service_instance.resolve(
                 options.workspace, current_directory or Path.cwd()
             )
-            operations = event_operations_service or build_event_operations_service(workspace.root)
-            if arguments.event_command == "retention":
+            if arguments.event_command == "deliver":
+                if not 1 <= arguments.max_events <= MAX_WEBHOOK_BATCH_EVENTS:
+                    raise ValueError("Webhook delivery bound must be between 1 and 100.")
+                delivery = event_delivery_service or build_webhook_delivery_service(
+                    workspace.root, arguments.endpoint
+                )
+                _render_event_delivery(
+                    delivery.run(arguments.consumer, max_events=arguments.max_events),
+                    options.output_format,
+                    stdout,
+                )
+            elif arguments.event_command == "retention":
+                operations = event_operations_service or build_event_operations_service(
+                    workspace.root
+                )
                 _render_event_retention(
                     operations.retention(apply=arguments.apply), options.output_format, stdout
                 )
-            elif arguments.consumer_command == "register":
-                _render_event_registration(
-                    operations.register(arguments.name, start_sequence=arguments.start_sequence),
-                    options.output_format,
-                    stdout,
-                )
-            elif arguments.consumer_command == "inspect":
-                _render_event_consumers(operations.inspect(), options.output_format, stdout)
-            elif arguments.consumer_command == "retry":
-                _render_event_retry(
-                    operations.retry(
-                        arguments.name, sequence=arguments.sequence, event_id=arguments.event_id
-                    ),
-                    options.output_format,
-                    stdout,
-                )
             else:
-                _render_event_action(
-                    operations.abandon(
-                        arguments.name,
-                        sequence=arguments.sequence,
-                        event_id=arguments.event_id,
-                        apply=arguments.apply,
-                    ),
-                    options.output_format,
-                    stdout,
+                operations = event_operations_service or build_event_operations_service(
+                    workspace.root
                 )
+                if arguments.consumer_command == "register":
+                    _render_event_registration(
+                        operations.register(
+                            arguments.name, start_sequence=arguments.start_sequence
+                        ),
+                        options.output_format,
+                        stdout,
+                    )
+                elif arguments.consumer_command == "inspect":
+                    _render_event_consumers(operations.inspect(), options.output_format, stdout)
+                elif arguments.consumer_command == "retry":
+                    _render_event_retry(
+                        operations.retry(
+                            arguments.name,
+                            sequence=arguments.sequence,
+                            event_id=arguments.event_id,
+                        ),
+                        options.output_format,
+                        stdout,
+                    )
+                else:
+                    _render_event_action(
+                        operations.abandon(
+                            arguments.name,
+                            sequence=arguments.sequence,
+                            event_id=arguments.event_id,
+                            apply=arguments.apply,
+                        ),
+                        options.output_format,
+                        stdout,
+                    )
         except WorkspaceError as error:
             if propagate_errors:
                 raise
@@ -1332,6 +1368,17 @@ def main(
                 f"event {arguments.event_command}",
                 str(error),
                 "Initialize or select a valid workspace and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
+        except ConfigurationError as error:
+            if propagate_errors:
+                raise
+            return _render_cli_failure(
+                f"event {arguments.event_command}",
+                str(error),
+                "Correct the exact configured webhook endpoint and retry.",
                 options.output_format,
                 stdout,
                 stderr,
@@ -1384,6 +1431,20 @@ def _render_event_registration(
         return
     action = "Registered" if result.applied else "Already registered"
     print(f"{action}: {result.consumer_id} (start sequence {result.start_sequence})", file=output)
+
+
+def _render_event_delivery(
+    result: DeliveryRunResult, output_format: str, output: TextIO | None
+) -> None:
+    payload = result.to_payload()
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    print(
+        f"Delivery {payload['state']}: {payload['delivered_count']} delivered, "
+        f"{payload['failed_count']} failed for {payload['consumer_id']}",
+        file=output,
+    )
 
 
 def _render_event_retry(

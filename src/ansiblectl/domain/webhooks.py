@@ -16,6 +16,7 @@ from ansiblectl.domain.secrets import SecretMaterial, SecretReference
 WEBHOOK_CONFIGURATION_SCHEMA_VERSION = 1
 MAX_WEBHOOK_TIMEOUT_SECONDS = 60
 MAX_WEBHOOK_PAYLOAD_BYTES = 262_144
+MAX_WEBHOOK_BATCH_EVENTS = 100
 _ENDPOINT_ID_PATTERN = re.compile(r"[a-z][a-z0-9._-]{0,127}")
 _DNS_LABEL_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 _ENDPOINT_FIELDS = {
@@ -263,6 +264,7 @@ def _positive_timeout(value: object, endpoint_id: str, field: str) -> int:
 
 __all__ = [
     "MAX_WEBHOOK_PAYLOAD_BYTES",
+    "MAX_WEBHOOK_BATCH_EVENTS",
     "MAX_WEBHOOK_TIMEOUT_SECONDS",
     "WEBHOOK_CONFIGURATION_SCHEMA_VERSION",
     "WebhookAddressResolver",
