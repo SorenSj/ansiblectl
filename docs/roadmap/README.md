@@ -443,6 +443,38 @@ Explicit non-goals:
 - Configurable headers, time formats, precision, algorithms, skew, body transforms, or fallbacks.
 - Background workers, inbound APIs, hosted control planes, remote commands, or a TUI.
 
+## Active milestone
+
+### v0.14.0 — Mutual TLS webhook client identity
+
+- Opt-in client certificate authentication for the existing outbound HTTPS adapter.
+- Paired workspace-file certificate-chain and private-key references with in-memory validation.
+- Mandatory server trust, destination policy, and application authentication composition.
+- Stable redacted failure with no anonymous TLS fallback or durable identity material.
+
+Exit criteria:
+
+- [x] ADR-0049 and TS-0032 define schema, custody, PEM, pair validation, ordering, TLS, lifecycle,
+  compatibility, failure, and redaction contracts before implementation.
+- [ ] Schema v6 selects a paired file-backed client identity while schemas 1 through 5 retain exact
+  behavior.
+- [ ] Certificate chains and unencrypted private keys are bounded, parsed, paired, and validated
+  before DNS or TLS activity.
+- [ ] The HTTPS transport consumes request-local identity material without filesystem persistence,
+  ambient identity discovery, or anonymous fallback.
+- [ ] Client identity composes with bearer, signature v1/v2, network policy, and server CA trust.
+- [ ] Adversarial tests prove identity material and metadata never reach public or durable surfaces.
+- [ ] The complete local quality, build, provenance, and release gates pass.
+- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [ ] The immutable v0.14.0 tag and tagged artifact workflow pass from the release merge commit.
+
+Explicit non-goals:
+
+- Certificate issuance, renewal, revocation services, passphrases, PKCS#12, hardware keys, KMS,
+  HSM, or ambient client identities.
+- Receiver authorization, anonymous fallback, proxies, redirects, TLS downgrade, or new transports.
+- Background workers, inbound APIs, hosted control planes, remote commands, or a TUI.
+
 ### Future — Additional delivery surfaces
 
 - Additional outbound transports only after each transport's trust and lifecycle contract is accepted.
