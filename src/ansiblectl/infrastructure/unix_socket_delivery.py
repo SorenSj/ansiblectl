@@ -157,7 +157,7 @@ def _peer_uid(connection: socket.socket) -> int:
             socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i")
         )
         _pid, uid, _gid = struct.unpack("3i", credentials)
-        return uid
+        return int(uid)
     if sys.platform == "darwin":
         libc = CDLL(None, use_errno=True)
         getpeereid = libc.getpeereid
