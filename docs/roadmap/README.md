@@ -561,8 +561,47 @@ Explicit non-goals:
 - Exactly-once delivery, background workers, inbound APIs, hosted control planes, remote commands,
   or a TUI.
 
+## Active milestone
+
+### v0.17.0 — Read-only local terminal dashboard
+
+- One foreground, single-workspace operational view over existing read-only application services.
+- Bounded safe execution metadata and payload-free durable-consumer status with atomic manual
+  refresh.
+- Fixed keyboard navigation, deterministic terminal-safe ASCII cells, and fail-closed terminal
+  lifecycle.
+- No mutation, captured output, payloads, automatic polling, discovery, listener, or remote caller.
+
+Exit criteria:
+
+- [x] ADR-0052 and TS-0035 define identity, authorization, tenancy, snapshot, interaction, terminal
+  lifecycle, compatibility, failure, and redaction contracts before implementation.
+- [ ] The dashboard composes only the closed read-only query set and cannot reach a mutation port.
+- [ ] Snapshot construction is atomic, deterministic, field-allowlisted, and bounded to the governed
+  execution and consumer limits.
+- [ ] Terminal-safe rendering rejects control injection and remains deterministic across truncation,
+  resize, and minimum-size boundaries.
+- [ ] Real pseudo-terminal and subprocess tests prove input bounds, foreground behavior, and exact
+  restoration across normal, error, interrupt, and signal exits.
+- [ ] Forbidden output, diagnostics, paths, targeting, revisions, digests, payloads, secrets, and
+  exceptions remain absent from every public and durable surface.
+- [ ] Existing CLI, machine output, services, SDK, history, events, delivery adapters, and exit-code
+  compatibility remain exact.
+- [ ] The complete local quality, build, provenance, and release gates pass.
+- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [ ] The immutable v0.17.0 tag and tagged artifact workflow pass from the release merge commit.
+
+Explicit non-goals:
+
+- Actions, execution, delivery operations, retention, configuration, repository operations, plugins,
+  external processes, shell escape, free-form input, search, filters, or details.
+- Automatic refresh, live output, event payloads, logs, diagnostics, diffs, inventory or playbook
+  content, mouse, paste, clipboard, or persistent sessions.
+- Workspace discovery, aggregation or switching, cross-user access, background services, inbound
+  APIs, hosted control planes, remote commands, Windows support, or a stable screen-layout API.
+
 ### Future — Additional delivery surfaces
 
 - Additional outbound transports only after each transport's trust and lifecycle contract is accepted.
-- A TUI only after its authentication, authorization, tenancy, lifecycle, and compatibility model is
-  governed independently from delivery adapters.
+- Mutable or remote terminal workflows only after their authentication, authorization, tenancy,
+  lifecycle, and compatibility models are governed independently from the read-only dashboard.

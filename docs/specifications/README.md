@@ -40,3 +40,4 @@ Architecture Handbook and applicable ADRs.
 | [TS-0032](ts-0032-mutual-tls-webhook-client-identity.md) | Mutual TLS Webhook Client Identity | Normative |
 | [TS-0033](ts-0033-workspace-event-archive.md) | Workspace Event Archive | Normative |
 | [TS-0034](ts-0034-workspace-unix-socket-delivery.md) | Workspace Unix Socket Delivery | Normative |
+| [TS-0035](ts-0035-read-only-local-terminal-dashboard.md) | Read-Only Local Terminal Dashboard | Normative |
