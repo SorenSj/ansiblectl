@@ -4,6 +4,31 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-04
+
+### Added
+
+- ADR-0052 and TS-0035 defining a bounded, read-only, single-workspace terminal dashboard.
+- The explicit `--workspace PATH dashboard` command with safe status, recent execution, and durable
+  consumer panels plus fixed keyboard navigation and manual refresh.
+- Deterministic ASCII rendering with field allowlists, governed row limits, terminal-size handling,
+  and real pseudo-terminal coverage on Linux and macOS.
+
+### Changed
+
+- Existing read-only application queries are composed into one atomic dashboard snapshot without
+  exposing mutation ports or changing existing CLI, machine-output, SDK, history, event, or delivery
+  behavior.
+- Foreground terminal ownership now uses immediate self-pipe wakeups for resize and interrupt
+  signals, with exact terminal restoration and stable interrupted exit behavior.
+
+### Security
+
+- Dashboard output excludes captured output, diagnostics, paths, targeting, revisions, digests,
+  payloads, secrets, exceptions, and arbitrary control bytes.
+- Terminal preflight fails closed unless input and output are the same supported foreground terminal;
+  the dashboard performs no discovery, polling, listening, persistence, or external execution.
+
 ## [0.16.0] - 2026-08-04
 
 ### Added
