@@ -497,7 +497,7 @@ Exit criteria:
 - [x] Canonical archive identifiers and filenames reject every alternate path representation.
 - [x] One immutable mode-0600 file is durably installed per event without partial final content.
 - [x] Exact existing content is an idempotent success; mismatched or unsafe content fails closed.
-- [ ] Real crash and multiprocess tests prove the install/ack boundary and same-event races.
+- [x] Real crash and multiprocess tests prove the install/ack boundary and same-event races.
 - [ ] Adversarial tests prove archive paths, identifiers, metadata, payloads, and exceptions remain
   absent from public and durable diagnostic surfaces.
 - [ ] Existing webhook delivery and outbox compatibility remain exact.

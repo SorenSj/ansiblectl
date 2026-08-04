@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import stat
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -17,6 +19,7 @@ from ansiblectl.domain.event_archive import WorkspaceEventArchive
 from ansiblectl.domain.event_delivery import DeliveryOutcome
 
 ARCHIVE_UNAVAILABLE = "ARCHIVE_UNAVAILABLE"
+_STAGING_PATTERN = re.compile(r"\.stage-[0-9a-f]{32}")
 
 
 @dataclass(frozen=True, repr=False)
@@ -25,6 +28,7 @@ class WorkspaceEventArchiveDeliveryAdapter:
 
     workspace_root: Path = field(repr=False)
     archive: WorkspaceEventArchive = field(repr=False)
+    checkpoint: Callable[[str], None] | None = field(default=None, repr=False, compare=False)
 
     def deliver(self, envelope: DurableEventEnvelope) -> DeliveryOutcome:
         try:
@@ -32,7 +36,13 @@ class WorkspaceEventArchiveDeliveryAdapter:
             content = envelope.to_canonical_bytes()
             if len(content) > MAX_DURABLE_EVENT_DELIVERY_BYTES:
                 raise OSError
-            _install(self.workspace_root, target.archive_id, target.filename, content)
+            _install(
+                self.workspace_root,
+                target.archive_id,
+                target.filename,
+                content,
+                self.checkpoint or (lambda _name: None),
+            )
         except Exception:
             return DeliveryOutcome.failure(ARCHIVE_UNAVAILABLE)
         return DeliveryOutcome.success()
@@ -41,7 +51,13 @@ class WorkspaceEventArchiveDeliveryAdapter:
         return "WorkspaceEventArchiveDeliveryAdapter(workspace_root=<redacted>, archive=<redacted>)"
 
 
-def _install(workspace_root: Path, archive_id: str, filename: str, content: bytes) -> None:
+def _install(
+    workspace_root: Path,
+    archive_id: str,
+    filename: str,
+    content: bytes,
+    checkpoint: Callable[[str], None],
+) -> None:
     if not _has_required_capabilities():
         raise OSError
     descriptors: list[int] = []
@@ -56,7 +72,7 @@ def _install(workspace_root: Path, archive_id: str, filename: str, content: byte
             directory_fd = _open_or_create_private_directory(component, parent_fd, root.st_dev)
             descriptors.append(directory_fd)
             parent_fd = directory_fd
-        _install_or_verify(parent_fd, root.st_dev, filename, content)
+        _install_or_verify(parent_fd, root.st_dev, filename, content, checkpoint)
     finally:
         for descriptor in reversed(descriptors):
             with suppress(OSError):
@@ -67,9 +83,10 @@ def _has_required_capabilities() -> bool:
     return (
         all(hasattr(os, name) for name in ("O_CLOEXEC", "O_DIRECTORY", "O_NOFOLLOW"))
         and all(
-            function in os.supports_dir_fd for function in (os.open, os.mkdir, os.link, os.unlink)
+            function in os.supports_dir_fd
+            for function in (os.open, os.mkdir, os.link, os.stat, os.unlink)
         )
-        and os.link in os.supports_follow_symlinks
+        and all(function in os.supports_follow_symlinks for function in (os.link, os.stat))
     )
 
 
@@ -102,7 +119,13 @@ def _open_or_create_private_directory(name: str, parent_fd: int, device: int) ->
     return descriptor
 
 
-def _install_or_verify(directory_fd: int, device: int, filename: str, content: bytes) -> None:
+def _install_or_verify(
+    directory_fd: int,
+    device: int,
+    filename: str,
+    content: bytes,
+    checkpoint: Callable[[str], None],
+) -> None:
     try:
         _verify_existing(directory_fd, device, filename, content)
         return
@@ -114,9 +137,11 @@ def _install_or_verify(directory_fd: int, device: int, filename: str, content: b
     try:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
         descriptor = os.open(staging, flags, 0o600, dir_fd=directory_fd)
+        checkpoint("archive.staging_created")
         _write_all(descriptor, content)
         os.fchmod(descriptor, 0o600)
         os.fsync(descriptor)
+        checkpoint("archive.content_synced")
         os.close(descriptor)
         descriptor = None
         try:
@@ -128,11 +153,15 @@ def _install_or_verify(directory_fd: int, device: int, filename: str, content: b
                 follow_symlinks=False,
             )
             installed = True
+            checkpoint("archive.target_linked")
         except FileExistsError:
             pass
-        os.unlink(staging, dir_fd=directory_fd)
+        with suppress(FileNotFoundError):
+            os.unlink(staging, dir_fd=directory_fd)
         staging = ""
+        checkpoint("archive.target_installed")
         os.fsync(directory_fd)
+        checkpoint("archive.directory_synced")
         _verify_existing(directory_fd, device, filename, content)
     finally:
         if descriptor is not None:
@@ -163,7 +192,7 @@ def _verify_existing(directory_fd: int, device: int, filename: str, expected: by
         if (
             not stat.S_ISREG(metadata.st_mode)
             or metadata.st_uid != os.geteuid()
-            or metadata.st_nlink != 1
+            or metadata.st_nlink not in {1, 2}
             or metadata.st_dev != device
             or stat.S_IMODE(metadata.st_mode) != 0o600
             or metadata.st_size != len(expected)
@@ -179,8 +208,26 @@ def _verify_existing(directory_fd: int, device: int, filename: str, expected: by
             remaining -= len(chunk)
         if b"".join(chunks) != expected:
             raise OSError
+        if metadata.st_nlink == 2:
+            _remove_matching_staging_link(directory_fd, metadata)
+            os.fsync(directory_fd)
+            if os.fstat(descriptor).st_nlink != 1:
+                raise OSError
     finally:
         os.close(descriptor)
+
+
+def _remove_matching_staging_link(directory_fd: int, target: os.stat_result) -> None:
+    matches: list[str] = []
+    for name in os.listdir(directory_fd):
+        if _STAGING_PATTERN.fullmatch(name) is None:
+            continue
+        metadata = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if metadata.st_dev == target.st_dev and metadata.st_ino == target.st_ino:
+            matches.append(name)
+    if len(matches) != 1:
+        raise OSError
+    os.unlink(matches[0], dir_fd=directory_fd)
 
 
 __all__ = ["ARCHIVE_UNAVAILABLE", "WorkspaceEventArchiveDeliveryAdapter"]
