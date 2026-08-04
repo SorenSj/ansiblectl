@@ -588,7 +588,8 @@ Exit criteria:
 - [x] Existing CLI, machine output, services, SDK, history, events, delivery adapters, and exit-code
   compatibility remain exact.
 - [x] The complete local quality, build, provenance, and release gates pass.
-- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
+  [readiness PR #94](https://github.com/SorenSj/ansiblectl/pull/94).
 - [ ] The immutable v0.17.0 tag and tagged artifact workflow pass from the release merge commit.
 
 Explicit non-goals:
