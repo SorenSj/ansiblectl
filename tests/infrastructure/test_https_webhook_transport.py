@@ -238,3 +238,51 @@ def test_exclusive_context_loads_only_snapshot_and_keeps_mandatory_verification(
     assert contexts[0].verify_mode == ssl.CERT_REQUIRED
     assert contexts[0].check_hostname is True
     assert contexts[0].loaded == ["-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE-----\n"]
+
+
+def test_exclusive_context_failure_never_loads_platform_roots_or_opens_socket(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailingContext(ExclusiveTlsContext):
+        def load_verify_locations(self, *, cadata: str) -> None:
+            self.loaded.append(cadata)
+            raise RuntimeError("sentinel-policy path certificate subject TLS alert")
+
+    contexts: list[FailingContext] = []
+
+    def context_factory(protocol: object) -> FailingContext:
+        context = FailingContext(protocol, TlsSocket())
+        contexts.append(context)
+        return context
+
+    monkeypatch.setattr(ssl, "SSLContext", context_factory)
+    monkeypatch.setattr(
+        ssl,
+        "create_default_context",
+        lambda: pytest.fail("exclusive trust must not fall back to platform roots"),
+    )
+    monkeypatch.setattr(
+        socket,
+        "create_connection",
+        lambda *args, **kwargs: pytest.fail("context failure must happen before socket I/O"),
+    )
+    selected = endpoint()
+    object.__setattr__(
+        selected,
+        "tls_trust_policy",
+        WebhookTlsTrustPolicy(
+            "sentinel-policy",
+            b"-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE-----\n",
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="sentinel-policy"):
+        BoundHttpsWebhookTransport().post(
+            selected,
+            WebhookDestination(selected.hostname, selected.port, ("8.8.8.8",)),
+            WebhookRequest(b"{}", {}),
+        )
+
+    assert len(contexts) == 1
+    assert contexts[0].verify_mode == ssl.CERT_REQUIRED
+    assert contexts[0].check_hostname is True

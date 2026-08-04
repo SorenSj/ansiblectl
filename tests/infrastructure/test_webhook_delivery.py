@@ -154,6 +154,17 @@ def test_adapter_maps_destination_and_transport_failures_without_retrying() -> N
     assert "private response body" not in repr(broken)
 
 
+def test_tls_failure_is_reduced_to_transport_code_without_trust_detail() -> None:
+    sentinel = "sentinel-policy /private/ca.pem CERTIFICATE issuer serial TLS alert"
+    transport = Transport(RuntimeError(sentinel))
+
+    outcome = HttpsWebhookDeliveryAdapter(endpoint(), Resolver(), transport).deliver(envelope())
+
+    assert outcome.failure_reason == TRANSPORT_FAILURE
+    assert len(transport.calls) == 1
+    assert all(part not in repr(outcome) for part in sentinel.split())
+
+
 def test_adapter_resolves_bearer_material_immediately_without_repr_leakage() -> None:
     transport = Transport()
     secrets = Secrets("credential-value")

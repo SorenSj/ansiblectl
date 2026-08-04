@@ -111,6 +111,11 @@ def test_adapter_exception_is_reduced_to_stable_reason(tmp_path: Path) -> None:
     assert result.failure_reason == ADAPTER_FAILURE
     assert "private" not in str(result.to_payload())
     assert adapter.calls == 1
+    status = outbox.inspect_consumers(now=_NOW)[0]
+    assert status.state == "delayed"
+    assert status.attempt_count == 1
+    assert "private" not in repr(status)
+    assert ADAPTER_FAILURE not in repr(status)
 
 
 def test_invalid_adapter_result_is_reduced_to_stable_reason(tmp_path: Path) -> None:
