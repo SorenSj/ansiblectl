@@ -4,6 +4,33 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-04
+
+### Added
+
+- ADR-0045 and TS-0028 defining bounded, named, exclusive CA trust for outbound HTTPS webhooks.
+- Strict workspace trust-policy and canonical PEM bundle loading with no-follow access, ownership,
+  permission, size, encoding, certificate-count, and X.509 CA semantic validation.
+- Webhook endpoint schema version 3 with one optional immutable TLS trust-policy binding; schema
+  versions 1 and 2 remain supported with unchanged platform trust.
+
+### Changed
+
+- A selected custom policy constructs one fresh client TLS context containing only its validated CA
+  snapshot while retaining secure runtime TLS and cipher defaults.
+- Trust configuration and CA bundles are captured once during command composition, so rotation
+  applies only to the next foreground delivery invocation.
+
+### Security
+
+- Exclusive contexts retain mandatory certificate-chain and hostname verification, original DNS
+  hostname SNI, and connection to the already validated address tuple without platform-root
+  fallback.
+- Invalid policies, bundles, certificates, contexts, or handshakes fail closed before or during the
+  single transport attempt with stable redacted outcomes.
+- Policy identifiers, paths, certificate material and metadata, TLS alerts, and exception details
+  remain absent from public and durable delivery surfaces.
+
 ## [0.9.0] - 2026-08-04
 
 ### Added
