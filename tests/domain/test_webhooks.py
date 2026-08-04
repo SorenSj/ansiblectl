@@ -212,6 +212,62 @@ def test_signature_version_requires_schema_five_and_signing_reference() -> None:
         )
 
 
+def test_schema_six_binds_one_paired_file_client_identity() -> None:
+    endpoint = parse_webhook_endpoints(
+        endpoint_document(
+            schema_version=6,
+            client_certificate_secret="file:WEBHOOK_CLIENT_CERTIFICATE",
+            client_private_key_secret="file:WEBHOOK_CLIENT_PRIVATE_KEY",
+        ),
+        "workspace",
+    )["audit.primary"]
+
+    assert endpoint.schema_version == 6
+    assert str(endpoint.client_certificate_secret) == "file:WEBHOOK_CLIENT_CERTIFICATE"
+    assert str(endpoint.client_private_key_secret) == "file:WEBHOOK_CLIENT_PRIVATE_KEY"
+    representation = repr(endpoint)
+    assert "WEBHOOK_CLIENT_CERTIFICATE" not in representation
+    assert "WEBHOOK_CLIENT_PRIVATE_KEY" not in representation
+
+
+@pytest.mark.parametrize(
+    ("certificate", "private_key", "message"),
+    [
+        ("file:CERTIFICATE", None, "requires both"),
+        (None, "file:PRIVATE_KEY", "requires both"),
+        ("env:CERTIFICATE", "file:PRIVATE_KEY", "requires file"),
+        ("file:CERTIFICATE", "env:PRIVATE_KEY", "requires file"),
+        ("file:SAME", "file:SAME", "must be distinct"),
+        (True, "file:PRIVATE_KEY", "provider:key"),
+    ],
+)
+def test_schema_six_rejects_partial_nonfile_duplicate_or_invalid_client_identity(
+    certificate: object, private_key: object, message: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        parse_webhook_endpoints(
+            endpoint_document(
+                schema_version=6,
+                client_certificate_secret=certificate,
+                client_private_key_secret=private_key,
+            ),
+            "workspace",
+        )
+
+
+def test_older_schemas_reject_client_identity_fields() -> None:
+    for schema_version in (1, 2, 3, 4, 5):
+        with pytest.raises(ConfigurationError, match="Unknown field"):
+            parse_webhook_endpoints(
+                endpoint_document(
+                    schema_version=schema_version,
+                    client_certificate_secret="file:CERTIFICATE",
+                    client_private_key_secret="file:PRIVATE_KEY",
+                ),
+                "workspace",
+            )
+
+
 def test_schema_four_combines_signing_network_and_tls_as_independent_controls() -> None:
     network_policies = parse_webhook_network_policies(private_policies(), "policy")
     trust = WebhookTlsTrustPolicy("private-ca", b"sentinel-certificate")

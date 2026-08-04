@@ -456,7 +456,7 @@ Exit criteria:
 
 - [x] ADR-0049 and TS-0032 define schema, custody, PEM, pair validation, ordering, TLS, lifecycle,
   compatibility, failure, and redaction contracts before implementation.
-- [ ] Schema v6 selects a paired file-backed client identity while schemas 1 through 5 retain exact
+- [x] Schema v6 selects a paired file-backed client identity while schemas 1 through 5 retain exact
   behavior.
 - [ ] Certificate chains and unencrypted private keys are bounded, parsed, paired, and validated
   before DNS or TLS activity.

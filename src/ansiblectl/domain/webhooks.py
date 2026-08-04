@@ -15,7 +15,7 @@ from ansiblectl.domain.secrets import SecretMaterial, SecretReference
 from ansiblectl.domain.webhook_network_policy import WebhookNetworkPolicy
 from ansiblectl.domain.webhook_tls_trust import WebhookTlsTrustPolicy
 
-WEBHOOK_CONFIGURATION_SCHEMA_VERSION = 5
+WEBHOOK_CONFIGURATION_SCHEMA_VERSION = 6
 MAX_WEBHOOK_TIMEOUT_SECONDS = 60
 MAX_WEBHOOK_PAYLOAD_BYTES = 262_144
 MAX_WEBHOOK_BATCH_EVENTS = 100
@@ -32,6 +32,10 @@ _ENDPOINT_FIELDS_V2 = _ENDPOINT_FIELDS | {"network_policy"}
 _ENDPOINT_FIELDS_V3 = _ENDPOINT_FIELDS_V2 | {"tls_trust_policy"}
 _ENDPOINT_FIELDS_V4 = _ENDPOINT_FIELDS_V3 | {"signature_secret"}
 _ENDPOINT_FIELDS_V5 = _ENDPOINT_FIELDS_V4 | {"signature_version"}
+_ENDPOINT_FIELDS_V6 = _ENDPOINT_FIELDS_V5 | {
+    "client_certificate_secret",
+    "client_private_key_secret",
+}
 
 
 @dataclass(frozen=True, repr=False)
@@ -50,13 +54,16 @@ class WebhookEndpoint:
     tls_trust_policy: WebhookTlsTrustPolicy | None = None
     signature_secret: SecretReference | None = None
     signature_version: int | None = None
+    client_certificate_secret: SecretReference | None = None
+    client_private_key_secret: SecretReference | None = None
     schema_version: int = WEBHOOK_CONFIGURATION_SCHEMA_VERSION
 
     def __repr__(self) -> str:
         return (
             "WebhookEndpoint(endpoint_id=<redacted>, url=<redacted>, "
             "network_policy=<redacted>, tls_trust_policy=<redacted>, "
-            "signature_secret=<redacted>, signature_version=<redacted>)"
+            "signature_secret=<redacted>, signature_version=<redacted>, "
+            "client_identity=<redacted>)"
         )
 
 
@@ -122,9 +129,9 @@ def parse_webhook_endpoints(
     if unknown:
         raise ConfigurationError(f"Unknown webhook field '{sorted(unknown)[0]}' in {origin}.")
     schema_version = values.get("schema_version")
-    if schema_version not in {1, 2, 3, 4, WEBHOOK_CONFIGURATION_SCHEMA_VERSION}:
+    if schema_version not in {1, 2, 3, 4, 5, WEBHOOK_CONFIGURATION_SCHEMA_VERSION}:
         raise ConfigurationError(
-            f"Webhook schema_version in {origin} must be 1, 2, 3, 4, or "
+            f"Webhook schema_version in {origin} must be 1, 2, 3, 4, 5, or "
             f"{WEBHOOK_CONFIGURATION_SCHEMA_VERSION}."
         )
     assert isinstance(schema_version, int)
@@ -191,8 +198,10 @@ def _parse_endpoint(
         allowed_fields = _ENDPOINT_FIELDS_V3
     elif schema_version == 4:
         allowed_fields = _ENDPOINT_FIELDS_V4
-    else:
+    elif schema_version == 5:
         allowed_fields = _ENDPOINT_FIELDS_V5
+    else:
+        allowed_fields = _ENDPOINT_FIELDS_V6
     unknown = set(values) - allowed_fields
     if unknown:
         raise ConfigurationError(
@@ -221,6 +230,12 @@ def _parse_endpoint(
     signature_version = _parse_signature_version(
         values.get("signature_version"), signature_secret, endpoint_id, schema_version
     )
+    client_certificate_secret, client_private_key_secret = _parse_client_identity_references(
+        values.get("client_certificate_secret"),
+        values.get("client_private_key_secret"),
+        endpoint_id,
+        schema_version,
+    )
     connect_timeout = _positive_timeout(
         values.get("connect_timeout_seconds", 10), endpoint_id, "connect_timeout_seconds"
     )
@@ -244,6 +259,8 @@ def _parse_endpoint(
         tls_trust_policy=tls_trust_policy,
         signature_secret=signature_secret,
         signature_version=signature_version,
+        client_certificate_secret=client_certificate_secret,
+        client_private_key_secret=client_private_key_secret,
         schema_version=schema_version,
     )
 
@@ -382,6 +399,38 @@ def _parse_signature_version(
             f"Webhook endpoint '{endpoint_id}' signature_version must be integer 2."
         )
     return value
+
+
+def _parse_client_identity_references(
+    certificate_value: object,
+    private_key_value: object,
+    endpoint_id: str,
+    schema_version: int,
+) -> tuple[SecretReference | None, SecretReference | None]:
+    if schema_version < 6:
+        return None, None
+    if certificate_value is None and private_key_value is None:
+        return None, None
+    if certificate_value is None or private_key_value is None:
+        raise ConfigurationError(
+            f"Webhook endpoint '{endpoint_id}' client identity requires both certificate and key."
+        )
+    certificate = _parse_secret_reference(
+        certificate_value, endpoint_id, "client_certificate_secret"
+    )
+    private_key = _parse_secret_reference(
+        private_key_value, endpoint_id, "client_private_key_secret"
+    )
+    assert certificate is not None and private_key is not None
+    if certificate.provider != "file" or private_key.provider != "file":
+        raise ConfigurationError(
+            f"Webhook endpoint '{endpoint_id}' client identity requires file references."
+        )
+    if certificate == private_key:
+        raise ConfigurationError(
+            f"Webhook endpoint '{endpoint_id}' client identity references must be distinct."
+        )
+    return certificate, private_key
 
 
 __all__ = [
