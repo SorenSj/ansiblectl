@@ -152,6 +152,14 @@ Exit criteria:
 - [x] Human, JSON, and YAML results are schema-aligned and redaction-safe.
 - [x] Existing v0.5 databases and all prior CLI, SDK, event, and history contracts remain compatible.
 - [x] The complete quality, build, provenance, and release gates pass.
+- [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
+  [PR #23](https://github.com/SorenSj/ansiblectl/pull/23).
+- [x] The immutable v0.6.0 tag and
+  [tagged artifact workflow](https://github.com/SorenSj/ansiblectl/actions/runs/30867027113) pass
+  from merge commit `da58943`.
+
+Readiness evidence was last reviewed on 2026-08-04. Version 0.6.0 is released, and its retained
+workflow artifact is named `ansiblectl-v0.6.0`; no existing release tag was moved or recreated.
 
 Explicit non-goals:
 
