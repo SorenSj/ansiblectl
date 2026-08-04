@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from collections.abc import Callable
 from contextlib import closing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -80,12 +81,18 @@ CREATE TABLE IF NOT EXISTS consumers (
 class SqliteEventOutbox:
     """Append and inspect committed event envelopes without delivery side effects."""
 
-    def __init__(self, workspace_root: Path) -> None:
+    def __init__(
+        self,
+        workspace_root: Path,
+        *,
+        checkpoint: Callable[[str], None] | None = None,
+    ) -> None:
         self._workspace_root = workspace_root.resolve()
         self._private_root = self._workspace_root / ".ansiblectl"
         self._directory = self._private_root / "events"
         self._path = self._directory / "outbox.sqlite3"
         self._lock_path = self._directory / "outbox.lock"
+        self._checkpoint = checkpoint or (lambda _name: None)
 
     def append(
         self,
@@ -135,7 +142,9 @@ class SqliteEventOutbox:
                         payload_json,
                     ),
                 )
+                self._checkpoint("append.inserted")
                 connection.commit()
+                self._checkpoint("append.committed")
                 return envelope
         except (OSError, sqlite3.Error, TypeError, ValueError) as error:
             raise StateError(
@@ -331,6 +340,10 @@ class SqliteEventOutbox:
                 else:
                     connection.executescript(_SCHEMA)
                 connection.executescript(_CONSUMER_SCHEMA)
+                integrity = connection.execute("PRAGMA quick_check").fetchone()
+                if integrity != ("ok",):
+                    connection.close()
+                    raise StateError("Durable event outbox is corrupt.")
             return connection
         except (OSError, sqlite3.Error):
             if "connection" in locals():
