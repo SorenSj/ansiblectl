@@ -199,6 +199,33 @@ def test_schema_five_rejects_missing_or_noncanonical_signed_version(value: objec
         parse_webhook_endpoints(definition, "workspace")
 
 
+@pytest.mark.parametrize("version", [1, 2])
+def test_schema_six_requires_and_accepts_explicit_signature_version(version: int) -> None:
+    endpoint = parse_webhook_endpoints(
+        endpoint_document(
+            schema_version=6,
+            signature_secret="file:WEBHOOK_SIGNING_KEY",
+            signature_version=version,
+        ),
+        "workspace",
+    )["audit.primary"]
+
+    assert endpoint.signature_version == version
+
+
+@pytest.mark.parametrize("value", [None, True, False, 0, 3, "1", "2"])
+def test_schema_six_rejects_missing_or_noncanonical_signed_version(value: object) -> None:
+    with pytest.raises(ConfigurationError, match="signature_version"):
+        parse_webhook_endpoints(
+            endpoint_document(
+                schema_version=6,
+                signature_secret="file:WEBHOOK_SIGNING_KEY",
+                signature_version=value,
+            ),
+            "workspace",
+        )
+
+
 def test_signature_version_requires_schema_five_and_signing_reference() -> None:
     for schema_version in (1, 2, 3, 4):
         with pytest.raises(ConfigurationError, match="Unknown field"):

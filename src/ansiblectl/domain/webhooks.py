@@ -402,9 +402,11 @@ def _parse_signature_version(
                 f"Webhook endpoint '{endpoint_id}' signature_version requires signature_secret."
             )
         return None
-    if not isinstance(value, int) or isinstance(value, bool) or value != 2:
+    allowed_versions = {2} if schema_version == 5 else {1, 2}
+    if not isinstance(value, int) or isinstance(value, bool) or value not in allowed_versions:
+        expected = "integer 2" if schema_version == 5 else "integer 1 or 2"
         raise ConfigurationError(
-            f"Webhook endpoint '{endpoint_id}' signature_version must be integer 2."
+            f"Webhook endpoint '{endpoint_id}' signature_version must be {expected}."
         )
     return value
 

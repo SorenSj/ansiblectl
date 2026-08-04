@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
 from ansiblectl.application.event_delivery import EventDeliveryService
 from ansiblectl.domain.event_delivery import DeliveryRetryProfile
 from ansiblectl.domain.events import Event
@@ -16,7 +18,9 @@ from ansiblectl.domain.webhooks import (
     WebhookRequest,
     parse_webhook_endpoints,
 )
+from ansiblectl.infrastructure import webhook_delivery as delivery_module
 from ansiblectl.infrastructure.event_outbox import SqliteEventOutbox
+from ansiblectl.infrastructure.webhook_client_identity import WebhookClientIdentity
 from ansiblectl.infrastructure.webhook_delivery import (
     SIGNING_UNAVAILABLE,
     TRANSPORT_FAILURE,
@@ -199,4 +203,88 @@ def test_v2_timestamp_signature_and_clock_detail_never_reach_durable_state(
         assert sentinel not in repr(result)
         assert sentinel not in str(result.to_payload())
         assert sentinel not in repr(status)
+        assert sentinel.encode() not in database
+
+
+def test_client_identity_and_tls_metadata_never_reach_public_or_durable_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    certificate_reference = "file:SENTINEL_CLIENT_CERTIFICATE_REFERENCE"
+    private_key_reference = "file:SENTINEL_CLIENT_PRIVATE_KEY_REFERENCE"
+    certificate_material = "sentinel-client-certificate-material"
+    private_key_material = "sentinel-client-private-key-material"
+    metadata = "sentinel-subject sentinel-issuer sentinel-serial sentinel-fingerprint"
+
+    class IdentitySecrets:
+        def resolve(self, reference: SecretReference) -> SecretMaterial:
+            values = {
+                certificate_reference: certificate_material,
+                private_key_reference: private_key_material,
+            }
+            return SecretMaterial(values[str(reference)])
+
+    def validate(certificate: SecretMaterial, private_key: SecretMaterial) -> WebhookClientIdentity:
+        assert certificate.reveal_for_operation() == certificate_material
+        assert private_key.reveal_for_operation() == private_key_material
+        return WebhookClientIdentity(b"sentinel-canonical-certificate", b"sentinel-canonical-key")
+
+    @dataclass
+    class MetadataFailingTransport:
+        request: WebhookRequest | None = None
+
+        def post(
+            self,
+            endpoint: WebhookEndpoint,
+            destination: WebhookDestination,
+            request: WebhookRequest,
+        ) -> int:
+            self.request = request
+            raise RuntimeError(f"{metadata} /private/client-key.pem TLS alert")
+
+    monkeypatch.setattr(delivery_module, "validate_webhook_client_identity", validate)
+    endpoint = parse_webhook_endpoints(
+        {
+            "schema_version": 6,
+            "endpoints": {
+                "audit": {
+                    "url": "https://hooks.example.test/events",
+                    "allowed_hostnames": ["hooks.example.test"],
+                    "client_certificate_secret": certificate_reference,
+                    "client_private_key_secret": private_key_reference,
+                }
+            },
+        },
+        "workspace",
+    )["audit"]
+    transport = MetadataFailingTransport()
+    outbox = SqliteEventOutbox(tmp_path)
+    outbox.append(Event("workspace.initialized", {}))
+    outbox.register_consumer("mutual-tls")
+    service = EventDeliveryService(
+        outbox,
+        HttpsWebhookDeliveryAdapter(endpoint, Resolver(), transport, IdentitySecrets()),
+        DeliveryRetryProfile(3, (10, 30), 30),
+        lambda: _NOW,
+    )
+
+    result = service.step("mutual-tls")
+
+    assert result.failure_reason == TRANSPORT_FAILURE
+    assert transport.request is not None
+    assert "sentinel-canonical" not in repr(transport.request)
+    status = outbox.inspect_consumers(now=_NOW)[0]
+    surfaces = (repr(result), str(result.to_payload()), repr(status))
+    database = (tmp_path / ".ansiblectl/events/outbox.sqlite3").read_bytes()
+    for sentinel in (
+        certificate_reference,
+        private_key_reference,
+        certificate_material,
+        private_key_material,
+        "sentinel-canonical-certificate",
+        "sentinel-canonical-key",
+        *metadata.split(),
+        "/private/client-key.pem",
+        "TLS alert",
+    ):
+        assert all(sentinel not in surface for surface in surfaces)
         assert sentinel.encode() not in database
