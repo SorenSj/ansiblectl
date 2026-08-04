@@ -443,7 +443,7 @@ Explicit non-goals:
 - Configurable headers, time formats, precision, algorithms, skew, body transforms, or fallbacks.
 - Background workers, inbound APIs, hosted control planes, remote commands, or a TUI.
 
-## Active milestone
+## Most recently completed milestone
 
 ### v0.14.0 — Mutual TLS webhook client identity
 
@@ -467,7 +467,12 @@ Exit criteria:
 - [x] The complete local quality, build, provenance, and release gates pass.
 - [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
   [release PR #70](https://github.com/SorenSj/ansiblectl/pull/70).
-- [ ] The immutable v0.14.0 tag and tagged artifact workflow pass from the release merge commit.
+- [x] The immutable v0.14.0 tag and
+  [tagged artifact workflow](https://github.com/SorenSj/ansiblectl/actions/runs/30878274983) pass
+  from merge commit `3ddd4fa`.
+
+Readiness evidence was last reviewed on 2026-08-04. Version 0.14.0 is released, and its retained
+workflow artifact is named `ansiblectl-v0.14.0`; no existing release tag was moved or recreated.
 
 Explicit non-goals:
 
