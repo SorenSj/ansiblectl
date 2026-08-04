@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import atexit
 import os
+import select
 import signal
 import termios
 import threading
@@ -121,6 +122,8 @@ class DashboardTerminalSession:
         self._active = False
         self._registered = False
         self._resize_pending = False
+        self._wake_read_fd: int | None = None
+        self._wake_write_fd: int | None = None
 
     def preflight(self) -> None:
         """Validate terminal and signal capabilities without mutating process state."""
@@ -167,6 +170,13 @@ class DashboardTerminalSession:
             _write_all(self._stdout_fd, _ENTER_TERMINAL)
             while True:
                 self._render(snapshot, state)
+                if self._wake_read_fd is None:
+                    raise OSError("Dashboard resize wakeup is unavailable.")
+                readable, _, _ = select.select([self._stdin_fd, self._wake_read_fd], [], [])
+                if self._wake_read_fd in readable:
+                    with _suppress_terminal_errors():
+                        os.read(self._wake_read_fd, MAX_DASHBOARD_INPUT_BYTES)
+                    continue
                 action = parse_dashboard_input(os.read(self._stdin_fd, MAX_DASHBOARD_INPUT_BYTES))
                 if action is DashboardAction.QUIT:
                     return DashboardLoopResult(ExitCode.SUCCESS, state)
@@ -206,6 +216,12 @@ class DashboardTerminalSession:
                 with _suppress_terminal_errors():
                     signal.signal(number, handler)
             self._original_handlers.clear()
+            for descriptor_name in ("_wake_read_fd", "_wake_write_fd"):
+                descriptor = getattr(self, descriptor_name)
+                if descriptor is not None:
+                    with _suppress_terminal_errors():
+                        os.close(descriptor)
+                    setattr(self, descriptor_name, None)
             if self._registered:
                 atexit.unregister(self.restore)
                 self._registered = False
@@ -219,6 +235,9 @@ class DashboardTerminalSession:
             signal.SIGWINCH: self._resize,
         }
         try:
+            self._wake_read_fd, self._wake_write_fd = os.pipe()
+            os.set_blocking(self._wake_read_fd, False)
+            os.set_blocking(self._wake_write_fd, False)
             for number, handler in handlers.items():
                 self._original_handlers[number] = signal.getsignal(number)
                 signal.signal(number, handler)
@@ -235,6 +254,9 @@ class DashboardTerminalSession:
 
     def _resize(self, _number: int, _frame: FrameType | None) -> None:
         self._resize_pending = True
+        if self._wake_write_fd is not None:
+            with _suppress_terminal_errors():
+                os.write(self._wake_write_fd, b"r")
 
     def _render(self, snapshot: DashboardSnapshot, state: DashboardViewState) -> None:
         size = os.get_terminal_size(self._stdout_fd)
