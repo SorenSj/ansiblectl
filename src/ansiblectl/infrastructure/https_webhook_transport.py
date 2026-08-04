@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import http.client
+import io
+import select
 import socket
 import ssl
-from collections.abc import Callable, Mapping
+import time
+from collections.abc import Buffer, Callable, Mapping
 from contextlib import suppress
 from dataclasses import dataclass
+from functools import partial
 from typing import Protocol, cast
 from urllib.parse import urlsplit
 
@@ -139,14 +143,14 @@ class _MemoryIdentityHttpsConnection(http.client.HTTPConnection):
             tls_socket: SSL.Connection | None = None
             try:
                 raw_socket = socket.create_connection((address, self.port), self.timeout)
-                raw_socket.settimeout(self._read_timeout)
+                raw_socket.setblocking(False)
                 tls_socket = SSL.Connection(self._context, raw_socket)
                 tls_socket.set_connect_state()
                 tls_socket.set_tlsext_host_name(self.host.encode("ascii"))
-                tls_socket.do_handshake()
+                _run_ssl_operation(tls_socket.do_handshake, raw_socket, self.timeout)
                 _verify_peer_hostname(tls_socket, self.host)
                 self._raw_socket = raw_socket
-                self.sock = tls_socket
+                self.sock = _OpenSslSocket(tls_socket, raw_socket, self._read_timeout)
                 return
             except Exception as error:
                 last_error = error
@@ -162,12 +166,92 @@ class _MemoryIdentityHttpsConnection(http.client.HTTPConnection):
     def close(self) -> None:
         tls_socket = self.sock
         self.sock = None
-        if isinstance(tls_socket, SSL.Connection):
-            with suppress(Exception):
-                tls_socket.shutdown()
+        if tls_socket is not None:
+            tls_socket.close()
         if self._raw_socket is not None:
             self._raw_socket.close()
             self._raw_socket = None
+
+
+class _OpenSslSocket:
+    """Bounded socket interface expected by ``http.client`` over pyOpenSSL."""
+
+    def __init__(self, connection: SSL.Connection, raw_socket: socket.socket, timeout: int) -> None:
+        self._connection = connection
+        self._raw_socket = raw_socket
+        self._timeout = timeout
+
+    def sendall(self, data: bytes) -> None:
+        view = memoryview(data)
+        sent = 0
+        deadline = time.monotonic() + self._timeout
+        while sent < len(view):
+            remaining = view[sent:]
+            sent += _run_ssl_operation(
+                partial(self._connection.send, remaining),
+                self._raw_socket,
+                self._timeout,
+                deadline=deadline,
+            )
+
+    def recv(self, amount: int) -> bytes:
+        try:
+            return _run_ssl_operation(
+                lambda: self._connection.recv(amount), self._raw_socket, self._timeout
+            )
+        except (SSL.ZeroReturnError, SSL.SysCallError):
+            return b""
+
+    def makefile(self, mode: str) -> io.BufferedReader:
+        if mode != "rb":
+            raise ValueError("Webhook TLS response stream must be binary read-only.")
+        return io.BufferedReader(_OpenSslReader(self))
+
+    def close(self) -> None:
+        with suppress(Exception):
+            self._connection.shutdown()
+
+
+class _OpenSslReader(io.RawIOBase):
+    def __init__(self, tls_socket: _OpenSslSocket) -> None:
+        super().__init__()
+        self._tls_socket = tls_socket
+
+    def readable(self) -> bool:
+        return True
+
+    def readinto(self, buffer: Buffer) -> int:
+        view = memoryview(buffer).cast("B")
+        data = self._tls_socket.recv(len(view))
+        view[: len(data)] = data
+        return len(data)
+
+
+def _run_ssl_operation[T](
+    operation: Callable[[], T],
+    raw_socket: socket.socket,
+    timeout: int | float | None,
+    *,
+    deadline: float | None = None,
+) -> T:
+    if timeout is None:
+        raise TimeoutError("Webhook TLS operation requires a bounded timeout.")
+    expires = deadline if deadline is not None else time.monotonic() + timeout
+    while True:
+        try:
+            return operation()
+        except SSL.WantReadError:
+            readable, _, _ = select.select(
+                [raw_socket], [], [], max(0.0, expires - time.monotonic())
+            )
+            if not readable:
+                raise TimeoutError("Webhook TLS read timed out.") from None
+        except SSL.WantWriteError:
+            _, writable, _ = select.select(
+                [], [raw_socket], [], max(0.0, expires - time.monotonic())
+            )
+            if not writable:
+                raise TimeoutError("Webhook TLS write timed out.") from None
 
 
 def _make_identity_connection(
