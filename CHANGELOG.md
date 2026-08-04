@@ -4,6 +4,35 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-04
+
+### Added
+
+- ADR-0050 and TS-0033 defining bounded local delivery to immutable workspace-private event
+  archives without arbitrary output paths, mutable aggregate files, or background workers.
+- Canonical logical archive identifiers and deterministic sequence/event filenames below the fixed
+  `.ansiblectl/events/archives/` root.
+- Explicit `event deliver CONSUMER --archive ARCHIVE_ID --max-events N` selection alongside the
+  existing mutually exclusive HTTPS endpoint adapter.
+
+### Changed
+
+- Durable event envelopes now expose one centralized canonical JSON byte representation shared by
+  archive identity, replay validation, and immutable file content.
+- Archive delivery reuses the existing consumer ordering, lease, retry, acknowledgement, and
+  redacted result contracts without changing webhook behavior or existing outbox databases.
+- Exact canonical replay after an archive-write/outbox-ack crash succeeds idempotently without
+  rewriting the final file.
+
+### Security
+
+- Archive directories and files are installed with private modes, descriptor-relative custody,
+  staging, durable synchronization, and no-overwrite finalization.
+- Symlinks, alternate paths, unsafe metadata, conflicting content, partial writes, filesystem
+  failures, and same-event races fail closed with a stable redacted outcome.
+- Archive identifiers, paths, metadata, payloads, staging details, and filesystem exceptions remain
+  absent from public results and durable diagnostic state.
+
 ## [0.14.0] - 2026-08-04
 
 ### Added
