@@ -4,6 +4,7 @@ import pytest
 
 from ansiblectl.domain.errors import ConfigurationError
 from ansiblectl.domain.webhook_network_policy import parse_webhook_network_policies
+from ansiblectl.domain.webhook_tls_trust import WebhookTlsTrustPolicy
 from ansiblectl.domain.webhooks import parse_webhook_endpoints, resolve_webhook_destination
 
 
@@ -126,6 +127,35 @@ def test_schema_one_rejects_policy_field_and_schema_two_fails_closed_on_missing_
             "workspace",
         )
     assert "sentinel-policy" not in str(caught.value)
+
+
+def test_schema_three_binds_exact_immutable_tls_trust_independently() -> None:
+    trust = WebhookTlsTrustPolicy("sentinel-trust", b"sentinel-certificate")
+    endpoint = parse_webhook_endpoints(
+        endpoint_document(schema_version=3, tls_trust_policy="sentinel-trust"),
+        "workspace",
+        tls_trust_policies={"sentinel-trust": trust},
+    )["audit.primary"]
+
+    assert endpoint.schema_version == 3
+    assert endpoint.network_policy is None
+    assert endpoint.tls_trust_policy is trust
+    assert "sentinel-trust" not in repr(endpoint)
+    assert "sentinel-certificate" not in repr(endpoint)
+
+
+def test_older_schemas_reject_tls_trust_and_schema_three_requires_exact_policy() -> None:
+    for schema_version in (1, 2):
+        with pytest.raises(ConfigurationError, match="Unknown field"):
+            parse_webhook_endpoints(
+                endpoint_document(schema_version=schema_version, tls_trust_policy="private-ca"),
+                "workspace",
+            )
+    with pytest.raises(ConfigurationError, match="TLS trust policy reference"):
+        parse_webhook_endpoints(
+            endpoint_document(schema_version=3, tls_trust_policy="sentinel-trust"),
+            "workspace",
+        )
 
 
 def test_private_policy_requires_every_resolved_address_in_exact_ranges() -> None:

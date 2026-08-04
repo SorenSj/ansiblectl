@@ -10,6 +10,7 @@ from typing import cast
 import pytest
 
 from ansiblectl.domain.secrets import SecretMaterial
+from ansiblectl.domain.webhook_tls_trust import WebhookTlsTrustPolicy
 from ansiblectl.domain.webhooks import (
     WebhookDestination,
     WebhookEndpoint,
@@ -164,6 +165,18 @@ class TlsContext:
         return self.tls_socket
 
 
+class ExclusiveTlsContext(TlsContext):
+    def __init__(self, protocol: object, tls_socket: TlsSocket) -> None:
+        super().__init__(tls_socket)
+        self.protocol = protocol
+        self.verify_mode: object = None
+        self.check_hostname = False
+        self.loaded: list[str] = []
+
+    def load_verify_locations(self, *, cadata: str) -> None:
+        self.loaded.append(cadata)
+
+
 def test_connection_uses_validated_literal_with_original_hostname_for_tls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -187,3 +200,43 @@ def test_connection_uses_validated_literal_with_original_hostname_for_tls(
     assert connections == [(("8.8.8.8", 8443), 4)]
     assert context.wraps == [(raw_socket, "hooks.example.test")]
     assert tls_socket.timeout == 9
+
+
+def test_exclusive_context_loads_only_snapshot_and_keeps_mandatory_verification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tls_socket = TlsSocket()
+    contexts: list[ExclusiveTlsContext] = []
+
+    def context_factory(protocol: object) -> ExclusiveTlsContext:
+        context = ExclusiveTlsContext(protocol, tls_socket)
+        contexts.append(context)
+        return context
+
+    monkeypatch.setattr(ssl, "SSLContext", context_factory)
+    monkeypatch.setattr(
+        ssl,
+        "create_default_context",
+        lambda: pytest.fail("exclusive trust must not load platform roots"),
+    )
+    selected = endpoint()
+    object.__setattr__(
+        selected,
+        "tls_trust_policy",
+        WebhookTlsTrustPolicy(
+            "sentinel", b"-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE-----\n"
+        ),
+    )
+
+    connection = transport_module._make_connection(
+        selected, WebhookDestination(selected.hostname, selected.port, ("8.8.8.8",))
+    )
+
+    assert connection is not None
+    assert len(contexts) == 1
+    assert contexts[0].protocol == ssl.PROTOCOL_TLS_CLIENT
+    assert contexts[0].verify_mode == ssl.CERT_REQUIRED
+    assert contexts[0].check_hostname is True
+    assert contexts[0].loaded == [
+        "-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE-----\n"
+    ]
