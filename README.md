@@ -273,6 +273,21 @@ uv run ansiblectl --workspace ~/automation/example execution prune --keep 100
 uv run ansiblectl --workspace ~/automation/example execution prune --keep 100 --apply
 ```
 
+Operate durable public-event delivery without exposing event payloads. Registration is idempotent;
+retry and abandon require an exact sequence and event identifier. Abandonment and retention are
+preview-only unless `--apply` is supplied:
+
+```console
+uv run ansiblectl --workspace ~/automation/example event consumer register audit --start-sequence 1
+uv run ansiblectl --workspace ~/automation/example event consumer inspect
+uv run ansiblectl --workspace ~/automation/example event consumer retry audit \
+  --sequence 7 --event-id <event-id>
+uv run ansiblectl --workspace ~/automation/example event consumer abandon audit \
+  --sequence 7 --event-id <event-id>
+uv run ansiblectl --workspace ~/automation/example event retention
+uv run ansiblectl --workspace ~/automation/example event retention --apply
+```
+
 ## Project governance
 
 The repository is the authoritative source for Ansiblectl's normative
