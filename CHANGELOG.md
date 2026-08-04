@@ -16,6 +16,8 @@ All notable changes to Ansiblectl are documented here.
   symlink boundary checks for durable event state.
 - Deterministic bounded delivery retries, exact operator retry and abandon actions, payload-free
   consumer inspection, and preview-first shared-prefix retention.
+- An isolated in-process outbox subscriber composed alongside the existing JSONL audit subscriber,
+  with independent outbox and execution-history retention lifecycles.
 
 ## [0.4.0] - 2026-08-04
 
