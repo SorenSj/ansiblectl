@@ -501,7 +501,7 @@ Exit criteria:
 - [x] Adversarial tests prove archive paths, identifiers, metadata, payloads, and exceptions remain
   absent from public and durable diagnostic surfaces.
 - [x] Existing webhook delivery and outbox compatibility remain exact.
-- [ ] The complete local quality, build, provenance, and release gates pass.
+- [x] The complete local quality, build, provenance, and release gates pass.
 - [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
 - [ ] The immutable v0.15.0 tag and tagged artifact workflow pass from the release merge commit.
 
