@@ -173,6 +173,45 @@ def test_schema_four_binds_one_signing_reference_independently() -> None:
     assert "WEBHOOK_SIGNING_KEY" not in repr(endpoint)
 
 
+def test_schema_five_requires_explicit_integer_v2_for_signed_endpoint() -> None:
+    endpoint = parse_webhook_endpoints(
+        endpoint_document(
+            schema_version=5,
+            signature_secret="env:WEBHOOK_SIGNING_KEY",
+            signature_version=2,
+        ),
+        "workspace",
+    )["audit.primary"]
+
+    assert endpoint.schema_version == 5
+    assert endpoint.signature_version == 2
+    assert "WEBHOOK_SIGNING_KEY" not in repr(endpoint)
+
+
+@pytest.mark.parametrize("value", [None, True, False, 1, 3, "2"])
+def test_schema_five_rejects_missing_or_noncanonical_signed_version(value: object) -> None:
+    definition = endpoint_document(
+        schema_version=5,
+        signature_secret="env:WEBHOOK_SIGNING_KEY",
+        signature_version=value,
+    )
+    with pytest.raises(ConfigurationError, match="signature_version"):
+        parse_webhook_endpoints(definition, "workspace")
+
+
+def test_signature_version_requires_schema_five_and_signing_reference() -> None:
+    for schema_version in (1, 2, 3, 4):
+        with pytest.raises(ConfigurationError, match="Unknown field"):
+            parse_webhook_endpoints(
+                endpoint_document(schema_version=schema_version, signature_version=2), "workspace"
+            )
+    with pytest.raises(ConfigurationError, match="requires signature_secret"):
+        parse_webhook_endpoints(
+            endpoint_document(schema_version=5, bearer_secret=None, signature_version=2),
+            "workspace",
+        )
+
+
 def test_schema_four_combines_signing_network_and_tls_as_independent_controls() -> None:
     network_policies = parse_webhook_network_policies(private_policies(), "policy")
     trust = WebhookTlsTrustPolicy("private-ca", b"sentinel-certificate")

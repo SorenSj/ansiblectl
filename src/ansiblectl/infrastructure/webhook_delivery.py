@@ -13,6 +13,7 @@ from ansiblectl.domain.secrets import SecretProvider
 from ansiblectl.domain.webhooks import (
     MAX_WEBHOOK_PAYLOAD_BYTES,
     WebhookAddressResolver,
+    WebhookClock,
     WebhookEndpoint,
     WebhookRequest,
     WebhookTransport,
@@ -27,6 +28,7 @@ REMOTE_RETRYABLE = "REMOTE_RETRYABLE"
 SIGNING_UNAVAILABLE = "SIGNING_UNAVAILABLE"
 TRANSPORT_FAILURE = "TRANSPORT_FAILURE"
 WEBHOOK_SIGNATURE_DOMAIN = b"ansiblectl-webhook-signature-v1\n"
+WEBHOOK_SIGNATURE_V2_DOMAIN = b"ansiblectl-webhook-signature-v2\n"
 MIN_WEBHOOK_SIGNING_KEY_BYTES = 32
 MAX_WEBHOOK_SIGNING_KEY_BYTES = 256
 
@@ -39,6 +41,7 @@ class HttpsWebhookDeliveryAdapter:
     resolver: WebhookAddressResolver
     transport: WebhookTransport
     secrets: SecretProvider | None = None
+    clock: WebhookClock | None = None
 
     def deliver(self, envelope: DurableEventEnvelope) -> DeliveryOutcome:
         body = json.dumps(
@@ -58,6 +61,7 @@ class HttpsWebhookDeliveryAdapter:
             except Exception:
                 return DeliveryOutcome.failure(AUTHENTICATION_UNAVAILABLE)
         signature = None
+        timestamp = None
         if self.endpoint.signature_secret is not None:
             if self.secrets is None:
                 return DeliveryOutcome.failure(SIGNING_UNAVAILABLE)
@@ -71,10 +75,24 @@ class HttpsWebhookDeliveryAdapter:
                     ord(char) < 32 or 127 <= ord(char) <= 159 for char in signing_value
                 ):
                     return DeliveryOutcome.failure(SIGNING_UNAVAILABLE)
-                digest = hmac.new(
-                    signing_key, WEBHOOK_SIGNATURE_DOMAIN + body, hashlib.sha256
-                ).hexdigest()
-                signature = f"v1={digest}"
+                if self.endpoint.signature_version == 2:
+                    if self.clock is None:
+                        return DeliveryOutcome.failure(SIGNING_UNAVAILABLE)
+                    timestamp_value = self.clock.now_unix_seconds()
+                    if (
+                        not isinstance(timestamp_value, int)
+                        or isinstance(timestamp_value, bool)
+                        or not 0 <= timestamp_value <= 253_402_300_799
+                    ):
+                        return DeliveryOutcome.failure(SIGNING_UNAVAILABLE)
+                    timestamp = str(timestamp_value)
+                    signed = WEBHOOK_SIGNATURE_V2_DOMAIN + timestamp.encode("ascii") + b"\n" + body
+                    signature = f"v2={hmac.new(signing_key, signed, hashlib.sha256).hexdigest()}"
+                else:
+                    digest = hmac.new(
+                        signing_key, WEBHOOK_SIGNATURE_DOMAIN + body, hashlib.sha256
+                    ).hexdigest()
+                    signature = f"v1={digest}"
             except Exception:
                 return DeliveryOutcome.failure(SIGNING_UNAVAILABLE)
         try:
@@ -90,6 +108,8 @@ class HttpsWebhookDeliveryAdapter:
         }
         if signature is not None:
             headers["X-Ansiblectl-Signature"] = signature
+        if timestamp is not None:
+            headers["X-Ansiblectl-Timestamp"] = timestamp
         request = WebhookRequest(body, headers, bearer)
         try:
             status = self.transport.post(self.endpoint, destination, request)
@@ -114,4 +134,5 @@ __all__ = [
     "SIGNING_UNAVAILABLE",
     "TRANSPORT_FAILURE",
     "WEBHOOK_SIGNATURE_DOMAIN",
+    "WEBHOOK_SIGNATURE_V2_DOMAIN",
 ]

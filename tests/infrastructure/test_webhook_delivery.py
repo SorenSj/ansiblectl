@@ -39,6 +39,19 @@ class Resolver:
 
 
 @dataclass
+class Clock:
+    values: list[object]
+    calls: int = 0
+
+    def now_unix_seconds(self) -> int:
+        value = self.values[self.calls]
+        self.calls += 1
+        if isinstance(value, BaseException):
+            raise value
+        return value  # type: ignore[return-value]
+
+
+@dataclass
 class Transport:
     status: object = 204
     calls: list[tuple[WebhookEndpoint, WebhookDestination, WebhookRequest]] = field(
@@ -77,7 +90,9 @@ class MappingSecrets:
         return SecretMaterial(self.values[reference.key])
 
 
-def endpoint(*, authenticated: bool = False, signed: bool = False) -> WebhookEndpoint:
+def endpoint(
+    *, authenticated: bool = False, signed: bool = False, timestamped: bool = False
+) -> WebhookEndpoint:
     definition: dict[str, object] = {
         "url": "https://hooks.example.test/events",
         "allowed_hostnames": ["hooks.example.test"],
@@ -86,7 +101,13 @@ def endpoint(*, authenticated: bool = False, signed: bool = False) -> WebhookEnd
         definition["bearer_secret"] = "env:WEBHOOK_TOKEN"
     if signed:
         definition["signature_secret"] = "env:WEBHOOK_SIGNING_KEY"
-    document = {"schema_version": 4 if signed else 1, "endpoints": {"audit": definition}}
+    if timestamped:
+        definition["signature_secret"] = "env:WEBHOOK_SIGNING_KEY"
+        definition["signature_version"] = 2
+    document = {
+        "schema_version": 5 if timestamped else 4 if signed else 1,
+        "endpoints": {"audit": definition},
+    }
     return parse_webhook_endpoints(document, "test")["audit"]
 
 
@@ -214,6 +235,83 @@ def test_adapter_signs_exact_canonical_body_with_fixed_hmac_vector() -> None:
     )
     assert "WEBHOOK_SIGNING_KEY" not in repr(request)
     assert "0123456789abcdef" not in repr(request)
+
+
+def test_adapter_signs_timestamp_and_exact_body_with_fixed_v2_vector() -> None:
+    transport = Transport()
+    secrets = Secrets("0123456789abcdef0123456789abcdef")
+    clock = Clock([0])
+
+    outcome = HttpsWebhookDeliveryAdapter(
+        endpoint(timestamped=True), Resolver(), transport, secrets, clock
+    ).deliver(envelope())
+
+    assert outcome.state is DeliveryOutcomeState.DELIVERED
+    assert clock.calls == 1
+    request = transport.calls[0][2]
+    assert request.headers["X-Ansiblectl-Timestamp"] == "0"
+    assert request.headers["X-Ansiblectl-Signature"] == (
+        "v2=f0d22c4f3df989ad73de48c92f2f4eb8c15c3b79d4726d6ba7bb914cf2189c9c"
+    )
+
+
+@pytest.mark.parametrize(
+    "value", [-1, 253_402_300_800, True, False, 1.5, "1", RuntimeError("private clock")]
+)
+def test_invalid_v2_clock_fails_before_dns(value: object) -> None:
+    resolver = Resolver()
+    transport = Transport()
+    clock = Clock([value])
+
+    outcome = HttpsWebhookDeliveryAdapter(
+        endpoint(timestamped=True),
+        resolver,
+        transport,
+        Secrets("0123456789abcdef0123456789abcdef"),
+        clock,
+    ).deliver(envelope())
+
+    assert outcome.failure_reason == SIGNING_UNAVAILABLE
+    assert clock.calls == 1
+    assert resolver.calls == 0
+    assert transport.calls == []
+
+
+def test_v2_retry_reads_new_timestamp_with_stable_body_and_identity() -> None:
+    transport = Transport()
+    clock = Clock([1, 2])
+    adapter = HttpsWebhookDeliveryAdapter(
+        endpoint(timestamped=True),
+        Resolver(),
+        transport,
+        Secrets("0123456789abcdef0123456789abcdef"),
+        clock,
+    )
+
+    assert adapter.deliver(envelope()).state is DeliveryOutcomeState.DELIVERED
+    assert adapter.deliver(envelope()).state is DeliveryOutcomeState.DELIVERED
+
+    first, second = (call[2] for call in transport.calls)
+    assert clock.calls == 2
+    assert first.body == second.body
+    assert first.headers["Idempotency-Key"] == second.headers["Idempotency-Key"]
+    assert first.headers["X-Ansiblectl-Timestamp"] == "1"
+    assert second.headers["X-Ansiblectl-Timestamp"] == "2"
+    assert first.headers["X-Ansiblectl-Signature"] != second.headers["X-Ansiblectl-Signature"]
+
+
+def test_v1_and_unsigned_delivery_never_read_clock() -> None:
+    clock = Clock([RuntimeError("must not be called")])
+    for selected in (endpoint(), endpoint(signed=True)):
+        outcome = HttpsWebhookDeliveryAdapter(
+            selected,
+            Resolver(),
+            Transport(),
+            Secrets("0123456789abcdef0123456789abcdef"),
+            clock,
+        ).deliver(envelope())
+        assert outcome.state is DeliveryOutcomeState.DELIVERED
+    assert clock.calls == 0
 
 
 def test_bearer_and_signing_secrets_are_resolved_once_before_dns() -> None:

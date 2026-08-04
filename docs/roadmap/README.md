@@ -419,10 +419,10 @@ Exit criteria:
 
 - [x] ADR-0048 and TS-0031 define schema, clock, timestamp, canonical bytes, headers, retry,
   compatibility, lifecycle, failure, and redaction contracts before implementation.
-- [ ] Schema v5 selects signature v2 while schemas 1 through 4 retain exact behavior.
-- [ ] Fixed vectors prove timestamp bounds, canonical encoding, domain separation, and HMAC bytes.
-- [ ] All secret and clock validation precedes DNS with no v1, alternate-clock, or unsigned fallback.
-- [ ] Retries retain event/body/idempotency identity while reading a new timestamp per attempt.
+- [x] Schema v5 selects signature v2 while schemas 1 through 4 retain exact behavior.
+- [x] Fixed vectors prove timestamp bounds, canonical encoding, domain separation, and HMAC bytes.
+- [x] All secret and clock validation precedes DNS with no v1, alternate-clock, or unsigned fallback.
+- [x] Retries retain event/body/idempotency identity while reading a new timestamp per attempt.
 - [ ] V2 composes with bearer authentication, env/file custody, network policy, and TLS trust.
 - [ ] Adversarial tests prove sensitive and request-local signing state never reaches public or
   durable surfaces.
