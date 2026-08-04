@@ -134,6 +134,32 @@ Explicit non-goals:
 - Exactly-once guarantees or distributed transactions with consumer side effects.
 - Automatic abandonment, unbounded retries, or using execution history as the outbox.
 
+## Active milestone
+
+### v0.6.0 — Local event delivery operations
+
+- Bounded application orchestration over the durable consumer claim and acknowledgement contract.
+- An injected transport-neutral adapter port with stable redacted outcomes.
+- Safe local operator commands for registration, inspection, retry, abandon, and retention.
+- Versioned human, JSON, and YAML results without payloads, paths, credentials, or adapter details.
+
+Exit criteria:
+
+- [x] ADR-0041 and TS-0024 define runner, adapter, operator, and output contracts before
+  implementation.
+- [ ] One-step and bounded-batch delivery preserve ordering, leases, retry, and stale-worker safety.
+- [ ] Operator commands enforce exact targets and preview-first destructive actions.
+- [ ] Human, JSON, and YAML results are schema-aligned and redaction-safe.
+- [ ] Existing v0.5 databases and all prior CLI, SDK, event, and history contracts remain compatible.
+- [ ] The complete quality, build, provenance, and release gates pass.
+
+Explicit non-goals:
+
+- Concrete remote delivery transports, endpoint credentials, authentication, authorization, or
+  tenancy.
+- Schedulers, daemons, background threads, infinite polling, or automatic recovery actions.
+- Exactly-once guarantees, automatic abandon, or automatic retention.
+
 ### Future — Remote delivery adapters
 
 - Remote API authentication, authorization, tenancy, lifecycle, and compatibility.
