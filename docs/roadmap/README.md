@@ -296,7 +296,7 @@ Exit criteria:
 
 - [x] ADR-0045 and TS-0028 define policy, bundle, certificate, endpoint, TLS, lifecycle,
   compatibility, and redaction contracts before implementation.
-- [ ] Strict trust-policy and bundle loading rejects traversal, unsafe files, permissions, ownership,
+- [x] Strict trust-policy and bundle loading rejects traversal, unsafe files, permissions, ownership,
   ambiguity, excess bounds, foreign blocks, duplicate certificates, and invalid CA semantics.
 - [ ] Endpoint schema version 3 binds at most one immutable trust snapshot while versions 1 and 2
   retain platform trust and reject the new field.
