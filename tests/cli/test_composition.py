@@ -121,3 +121,30 @@ endpoints:
     assert isinstance(service.adapter.secrets, EnvironmentSecretProvider)
     with pytest.raises(ConfigurationError, match="not configured"):
         build_webhook_delivery_service(tmp_path, "missing")
+
+
+def test_webhook_delivery_composition_binds_private_policy_once(tmp_path: Path) -> None:
+    private = tmp_path / ".ansiblectl"
+    private.mkdir()
+    (private / "webhook-network-policies.yaml").write_text(
+        "schema_version: 1\npolicies:\n  receiver:\n    allowed_cidrs: [10.20.0.0/16]\n",
+        encoding="utf-8",
+    )
+    (private / "webhooks.yaml").write_text(
+        """schema_version: 2
+endpoints:
+  primary:
+    url: https://hooks.example.test/events
+    allowed_hostnames: [hooks.example.test]
+    network_policy: receiver
+""",
+        encoding="utf-8",
+    )
+
+    service = build_webhook_delivery_service(tmp_path, "primary")
+
+    assert isinstance(service.adapter, HttpsWebhookDeliveryAdapter)
+    assert service.adapter.endpoint.network_policy is not None
+    assert tuple(
+        str(item) for item in service.adapter.endpoint.network_policy.allowed_networks
+    ) == ("10.20.0.0/16",)

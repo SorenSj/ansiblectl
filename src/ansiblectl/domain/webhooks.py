@@ -12,8 +12,9 @@ from urllib.parse import urlsplit
 
 from ansiblectl.domain.errors import ConfigurationError
 from ansiblectl.domain.secrets import SecretMaterial, SecretReference
+from ansiblectl.domain.webhook_network_policy import WebhookNetworkPolicy
 
-WEBHOOK_CONFIGURATION_SCHEMA_VERSION = 1
+WEBHOOK_CONFIGURATION_SCHEMA_VERSION = 2
 MAX_WEBHOOK_TIMEOUT_SECONDS = 60
 MAX_WEBHOOK_PAYLOAD_BYTES = 262_144
 MAX_WEBHOOK_BATCH_EVENTS = 100
@@ -26,9 +27,10 @@ _ENDPOINT_FIELDS = {
     "read_timeout_seconds",
     "url",
 }
+_ENDPOINT_FIELDS_V2 = _ENDPOINT_FIELDS | {"network_policy"}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class WebhookEndpoint:
     """One validated named HTTPS destination without secret material."""
 
@@ -40,7 +42,11 @@ class WebhookEndpoint:
     bearer_secret: SecretReference | None
     connect_timeout_seconds: int
     read_timeout_seconds: int
+    network_policy: WebhookNetworkPolicy | None = None
     schema_version: int = WEBHOOK_CONFIGURATION_SCHEMA_VERSION
+
+    def __repr__(self) -> str:
+        return "WebhookEndpoint(endpoint_id=<redacted>, url=<redacted>, network_policy=<redacted>)"
 
 
 @dataclass(frozen=True)
@@ -88,17 +94,22 @@ class WebhookTransport(Protocol):
 
 
 def parse_webhook_endpoints(
-    values: Mapping[str, object], origin: str
+    values: Mapping[str, object],
+    origin: str,
+    policies: Mapping[str, WebhookNetworkPolicy] | None = None,
 ) -> Mapping[str, WebhookEndpoint]:
     """Parse one versioned endpoint document into immutable typed endpoints."""
 
     unknown = set(values) - {"schema_version", "endpoints"}
     if unknown:
         raise ConfigurationError(f"Unknown webhook field '{sorted(unknown)[0]}' in {origin}.")
-    if values.get("schema_version") != WEBHOOK_CONFIGURATION_SCHEMA_VERSION:
+    schema_version = values.get("schema_version")
+    if schema_version not in {1, WEBHOOK_CONFIGURATION_SCHEMA_VERSION}:
         raise ConfigurationError(
-            f"Webhook schema_version in {origin} must be {WEBHOOK_CONFIGURATION_SCHEMA_VERSION}."
+            f"Webhook schema_version in {origin} must be 1 or "
+            f"{WEBHOOK_CONFIGURATION_SCHEMA_VERSION}."
         )
+    assert isinstance(schema_version, int)
     endpoints = values.get("endpoints")
     if not isinstance(endpoints, dict):
         raise ConfigurationError(f"Webhook endpoints in {origin} must be a mapping.")
@@ -110,14 +121,16 @@ def parse_webhook_endpoints(
             raise ConfigurationError(
                 f"Webhook endpoint '{endpoint_id}' in {origin} must be a mapping."
             )
-        parsed[endpoint_id] = _parse_endpoint(endpoint_id, definition, origin)
+        parsed[endpoint_id] = _parse_endpoint(
+            endpoint_id, definition, origin, schema_version, policies or {}
+        )
     return MappingProxyType(parsed)
 
 
 def resolve_webhook_destination(
     endpoint: WebhookEndpoint, resolver: WebhookAddressResolver
 ) -> WebhookDestination:
-    """Resolve and reject any destination containing a non-global address."""
+    """Resolve and require every address to satisfy one immutable endpoint policy."""
 
     try:
         candidates = resolver.resolve(endpoint.hostname, endpoint.port)
@@ -131,24 +144,23 @@ def resolve_webhook_destination(
             address = ipaddress.ip_address(candidate)
         except ValueError as error:
             raise ConfigurationError("Webhook destination resolution was not canonical.") from error
-        if (
-            not address.is_global
-            or address.is_loopback
-            or address.is_link_local
-            or address.is_multicast
-            or address.is_unspecified
-            or address.is_reserved
-            or address.is_private
-        ):
-            raise ConfigurationError("Webhook destination is denied by address policy.")
         canonical = str(address)
+        if canonical != candidate or not _address_allowed(endpoint, address):
+            raise ConfigurationError("Webhook destination is denied by address policy.")
         if canonical not in addresses:
             addresses.append(canonical)
     return WebhookDestination(endpoint.hostname, endpoint.port, tuple(addresses))
 
 
-def _parse_endpoint(endpoint_id: str, values: Mapping[str, object], origin: str) -> WebhookEndpoint:
-    unknown = set(values) - _ENDPOINT_FIELDS
+def _parse_endpoint(
+    endpoint_id: str,
+    values: Mapping[str, object],
+    origin: str,
+    schema_version: int,
+    policies: Mapping[str, WebhookNetworkPolicy],
+) -> WebhookEndpoint:
+    allowed_fields = _ENDPOINT_FIELDS if schema_version == 1 else _ENDPOINT_FIELDS_V2
+    unknown = set(values) - allowed_fields
     if unknown:
         raise ConfigurationError(
             f"Unknown field '{sorted(unknown)[0]}' for webhook endpoint "
@@ -176,16 +188,48 @@ def _parse_endpoint(endpoint_id: str, values: Mapping[str, object], origin: str)
     read_timeout = _positive_timeout(
         values.get("read_timeout_seconds", 30), endpoint_id, "read_timeout_seconds"
     )
+    network_policy = _resolve_network_policy(values.get("network_policy"), policies, origin)
     return WebhookEndpoint(
-        endpoint_id,
-        url,
-        hostname,
-        port,
-        allowed,
-        bearer_secret,
-        connect_timeout,
-        read_timeout,
+        endpoint_id=endpoint_id,
+        url=url,
+        hostname=hostname,
+        port=port,
+        allowed_hostnames=allowed,
+        bearer_secret=bearer_secret,
+        connect_timeout_seconds=connect_timeout,
+        read_timeout_seconds=read_timeout,
+        network_policy=network_policy,
+        schema_version=schema_version,
     )
+
+
+def _resolve_network_policy(
+    value: object,
+    policies: Mapping[str, WebhookNetworkPolicy],
+    origin: str,
+) -> WebhookNetworkPolicy | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or value not in policies:
+        raise ConfigurationError(f"Webhook network policy reference in {origin} is not configured.")
+    return policies[value]
+
+
+def _address_allowed(
+    endpoint: WebhookEndpoint, address: ipaddress.IPv4Address | ipaddress.IPv6Address
+) -> bool:
+    if (
+        address.is_loopback
+        or address.is_link_local
+        or address.is_multicast
+        or address.is_unspecified
+        or address.is_reserved
+        or (isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None)
+    ):
+        return False
+    if endpoint.network_policy is None:
+        return address.is_global and not address.is_private
+    return any(address in network for network in endpoint.network_policy.allowed_networks)
 
 
 def _parse_https_url(url: str, endpoint_id: str) -> tuple[str, int]:
