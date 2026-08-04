@@ -243,7 +243,7 @@ Explicit non-goals:
   revocation, caching, persistence, or background refresh.
 - CLI secret input, interactive prompts, inbound APIs, background delivery, or remote control.
 
-## Most recently completed milestone
+## Completed milestone
 
 ### v0.9.0 — Private webhook network policy
 
@@ -283,7 +283,7 @@ Explicit non-goals:
   insecure TLS.
 - Background workers, schedulers, daemons, inbound APIs, hosted control planes, or remote commands.
 
-## Active milestone
+## Most recently completed milestone
 
 ### v0.10.0 — Exclusive webhook CA trust
 
@@ -308,7 +308,12 @@ Exit criteria:
 - [x] The complete local quality, build, provenance, and release gates pass.
 - [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
   [PR #45](https://github.com/SorenSj/ansiblectl/pull/45).
-- [ ] The immutable v0.10.0 tag and tagged artifact workflow pass from the reviewed merge commit.
+- [x] The immutable v0.10.0 tag and
+  [tagged artifact workflow](https://github.com/SorenSj/ansiblectl/actions/runs/30872153175) pass
+  from merge commit `204b5f2`.
+
+Readiness evidence was last reviewed on 2026-08-04. Version 0.10.0 is released, and its retained
+workflow artifact is named `ansiblectl-v0.10.0`; no existing release tag was moved or recreated.
 
 Explicit non-goals:
 
