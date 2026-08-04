@@ -466,7 +466,7 @@ Exit criteria:
 - [x] Adversarial tests prove identity material and metadata never reach public or durable surfaces.
 - [x] The complete local quality, build, provenance, and release gates pass.
 - [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
-  [PR #69](https://github.com/SorenSj/ansiblectl/pull/69).
+  [release PR #70](https://github.com/SorenSj/ansiblectl/pull/70).
 - [ ] The immutable v0.14.0 tag and tagged artifact workflow pass from the release merge commit.
 
 Explicit non-goals:
