@@ -6,11 +6,15 @@ import json
 import os
 import sqlite3
 from contextlib import closing
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from ansiblectl.domain.context import new_operation_id
-from ansiblectl.domain.durable_events import DurableEventEnvelope
+from ansiblectl.domain.durable_events import (
+    DurableEventClaim,
+    DurableEventEnvelope,
+    validate_consumer_id,
+)
 from ansiblectl.domain.errors import StateError
 from ansiblectl.domain.events import Event
 from ansiblectl.infrastructure.file_locking import locked
@@ -30,12 +34,46 @@ CREATE TABLE events (
     operation_id TEXT,
     payload_json TEXT NOT NULL
 );
+CREATE TABLE consumers (
+    consumer_id TEXT PRIMARY KEY,
+    next_sequence INTEGER NOT NULL CHECK (next_sequence >= 1),
+    registered_at TEXT NOT NULL,
+    claim_sequence INTEGER,
+    claim_event_id TEXT,
+    claim_token TEXT,
+    claim_expires_at TEXT,
+    CHECK (
+        (claim_sequence IS NULL AND claim_event_id IS NULL AND claim_token IS NULL
+         AND claim_expires_at IS NULL)
+        OR
+        (claim_sequence IS NOT NULL AND claim_event_id IS NOT NULL AND claim_token IS NOT NULL
+         AND claim_expires_at IS NOT NULL)
+    )
+);
 CREATE TRIGGER events_immutable
 BEFORE UPDATE ON events
 BEGIN
     SELECT RAISE(ABORT, 'durable events are immutable');
 END;
 PRAGMA user_version = 1;
+"""
+_CONSUMER_SCHEMA = """
+CREATE TABLE IF NOT EXISTS consumers (
+    consumer_id TEXT PRIMARY KEY,
+    next_sequence INTEGER NOT NULL CHECK (next_sequence >= 1),
+    registered_at TEXT NOT NULL,
+    claim_sequence INTEGER,
+    claim_event_id TEXT,
+    claim_token TEXT,
+    claim_expires_at TEXT,
+    CHECK (
+        (claim_sequence IS NULL AND claim_event_id IS NULL AND claim_token IS NULL
+         AND claim_expires_at IS NULL)
+        OR
+        (claim_sequence IS NOT NULL AND claim_event_id IS NOT NULL AND claim_token IS NOT NULL
+         AND claim_expires_at IS NOT NULL)
+    )
+);
 """
 
 
@@ -124,6 +162,151 @@ class SqliteEventOutbox:
                 hint="Inspect the workspace event outbox before retrying.",
             ) from error
 
+    def register_consumer(
+        self,
+        consumer_id: str,
+        *,
+        start_sequence: int = 1,
+        registered_at: str | None = None,
+    ) -> None:
+        """Idempotently establish a consumer's first desired sequence."""
+
+        validate_consumer_id(consumer_id)
+        _validate_sequence(start_sequence)
+        assigned_time = registered_at or _canonical_time(datetime.now(UTC))
+        _parse_time(assigned_time)
+        try:
+            with closing(self._connect()) as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute(
+                    "SELECT next_sequence FROM consumers WHERE consumer_id = ?",
+                    (consumer_id,),
+                ).fetchone()
+                if row is None:
+                    connection.execute(
+                        "INSERT INTO consumers(consumer_id, next_sequence, registered_at) "
+                        "VALUES (?, ?, ?)",
+                        (consumer_id, start_sequence, assigned_time),
+                    )
+                elif row != (start_sequence,):
+                    raise StateError(
+                        "Durable event consumer is already registered at another sequence."
+                    )
+                connection.commit()
+        except (OSError, sqlite3.Error) as error:
+            raise StateError("Durable event consumer could not be registered safely.") from error
+
+    def claim_next(
+        self,
+        consumer_id: str,
+        *,
+        lease_seconds: int = 30,
+        now: datetime | None = None,
+        claim_token: str | None = None,
+    ) -> DurableEventClaim | None:
+        """Lease only the consumer's exact next sequence, if it is available."""
+
+        validate_consumer_id(consumer_id)
+        if (
+            not isinstance(lease_seconds, int)
+            or isinstance(lease_seconds, bool)
+            or lease_seconds < 1
+        ):
+            raise ValueError("Durable event lease must be a positive integer number of seconds.")
+        current = now or datetime.now(UTC)
+        current_text = _canonical_time(current)
+        assigned_token = claim_token or new_operation_id()
+        expires_at = _canonical_time(current + timedelta(seconds=lease_seconds))
+        try:
+            with closing(self._connect()) as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                consumer = connection.execute(
+                    """
+                    SELECT next_sequence, claim_expires_at
+                    FROM consumers WHERE consumer_id = ?
+                    """,
+                    (consumer_id,),
+                ).fetchone()
+                if consumer is None:
+                    raise StateError("Durable event consumer is not registered.")
+                next_sequence, active_expiry = consumer
+                if isinstance(active_expiry, str) and active_expiry > current_text:
+                    connection.rollback()
+                    return None
+                row = connection.execute(
+                    """
+                    SELECT event_id, sequence, name, occurred_at, operation_id, payload_json,
+                           schema_version
+                    FROM events WHERE sequence = ?
+                    """,
+                    (next_sequence,),
+                ).fetchone()
+                if row is None:
+                    connection.execute(
+                        """
+                        UPDATE consumers SET claim_sequence = NULL, claim_event_id = NULL,
+                                             claim_token = NULL, claim_expires_at = NULL
+                        WHERE consumer_id = ?
+                        """,
+                        (consumer_id,),
+                    )
+                    connection.commit()
+                    return None
+                envelope = _envelope_from_row(row)
+                claim = DurableEventClaim(consumer_id, assigned_token, expires_at, envelope)
+                connection.execute(
+                    """
+                    UPDATE consumers
+                    SET claim_sequence = ?, claim_event_id = ?, claim_token = ?,
+                        claim_expires_at = ?
+                    WHERE consumer_id = ? AND next_sequence = ?
+                    """,
+                    (
+                        envelope.sequence,
+                        envelope.event_id,
+                        claim.claim_token,
+                        claim.lease_expires_at,
+                        consumer_id,
+                        envelope.sequence,
+                    ),
+                )
+                connection.commit()
+                return claim
+        except (OSError, sqlite3.Error, TypeError, ValueError, json.JSONDecodeError) as error:
+            raise StateError("Durable event could not be claimed safely.") from error
+
+    def acknowledge(
+        self,
+        consumer_id: str,
+        *,
+        sequence: int,
+        event_id: str,
+        claim_token: str,
+    ) -> None:
+        """Advance a consumer only when every claim identity field still matches."""
+
+        validate_consumer_id(consumer_id)
+        _validate_sequence(sequence)
+        try:
+            with closing(self._connect()) as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                cursor = connection.execute(
+                    """
+                    UPDATE consumers
+                    SET next_sequence = next_sequence + 1,
+                        claim_sequence = NULL, claim_event_id = NULL,
+                        claim_token = NULL, claim_expires_at = NULL
+                    WHERE consumer_id = ? AND next_sequence = ? AND claim_sequence = ?
+                      AND claim_event_id = ? AND claim_token = ?
+                    """,
+                    (consumer_id, sequence, sequence, event_id, claim_token),
+                )
+                if cursor.rowcount != 1:
+                    raise StateError("Durable event acknowledgement is stale or invalid.")
+                connection.commit()
+        except (OSError, sqlite3.Error) as error:
+            raise StateError("Durable event could not be acknowledged safely.") from error
+
     def _connect(self) -> sqlite3.Connection:
         self._prepare_path()
         try:
@@ -147,6 +330,7 @@ class SqliteEventOutbox:
                         raise StateError("Durable event outbox schema is unsupported.")
                 else:
                     connection.executescript(_SCHEMA)
+                connection.executescript(_CONSUMER_SCHEMA)
             return connection
         except (OSError, sqlite3.Error):
             if "connection" in locals():
@@ -204,6 +388,28 @@ def _envelope_from_row(row: tuple[object, ...]) -> DurableEventEnvelope:
         payload=payload,
         schema_version=schema_version,  # type: ignore[arg-type]
     )
+
+
+def _canonical_time(value: datetime) -> str:
+    if value.tzinfo is None or value.utcoffset() != timedelta(0):
+        raise ValueError("Durable event time must be timezone-aware UTC.")
+    return value.isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+
+def _parse_time(value: str) -> datetime:
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=UTC)
+    except (TypeError, ValueError) as error:
+        raise ValueError("Durable event time must be canonical UTC with microseconds.") from error
+    if _canonical_time(parsed) != value:
+        raise ValueError("Durable event time must be canonical UTC with microseconds.")
+    return parsed
+
+
+def _validate_sequence(sequence: object) -> int:
+    if not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 1:
+        raise ValueError("Durable event sequence must be a positive integer.")
+    return sequence
 
 
 __all__ = ["MAX_ENVELOPE_BYTES", "SCHEMA_VERSION", "SqliteEventOutbox"]

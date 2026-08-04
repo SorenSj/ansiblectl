@@ -10,6 +10,8 @@ All notable changes to Ansiblectl are documented here.
   deterministic retry, operator recovery, and safe retention contracts.
 - Schema-versioned SQLite event outbox with immutable redacted envelopes and atomic sequence
   allocation.
+- Durable consumer registration, ordered leased claims, acknowledgements, and stale-worker
+  rejection backed by the workspace SQLite outbox.
 
 ## [0.4.0] - 2026-08-04
 
