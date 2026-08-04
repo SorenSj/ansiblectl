@@ -4,6 +4,33 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-04
+
+### Added
+
+- ADR-0047 and TS-0030 defining a fixed workspace-private file secret provider without arbitrary
+  paths, configurable roots, provider fallback, or background lifecycle management.
+- Exact `file:NAME` routing to `.ansiblectl/secrets/NAME` for bounded webhook bearer authentication
+  and HMAC signing alongside unchanged `env:NAME` references.
+- Operator guidance and repository exclusion for the private secret namespace.
+
+### Changed
+
+- Webhook delivery now routes each reference to exactly one selected provider and resolves all
+  required material before DNS, socket, TLS, or HTTP activity.
+- Atomic operator-managed file replacement is observed on the next delivery attempt while an
+  in-flight resolution remains bound to its validated descriptor snapshot.
+
+### Security
+
+- Descriptor-relative, no-follow access validates private ownership, permissions, regular-file
+  type, single-link custody, device identity, platform capabilities, exact UTF-8 content, and an
+  8 KiB bound without trimming or mutation.
+- Symlink, directory-replacement, file-replacement, special-file, hard-link, permission, ownership,
+  malformed-content, and unsupported-platform paths fail closed with one stable redacted error.
+- Secret names, paths, values, metadata, provider details, and exceptions remain absent from public
+  results, logs, events, history, retry state, and raw SQLite storage.
+
 ## [0.11.0] - 2026-08-04
 
 ### Added
