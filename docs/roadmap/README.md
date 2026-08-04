@@ -302,7 +302,7 @@ Exit criteria:
   retain platform trust and reject the new field.
 - [x] Exclusive contexts load no platform roots and retain `CERT_REQUIRED`, hostname checking,
   original-hostname SNI, and validated-address binding.
-- [ ] Failures never fall back and expose no policy, path, certificate, or TLS detail.
+- [x] Failures never fall back and expose no policy, path, certificate, or TLS detail.
 - [ ] Existing v0.5 databases and v0.6-v0.9 CLI, SDK, event, history, secret, endpoint,
   network-policy, runner, and transport contracts remain compatible.
 - [ ] The complete local quality, build, provenance, and release gates pass.

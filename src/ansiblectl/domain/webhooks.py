@@ -240,14 +240,12 @@ def _resolve_network_policy(
 def _resolve_tls_trust_policy(
     value: object,
     policies: Mapping[str, WebhookTlsTrustPolicy],
-    origin: str,
+    _origin: str,
 ) -> WebhookTlsTrustPolicy | None:
     if value is None:
         return None
     if not isinstance(value, str) or value not in policies:
-        raise ConfigurationError(
-            f"Webhook TLS trust policy reference in {origin} is not configured."
-        )
+        raise ConfigurationError("Webhook TLS trust policy reference is not configured.")
     return policies[value]
 
 

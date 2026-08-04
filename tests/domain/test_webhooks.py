@@ -151,11 +151,13 @@ def test_older_schemas_reject_tls_trust_and_schema_three_requires_exact_policy()
                 endpoint_document(schema_version=schema_version, tls_trust_policy="private-ca"),
                 "workspace",
             )
-    with pytest.raises(ConfigurationError, match="TLS trust policy reference"):
+    with pytest.raises(ConfigurationError, match="TLS trust policy reference") as caught:
         parse_webhook_endpoints(
             endpoint_document(schema_version=3, tls_trust_policy="sentinel-trust"),
-            "workspace",
+            "/sentinel/private/workspace/.ansiblectl/webhooks.yaml",
         )
+    assert "sentinel-trust" not in str(caught.value)
+    assert "/sentinel/private" not in str(caught.value)
 
 
 def test_private_policy_requires_every_resolved_address_in_exact_ranges() -> None:
