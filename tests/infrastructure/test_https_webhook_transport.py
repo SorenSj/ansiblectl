@@ -237,6 +237,4 @@ def test_exclusive_context_loads_only_snapshot_and_keeps_mandatory_verification(
     assert contexts[0].protocol == ssl.PROTOCOL_TLS_CLIENT
     assert contexts[0].verify_mode == ssl.CERT_REQUIRED
     assert contexts[0].check_hostname is True
-    assert contexts[0].loaded == [
-        "-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE-----\n"
-    ]
+    assert contexts[0].loaded == ["-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE-----\n"]
