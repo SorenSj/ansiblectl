@@ -147,7 +147,7 @@ Exit criteria:
 
 - [x] ADR-0041 and TS-0024 define runner, adapter, operator, and output contracts before
   implementation.
-- [ ] One-step and bounded-batch delivery preserve ordering, leases, retry, and stale-worker safety.
+- [x] One-step and bounded-batch delivery preserve ordering, leases, retry, and stale-worker safety.
 - [ ] Operator commands enforce exact targets and preview-first destructive actions.
 - [ ] Human, JSON, and YAML results are schema-aligned and redaction-safe.
 - [ ] Existing v0.5 databases and all prior CLI, SDK, event, and history contracts remain compatible.
