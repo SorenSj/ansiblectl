@@ -100,7 +100,7 @@ Explicit non-goals:
 - Online key discovery, trust on first use, automatic revocation, or transparency-log availability.
 - Hosted policy management, remote API, or plugin execution sandboxing.
 
-## Most recently completed milestone
+## Completed milestone
 
 ### v0.5.0 — Durable event outbox
 
@@ -205,7 +205,7 @@ Explicit non-goals:
 - Private-network destinations, redirects, proxies, custom trust stores, mutual TLS, or insecure TLS.
 - Arbitrary headers, payload transforms, filters, compression, or additional production secret backends.
 
-## Active milestone
+## Most recently completed milestone
 
 ### v0.8.0 — Environment secret resolution
 
@@ -229,7 +229,12 @@ Exit criteria:
 - [x] The complete local quality, build, provenance, and release gates pass.
 - [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
   [PR #34](https://github.com/SorenSj/ansiblectl/pull/34).
-- [ ] The immutable v0.8.0 tag and tagged artifact workflow pass from the reviewed merge commit.
+- [x] The immutable v0.8.0 tag and
+  [tagged artifact workflow](https://github.com/SorenSj/ansiblectl/actions/runs/30869787997) pass
+  from merge commit `9acfcb5`.
+
+Readiness evidence was last reviewed on 2026-08-04. Version 0.8.0 is released, and its retained
+workflow artifact is named `ansiblectl-v0.8.0`; no existing release tag was moved or recreated.
 
 Explicit non-goals:
 
