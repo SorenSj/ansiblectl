@@ -10,6 +10,9 @@ All notable changes to Ansiblectl are documented here.
   destination policy, secret-reference authentication, and bounded foreground CLI contract.
 - Typed workspace webhook endpoint configuration with strict canonical HTTPS parsing,
   explicit hostname allowlists, bounded timeouts, and fail-closed global-address resolution.
+- A single-attempt webhook delivery adapter with canonical size-bounded JSON, fixed identity
+  headers, redacted secret material, and stable destination, authentication, transport, and HTTP
+  outcome classifications.
 
 ## [0.6.0] - 2026-08-04
 

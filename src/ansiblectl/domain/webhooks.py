@@ -11,10 +11,11 @@ from typing import Protocol
 from urllib.parse import urlsplit
 
 from ansiblectl.domain.errors import ConfigurationError
-from ansiblectl.domain.secrets import SecretReference
+from ansiblectl.domain.secrets import SecretMaterial, SecretReference
 
 WEBHOOK_CONFIGURATION_SCHEMA_VERSION = 1
 MAX_WEBHOOK_TIMEOUT_SECONDS = 60
+MAX_WEBHOOK_PAYLOAD_BYTES = 262_144
 _ENDPOINT_ID_PATTERN = re.compile(r"[a-z][a-z0-9._-]{0,127}")
 _DNS_LABEL_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 _ENDPOINT_FIELDS = {
@@ -50,10 +51,39 @@ class WebhookDestination:
     addresses: tuple[str, ...]
 
 
+@dataclass(frozen=True, repr=False)
+class WebhookRequest:
+    """One bounded request whose representation omits body and credential material."""
+
+    body: bytes
+    headers: Mapping[str, str]
+    bearer_material: SecretMaterial | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "headers", MappingProxyType(dict(self.headers)))
+
+    def __repr__(self) -> str:
+        return (
+            f"WebhookRequest(body=<redacted:{len(self.body)} bytes>, "
+            f"headers={tuple(self.headers)}, bearer_material=<redacted>)"
+        )
+
+
 class WebhookAddressResolver(Protocol):
     """Resolve one hostname for policy evaluation before connection."""
 
     def resolve(self, hostname: str, port: int) -> tuple[str, ...]: ...
+
+
+class WebhookTransport(Protocol):
+    """Send once using only the already-validated destination addresses."""
+
+    def post(
+        self,
+        endpoint: WebhookEndpoint,
+        destination: WebhookDestination,
+        request: WebhookRequest,
+    ) -> int: ...
 
 
 def parse_webhook_endpoints(
@@ -232,11 +262,14 @@ def _positive_timeout(value: object, endpoint_id: str, field: str) -> int:
 
 
 __all__ = [
+    "MAX_WEBHOOK_PAYLOAD_BYTES",
     "MAX_WEBHOOK_TIMEOUT_SECONDS",
     "WEBHOOK_CONFIGURATION_SCHEMA_VERSION",
     "WebhookAddressResolver",
     "WebhookDestination",
     "WebhookEndpoint",
+    "WebhookRequest",
+    "WebhookTransport",
     "parse_webhook_endpoints",
     "resolve_webhook_destination",
 ]
