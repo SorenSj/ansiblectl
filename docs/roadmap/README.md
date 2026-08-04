@@ -581,7 +581,7 @@ Exit criteria:
   execution and consumer limits.
 - [x] Terminal-safe rendering rejects control injection and remains deterministic across truncation,
   resize, and minimum-size boundaries.
-- [ ] Real pseudo-terminal and subprocess tests prove input bounds, foreground behavior, and exact
+- [x] Real pseudo-terminal and subprocess tests prove input bounds, foreground behavior, and exact
   restoration across normal, error, interrupt, and signal exits.
 - [ ] Forbidden output, diagnostics, paths, targeting, revisions, digests, payloads, secrets, and
   exceptions remain absent from every public and durable surface.
