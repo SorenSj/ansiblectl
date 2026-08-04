@@ -32,3 +32,4 @@ Architecture Handbook and applicable ADRs.
 | [TS-0024](ts-0024-local-event-delivery-operations.md) | Local Event Delivery Operations | Normative |
 | [TS-0025](ts-0025-outbound-https-webhook-delivery.md) | Outbound HTTPS Webhook Delivery | Normative |
 | [TS-0026](ts-0026-environment-secret-provider.md) | Environment Secret Provider | Normative |
+| [TS-0027](ts-0027-private-webhook-network-policy.md) | Private Webhook Network Policy | Normative |
