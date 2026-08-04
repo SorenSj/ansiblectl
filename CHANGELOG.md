@@ -4,6 +4,36 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-04
+
+### Added
+
+- ADR-0049 and TS-0032 defining optional mutual TLS client authentication for outbound HTTPS
+  webhooks without weakening server trust, destination policy, or application authentication.
+- Endpoint schema version 6 with paired, distinct workspace-file references for a PEM certificate
+  chain and its unencrypted private key.
+- In-memory certificate-chain, key-pair, and client-auth usage validation plus an opaque
+  request-local identity boundary for the HTTPS transport.
+
+### Changed
+
+- Signed schema v6 endpoints select signature version 1 or 2 explicitly, while schema v5 retains
+  its exact v2-only contract and schemas 1 through 4 retain their existing request behavior.
+- The HTTPS transport can complete a mutual TLS handshake without persisting client identity
+  material or consulting ambient certificate stores.
+- Client identity composes independently with bearer authentication, signature v1/v2,
+  private-network policy, and platform or exclusive server CA trust.
+
+### Security
+
+- Bearer, signing, certificate, and private-key material resolve and validate before the optional
+  clock read, DNS resolution, socket creation, or TLS activity, with no provider, identity,
+  anonymous-handshake, or signature-version fallback.
+- Missing, malformed, mismatched, unsupported, or unavailable client identity fails with the stable
+  redacted `CLIENT_IDENTITY_UNAVAILABLE` outcome before network activity.
+- Certificate and key references, PEM material, subjects, issuers, serials, fingerprints, parser
+  details, and TLS exceptions remain absent from public results and raw durable retry storage.
+
 ## [0.13.0] - 2026-08-04
 
 ### Added
