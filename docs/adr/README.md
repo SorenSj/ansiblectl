@@ -50,3 +50,4 @@ New decisions supersede earlier ADRs; accepted ADRs are not silently rewritten.
 | [0043](0043-environment-secret-provider.md) | Environment Secret Provider | Accepted |
 | [0044](0044-private-webhook-network-policy.md) | Private Webhook Network Policy | Accepted |
 | [0045](0045-exclusive-webhook-ca-trust.md) | Exclusive Webhook CA Trust | Accepted |
+| [0046](0046-signed-webhook-delivery.md) | Signed Webhook Delivery | Accepted |
