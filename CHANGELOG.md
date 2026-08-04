@@ -13,6 +13,9 @@ All notable changes to Ansiblectl are documented here.
 - A single-attempt webhook delivery adapter with canonical size-bounded JSON, fixed identity
   headers, redacted secret material, and stable destination, authentication, transport, and HTTP
   outcome classifications.
+- An address-bound standard-library HTTPS transport using validated IP literals with the original
+  hostname for platform TLS verification, bounded response reads, and no proxy, redirect, or retry
+  behavior.
 
 ## [0.6.0] - 2026-08-04
 

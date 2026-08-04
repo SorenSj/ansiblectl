@@ -179,10 +179,10 @@ Exit criteria:
 
 - [x] ADR-0042 and TS-0025 define transport, authentication, destination, lifecycle, and
   compatibility contracts before implementation.
-- [ ] Endpoint parsing and address-bound connection policy prevent redirect, downgrade, and SSRF
+- [x] Endpoint parsing and address-bound connection policy prevent redirect, downgrade, and SSRF
   escape paths.
 - [x] Canonical bounded requests and stable response classifications preserve v0.6 retry ownership.
-- [ ] Secret material remains confined to immediate request construction and never reaches public or
+- [x] Secret material remains confined to immediate request construction and never reaches public or
   durable surfaces.
 - [ ] The bounded CLI command is schema-aligned, foreground-only, and exact-targeted.
 - [ ] Existing v0.5 databases and v0.6 CLI, SDK, event, history, and runner contracts remain compatible.
