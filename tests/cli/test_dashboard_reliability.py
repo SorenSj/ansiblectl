@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fcntl
+import json
 import os
 import pty
 import select
@@ -19,6 +20,8 @@ import pytest
 
 from ansiblectl.cli.composition import build_workspace_service
 from ansiblectl.domain.errors import ExitCode
+from ansiblectl.domain.events import Event
+from ansiblectl.infrastructure.event_outbox import SqliteEventOutbox
 
 
 @dataclass
@@ -130,6 +133,14 @@ def _restored_attributes(process: DashboardProcess) -> list[int | list[bytes]]:
         os.close(descriptor)
 
 
+def _workspace_bytes(workspace: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(workspace).as_posix(): path.read_bytes()
+        for path in sorted(workspace.rglob("*"))
+        if path.is_file()
+    }
+
+
 @pytest.mark.parametrize("interrupt", [signal.SIGINT, signal.SIGTERM])
 def test_real_interrupt_restores_terminal_and_returns_130(
     tmp_path: Path, interrupt: signal.Signals
@@ -174,5 +185,76 @@ def test_real_resize_repaints_without_input_or_snapshot_disclosure(tmp_path: Pat
         status = _wait(process)
         assert os.waitstatus_to_exitcode(status) == ExitCode.SUCCESS
         assert _restored_attributes(process) == process.original_attributes
+    finally:
+        _close(process)
+
+
+def test_forbidden_values_never_leave_unchanged_durable_workspace(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    build_workspace_service().initialize(workspace)
+    forbidden = {
+        "stdout": "sentinel-forbidden-stdout",
+        "stderr": "sentinel-forbidden-stderr",
+        "diagnostic": "sentinel-forbidden-exception",
+        "limit": "sentinel-forbidden-targeting",
+        "requested": "sentinel-forbidden-requested-revision",
+        "resolved": "sentinel-forbidden-resolved-revision",
+        "inventory": "sha256:sentinel-forbidden-inventory-digest",
+        "playbook": "sha256:sentinel-forbidden-playbook-digest",
+        "path": "sentinel/forbidden-playbook-path.yml",
+        "payload": "sentinel-forbidden-secret-payload",
+    }
+    log_directory = workspace / ".ansiblectl/logs"
+    log_directory.mkdir(mode=0o700)
+    (log_directory / "events.lock").write_bytes(b"")
+    history = {
+        "timestamp": "2026-08-04T00:00:00.000000Z",
+        "event": "execution.completed",
+        "fields": {
+            "execution_id": "safe-run-1",
+            "status": "completed",
+            "exit_code": 0,
+            "elapsed_seconds": 1.0,
+            "stdout_reference": forbidden["stdout"],
+            "stderr_reference": forbidden["stderr"],
+            "diagnostic": forbidden["diagnostic"],
+            "targeting": {"limit": forbidden["limit"], "tags": [], "skip_tags": []},
+            "mode": "check",
+            "requested_revision": forbidden["requested"],
+            "resolved_revision": forbidden["resolved"],
+            "inventory_digest": forbidden["inventory"],
+            "playbook_digest": forbidden["playbook"],
+            "playbook_path": forbidden["path"],
+            "verbosity": 4,
+            "diff": True,
+            "operation": "run",
+        },
+    }
+    (log_directory / "events.jsonl").write_text(
+        json.dumps(history, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    outbox = SqliteEventOutbox(workspace)
+    outbox.append(
+        Event("workspace.initialized", {"project_name": forbidden["payload"]}),
+        event_id="00000000Z80000000000000001",
+        occurred_at="2026-08-04T00:00:00.000000Z",
+    )
+    outbox.register_consumer("safe-consumer")
+    before = _workspace_bytes(workspace)
+
+    process = _launch(workspace)
+    try:
+        _read_until(process, b"safe-consumer")
+        os.write(process.master, b"q")
+        status = _wait(process)
+        _drain(process)
+        output = bytes(process.output)
+
+        assert os.waitstatus_to_exitcode(status) == ExitCode.SUCCESS
+        assert b"safe-run-1" in output
+        assert b"safe-consumer" in output
+        for value in forbidden.values():
+            assert value.encode() not in output
+        assert _workspace_bytes(workspace) == before
     finally:
         _close(process)
