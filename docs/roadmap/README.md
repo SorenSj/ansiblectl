@@ -256,7 +256,7 @@ Exit criteria:
 
 - [x] ADR-0044 and TS-0027 define configuration, CIDR, resolution, connection, lifecycle,
   compatibility, and redaction contracts before implementation.
-- [ ] Strict private-policy parsing rejects unsafe files, ambiguous networks, overlaps, excess
+- [x] Strict private-policy parsing rejects unsafe files, ambiguous networks, overlaps, excess
   bounds, unknown fields, and unsupported schemas.
 - [ ] Endpoint schema version 2 binds at most one named policy while version 1 remains global-only.
 - [ ] Every resolved address must be allowed, and the connector uses only that validated tuple.
