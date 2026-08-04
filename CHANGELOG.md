@@ -12,6 +12,8 @@ All notable changes to Ansiblectl are documented here.
   allocation.
 - Durable consumer registration, ordered leased claims, acknowledgements, and stale-worker
   rejection backed by the workspace SQLite outbox.
+- Subprocess crash-window and multiprocess verification plus fail-closed SQLite integrity and
+  symlink boundary checks for durable event state.
 
 ## [0.4.0] - 2026-08-04
 
