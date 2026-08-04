@@ -388,8 +388,9 @@ Exit criteria:
   public or durable surfaces.
 - [x] Existing endpoint schemas, `env` references, databases, CLI, SDK, event, history, network,
   TLS, runner, and transport contracts remain compatible.
-- [ ] The complete local quality, build, provenance, and release gates pass.
-- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [x] The complete local quality, build, provenance, and release gates pass.
+- [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
+  [PR #53](https://github.com/SorenSj/ansiblectl/pull/53).
 - [ ] The immutable v0.12.0 tag and tagged artifact workflow pass from the release merge commit.
 
 Explicit non-goals:

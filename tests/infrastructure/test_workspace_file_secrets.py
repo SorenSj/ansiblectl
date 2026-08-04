@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from ansiblectl.domain.secrets import SecretNotFoundError, SecretReference
+from ansiblectl.infrastructure import workspace_file_secrets
 from ansiblectl.infrastructure.workspace_file_secrets import WorkspaceFileSecretProvider
 
 _MESSAGE = "Secret material is unavailable from the selected provider."
@@ -173,3 +174,65 @@ def test_owner_mismatch_is_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(SecretNotFoundError, match=_MESSAGE):
         resolve(tmp_path)
+
+
+def test_atomic_rotation_is_observed_only_by_the_next_resolution(tmp_path: Path) -> None:
+    secret = private_secret(tmp_path, b"first-private-value")
+    provider = WorkspaceFileSecretProvider(tmp_path)
+
+    first = provider.resolve(SecretReference("file", "WEBHOOK_KEY"))
+    replacement = secret.with_name("REPLACEMENT")
+    replacement.write_bytes(b"second-private-value")
+    replacement.chmod(0o600)
+    replacement.replace(secret)
+    second = provider.resolve(SecretReference("file", "WEBHOOK_KEY"))
+
+    assert first.reveal_for_operation() == "first-private-value"
+    assert second.reveal_for_operation() == "second-private-value"
+
+
+def test_replacement_after_validation_reads_the_validated_descriptor_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    secret = private_secret(tmp_path, b"validated-private-value")
+    original_read = os.read
+    replaced = False
+
+    def replacing_read(descriptor: int, size: int) -> bytes:
+        nonlocal replaced
+        if not replaced:
+            replacement = secret.with_name("REPLACEMENT")
+            replacement.write_bytes(b"attacker-controlled-value")
+            replacement.chmod(0o600)
+            replacement.replace(secret)
+            replaced = True
+        return original_read(descriptor, size)
+
+    monkeypatch.setattr(os, "read", replacing_read)
+
+    assert resolve(tmp_path) == "validated-private-value"
+    assert replaced is True
+
+
+def test_directory_replacement_cannot_redirect_descriptor_relative_material_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    secret = private_secret(tmp_path, b"validated-directory-value")
+    secrets = secret.parent
+    moved = secrets.with_name("validated-secrets")
+    original_open_material = workspace_file_secrets._open_material
+
+    def replacing_open(name: str, *, directory_fd: int) -> int:
+        secrets.rename(moved)
+        secrets.mkdir(mode=0o700)
+        secrets.chmod(0o700)
+        attacker = secrets / name
+        attacker.write_bytes(b"attacker-controlled-value")
+        attacker.chmod(0o600)
+        return original_open_material(name, directory_fd=directory_fd)
+
+    monkeypatch.setattr(
+        "ansiblectl.infrastructure.workspace_file_secrets._open_material", replacing_open
+    )
+
+    assert resolve(tmp_path) == "validated-directory-value"

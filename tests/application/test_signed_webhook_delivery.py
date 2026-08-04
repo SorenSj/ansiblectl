@@ -18,9 +18,11 @@ from ansiblectl.domain.webhooks import (
 )
 from ansiblectl.infrastructure.event_outbox import SqliteEventOutbox
 from ansiblectl.infrastructure.webhook_delivery import (
+    SIGNING_UNAVAILABLE,
     TRANSPORT_FAILURE,
     HttpsWebhookDeliveryAdapter,
 )
+from ansiblectl.infrastructure.workspace_file_secrets import WorkspaceFileSecretProvider
 
 _NOW = datetime(2026, 8, 4, tzinfo=UTC)
 _SIGNING_KEY = "sentinel-key-material-0123456789abcdef"
@@ -96,4 +98,56 @@ def test_signature_and_key_never_reach_result_or_durable_retry_state(tmp_path: P
         "signature detail",
     ):
         assert all(sentinel not in surface for surface in surfaces)
+        assert sentinel.encode() not in database
+
+
+def test_unsafe_file_reference_never_reaches_result_or_raw_retry_database(
+    tmp_path: Path,
+) -> None:
+    private = tmp_path / ".ansiblectl"
+    private.mkdir(mode=0o700)
+    private.chmod(0o700)
+    secrets = private / "secrets"
+    secrets.mkdir(mode=0o700)
+    secrets.chmod(0o700)
+    key = "SENTINEL_FILE_SIGNING_KEY"
+    material = "sentinel-file-material-0123456789abcdef"
+    candidate = secrets / key
+    candidate.write_text(material, encoding="utf-8")
+    candidate.chmod(0o640)
+    reference = f"file:{key}"
+    endpoint = parse_webhook_endpoints(
+        {
+            "schema_version": 4,
+            "endpoints": {
+                "audit": {
+                    "url": "https://hooks.example.test/events",
+                    "allowed_hostnames": ["hooks.example.test"],
+                    "signature_secret": reference,
+                }
+            },
+        },
+        "workspace",
+    )["audit"]
+    outbox = SqliteEventOutbox(tmp_path)
+    outbox.append(Event("workspace.initialized", {}))
+    outbox.register_consumer("file-signed")
+    service = EventDeliveryService(
+        outbox,
+        HttpsWebhookDeliveryAdapter(
+            endpoint, Resolver(), FailingTransport(), WorkspaceFileSecretProvider(tmp_path)
+        ),
+        DeliveryRetryProfile(3, (10, 30), 30),
+        lambda: _NOW,
+    )
+
+    result = service.step("file-signed")
+
+    assert result.failure_reason == SIGNING_UNAVAILABLE
+    status = outbox.inspect_consumers(now=_NOW)[0]
+    database = (tmp_path / ".ansiblectl/events/outbox.sqlite3").read_bytes()
+    for sentinel in (key, material, reference, str(candidate), "0o640"):
+        assert sentinel not in repr(result)
+        assert sentinel not in str(result.to_payload())
+        assert sentinel not in repr(status)
         assert sentinel.encode() not in database
