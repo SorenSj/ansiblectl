@@ -45,3 +45,4 @@ New decisions supersede earlier ADRs; accepted ADRs are not silently rewritten.
 | [0038](0038-signed-plugin-provenance-and-registry-trust.md) | Signed Plugin Provenance and Registry Trust | Accepted |
 | [0039](0039-unattended-plugin-policy.md) | Unattended Plugin Policy | Accepted |
 | [0040](0040-durable-event-outbox.md) | Durable Event Outbox | Accepted |
+| [0041](0041-local-event-delivery-runner.md) | Local Event Delivery Runner | Accepted |

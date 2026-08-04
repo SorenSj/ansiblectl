@@ -4,6 +4,11 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- ADR-0041 and TS-0024 defining the v0.6 bounded local delivery-runner and safe operator CLI
+  contracts without introducing a remote transport or background service.
+
 ## [0.5.0] - 2026-08-04
 
 ### Added
