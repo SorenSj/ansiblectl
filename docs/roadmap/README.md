@@ -561,7 +561,7 @@ Explicit non-goals:
 - Exactly-once delivery, background workers, inbound APIs, hosted control planes, remote commands,
   or a TUI.
 
-## Active milestone
+## Most recently completed milestone
 
 ### v0.17.0 — Read-only local terminal dashboard
 
@@ -590,7 +590,14 @@ Exit criteria:
 - [x] The complete local quality, build, provenance, and release gates pass.
 - [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
   [readiness PR #94](https://github.com/SorenSj/ansiblectl/pull/94).
-- [ ] The immutable v0.17.0 tag and tagged artifact workflow pass from the release merge commit.
+- [x] After the immutable v0.17.0 tag workflow exposed a macOS/Python 3.12 signal-wakeup fault, the
+  corrective immutable v0.17.1 tag and
+  [tagged artifact workflow](https://github.com/SorenSj/ansiblectl/actions/runs/30887113771) pass
+  from patch merge commit `05e5dc6` without moving or recreating v0.17.0.
+
+Readiness evidence was last reviewed on 2026-08-04. Version 0.17.1 is released, and its retained
+workflow artifact is named `ansiblectl-v0.17.1` with digest
+`sha256:049913e83131966f23dc99ad678bf275b524d592e8f76a82cd54a7bfb382c30d`.
 
 Explicit non-goals:
 
