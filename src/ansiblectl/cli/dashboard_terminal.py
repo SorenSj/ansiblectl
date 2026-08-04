@@ -125,6 +125,7 @@ class DashboardTerminalSession:
         self._resize_pending = False
         self._wake_read_fd: int | None = None
         self._wake_write_fd: int | None = None
+        self._previous_wakeup_fd: int | None = None
 
     def preflight(self) -> None:
         """Validate terminal and signal capabilities without mutating process state."""
@@ -219,6 +220,10 @@ class DashboardTerminalSession:
                 with _suppress_terminal_errors():
                     signal.signal(number, handler)
             self._original_handlers.clear()
+            if self._previous_wakeup_fd is not None:
+                with _suppress_terminal_errors():
+                    signal.set_wakeup_fd(self._previous_wakeup_fd)
+                self._previous_wakeup_fd = None
             for descriptor_name in ("_wake_read_fd", "_wake_write_fd"):
                 descriptor = getattr(self, descriptor_name)
                 if descriptor is not None:
@@ -241,6 +246,9 @@ class DashboardTerminalSession:
             self._wake_read_fd, self._wake_write_fd = os.pipe()
             os.set_blocking(self._wake_read_fd, False)
             os.set_blocking(self._wake_write_fd, False)
+            self._previous_wakeup_fd = signal.set_wakeup_fd(
+                self._wake_write_fd, warn_on_full_buffer=False
+            )
             for number, handler in handlers.items():
                 self._original_handlers[number] = signal.getsignal(number)
                 signal.signal(number, handler)
@@ -254,15 +262,9 @@ class DashboardTerminalSession:
 
     def _interrupt(self, _number: int, _frame: FrameType | None) -> None:
         self._interrupt_pending = True
-        if self._wake_write_fd is not None:
-            with _suppress_terminal_errors():
-                os.write(self._wake_write_fd, b"i")
 
     def _resize(self, _number: int, _frame: FrameType | None) -> None:
         self._resize_pending = True
-        if self._wake_write_fd is not None:
-            with _suppress_terminal_errors():
-                os.write(self._wake_write_fd, b"r")
 
     def _render(self, snapshot: DashboardSnapshot, state: DashboardViewState) -> None:
         size = os.get_terminal_size(self._stdout_fd)

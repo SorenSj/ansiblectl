@@ -4,6 +4,15 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-08-04
+
+### Fixed
+
+- POSIX signal delivery now uses Python's runtime wakeup descriptor so SIGINT, SIGTERM, and
+  SIGWINCH reliably interrupt a blocked dashboard terminal wait on every supported Python version.
+- The dashboard restores the caller's previous process-global signal wakeup descriptor before
+  closing its private self-pipe.
+
 ## [0.17.0] - 2026-08-04
 
 ### Added

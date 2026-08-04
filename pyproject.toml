@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ansiblectl"
-version = "0.17.0"
+version = "0.17.1"
 description = "A local-first CLI platform for managing Ansible automation."
 readme = "README.md"
 requires-python = ">=3.12"

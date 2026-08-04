@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import pty
+import signal
 import termios
 import tty
 from dataclasses import replace
@@ -127,13 +128,20 @@ def test_pseudo_terminal_quit_restores_attributes_and_modes(
     before = termios.tcgetattr(slave)
     frames: list[tuple[int, int]] = []
     writes: list[bytes] = []
+    wakeup_calls: list[int] = []
     original_write_all = terminal_module._write_all
+
+    def observe_wakeup(file_descriptor: int, *, warn_on_full_buffer: bool = True) -> int:
+        del warn_on_full_buffer
+        wakeup_calls.append(file_descriptor)
+        return 73
 
     def observe_write(file_descriptor: int, data: bytes) -> None:
         writes.append(data)
         original_write_all(file_descriptor, data)
 
     monkeypatch.setattr(terminal_module, "_write_all", observe_write)
+    monkeypatch.setattr(signal, "set_wakeup_fd", observe_wakeup)
 
     def renderer(
         _snapshot_value: DashboardSnapshot,
@@ -155,6 +163,8 @@ def test_pseudo_terminal_quit_restores_attributes_and_modes(
         assert termios.tcgetattr(slave) == before
         assert b"\x1b[?1049h\x1b[?25l" in writes
         assert b"\x1b[?25h\x1b[?1049l" in writes
+        assert wakeup_calls[0] >= 0
+        assert wakeup_calls[-1] == 73
         session.restore()
         assert termios.tcgetattr(slave) == before
     finally:
