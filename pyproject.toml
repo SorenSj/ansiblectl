@@ -12,6 +12,7 @@ license = { text = "Apache-2.0" }
 authors = [{ name = "Ansiblectl maintainers" }]
 dependencies = [
     "cryptography>=50,<51",
+    "pyopenssl>=26,<27",
     "PyYAML>=6.0.2,<7",
 ]
 classifiers = [

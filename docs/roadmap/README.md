@@ -460,7 +460,7 @@ Exit criteria:
   behavior.
 - [x] Certificate chains and unencrypted private keys are bounded, parsed, paired, and validated
   before DNS or TLS activity.
-- [ ] The HTTPS transport consumes request-local identity material without filesystem persistence,
+- [x] The HTTPS transport consumes request-local identity material without filesystem persistence,
   ambient identity discovery, or anonymous fallback.
 - [ ] Client identity composes with bearer, signature v1/v2, network policy, and server CA trust.
 - [ ] Adversarial tests prove identity material and metadata never reach public or durable surfaces.

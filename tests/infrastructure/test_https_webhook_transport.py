@@ -8,6 +8,9 @@ from dataclasses import dataclass, field
 from typing import cast
 
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
+from OpenSSL import SSL
 
 from ansiblectl.domain.secrets import SecretMaterial
 from ansiblectl.domain.webhook_tls_trust import WebhookTlsTrustPolicy
@@ -23,6 +26,7 @@ from ansiblectl.infrastructure.https_webhook_transport import (
     BoundHttpsWebhookTransport,
     SocketAddressResolver,
 )
+from ansiblectl.infrastructure.webhook_client_identity import WebhookClientIdentity
 
 
 def endpoint() -> WebhookEndpoint:
@@ -120,6 +124,153 @@ def test_transport_always_closes_and_rejects_header_injection() -> None:
 
     assert connection.requests == []
     assert connection.closed is False
+
+
+def test_transport_selects_only_the_in_memory_factory_for_client_identity() -> None:
+    connection = Connection()
+    selected = endpoint()
+    destination = WebhookDestination("hooks.example.test", 8443, ("8.8.8.8",))
+    request = WebhookRequest(
+        b"{}",
+        {},
+        client_identity=WebhookClientIdentity(b"certificate", b"private-key"),
+    )
+    calls: list[tuple[WebhookEndpoint, WebhookDestination, WebhookRequest]] = []
+
+    def identity_factory(
+        endpoint: WebhookEndpoint,
+        destination: WebhookDestination,
+        request: WebhookRequest,
+    ) -> Connection:
+        calls.append((endpoint, destination, request))
+        return connection
+
+    transport = BoundHttpsWebhookTransport(
+        lambda endpoint, destination: pytest.fail("standard TLS path must not be used"),
+        identity_factory,
+    )
+
+    assert transport.post(selected, destination, request) == 202
+    assert calls == [(selected, destination, request)]
+    assert connection.closed is True
+
+
+@pytest.mark.parametrize(
+    ("pattern", "hostname", "matches"),
+    [
+        ("hooks.example.test", "hooks.example.test", True),
+        ("hooks.example.test", "other.example.test", False),
+        ("*.example.test", "hooks.example.test", True),
+        ("*.example.test", "nested.hooks.example.test", False),
+        ("h*oks.example.test", "hooks.example.test", False),
+        ("*.*.test", "hooks.example.test", False),
+    ],
+)
+def test_in_memory_hostname_matching_is_exact_or_one_label_wildcard(
+    pattern: str, hostname: str, matches: bool
+) -> None:
+    assert transport_module._dns_name_matches(pattern, hostname) is matches
+
+
+def test_in_memory_context_loads_identity_chain_and_platform_trust(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Identity:
+        def reveal_for_transport(self) -> tuple[bytes, bytes]:
+            return b"certificate-chain", b"private-key"
+
+    class Context:
+        def __init__(self, method: object) -> None:
+            self.calls: list[tuple[str, object]] = [("method", method)]
+
+        def set_min_proto_version(self, version: object) -> None:
+            self.calls.append(("minimum", version))
+
+        def set_verify(self, mode: object, callback: object) -> None:
+            self.calls.append(("verify", (mode, callback)))
+
+        def set_default_verify_paths(self) -> None:
+            self.calls.append(("platform", True))
+
+        def use_certificate(self, certificate: object) -> None:
+            self.calls.append(("leaf", certificate))
+
+        def use_privatekey(self, private_key: object) -> None:
+            self.calls.append(("key", private_key))
+
+        def add_extra_chain_cert(self, certificate: object) -> None:
+            self.calls.append(("chain", certificate))
+
+        def check_privatekey(self) -> None:
+            self.calls.append(("matched", True))
+
+    contexts: list[Context] = []
+
+    def context_factory(method: object) -> Context:
+        context = Context(method)
+        contexts.append(context)
+        return context
+
+    monkeypatch.setattr(SSL, "Context", context_factory)
+    monkeypatch.setattr(
+        x509,
+        "load_pem_x509_certificates",
+        lambda value: ["leaf", "intermediate"],
+    )
+    monkeypatch.setattr(
+        serialization,
+        "load_pem_private_key",
+        lambda value, password: "parsed-key",
+    )
+    request = WebhookRequest(b"{}", {}, client_identity=Identity())
+
+    context = transport_module._make_identity_tls_context(endpoint(), request)
+
+    assert context is not None
+    assert len(contexts) == 1
+    assert contexts[0].calls == [
+        ("method", SSL.TLS_CLIENT_METHOD),
+        ("minimum", SSL.TLS1_2_VERSION),
+        ("verify", (SSL.VERIFY_PEER, None)),
+        ("platform", True),
+        ("leaf", "leaf"),
+        ("key", "parsed-key"),
+        ("chain", "intermediate"),
+        ("matched", True),
+    ]
+
+
+def test_in_memory_context_rejects_a_missing_identity() -> None:
+    with pytest.raises(ValueError, match="identity"):
+        transport_module._make_identity_tls_context(endpoint(), WebhookRequest(b"{}", {}))
+
+
+def test_in_memory_peer_hostname_requires_matching_dns_san() -> None:
+    class AlternativeNames:
+        def get_values_for_type(self, kind: object) -> list[str]:
+            assert kind is x509.DNSName
+            return ["hooks.example.test"]
+
+    class Extensions:
+        def get_extension_for_class(self, kind: object) -> object:
+            assert kind is x509.SubjectAlternativeName
+            return type("Extension", (), {"value": AlternativeNames()})()
+
+    class Certificate:
+        extensions = Extensions()
+
+    class Peer:
+        def to_cryptography(self) -> Certificate:
+            return Certificate()
+
+    class ConnectionWithPeer:
+        def get_peer_certificate(self) -> Peer:
+            return Peer()
+
+    connection = cast(SSL.Connection, ConnectionWithPeer())
+    transport_module._verify_peer_hostname(connection, "hooks.example.test")
+    with pytest.raises(ssl.CertificateError, match="hostname"):
+        transport_module._verify_peer_hostname(connection, "other.example.test")
 
 
 def test_socket_resolver_returns_unique_addresses(monkeypatch: pytest.MonkeyPatch) -> None:
