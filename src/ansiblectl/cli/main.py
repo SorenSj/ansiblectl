@@ -16,6 +16,7 @@ from typing import TextIO
 import yaml
 
 from ansiblectl.application.configuration import ConfigurationService
+from ansiblectl.application.event_operations import EventOperationsService
 from ansiblectl.application.execution import GovernedExecutionResult
 from ansiblectl.application.execution_history import ExecutionHistoryService, ExecutionSummary
 from ansiblectl.application.filesystem import FilesystemRecoveryService
@@ -38,6 +39,7 @@ from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.cli.boundary import render_exception
 from ansiblectl.cli.composition import (
     build_configuration_service,
+    build_event_operations_service,
     build_execution_history_service,
     build_filesystem_recovery_service,
     build_inventory_service,
@@ -55,6 +57,13 @@ from ansiblectl.cli.outcomes import render_outcome
 from ansiblectl.cli.rendering import render_success
 from ansiblectl.domain.configuration import EffectiveConfiguration
 from ansiblectl.domain.context import CommandContext, create_command_context
+from ansiblectl.domain.durable_events import (
+    DurableConsumerRegistrationResult,
+    DurableConsumerStatus,
+    DurableEventActionResult,
+    DurableEventRetentionResult,
+    DurableEventRetryResult,
+)
 from ansiblectl.domain.errors import (
     AnsiblectlError,
     ConfigurationError,
@@ -99,6 +108,7 @@ EXIT_UNEXPECTED_FAILURE = 1
 _COMMANDS: dict[str, frozenset[str]] = {
     "config": frozenset({"show"}),
     "execution": frozenset({"list", "prune", "show", "summary"}),
+    "event": frozenset({"consumer", "retention"}),
     "inventory": frozenset({"show", "validate"}),
     "playbook": frozenset({"validate"}),
     "plugin": frozenset({"discover", "list", "permissions", "validate"}),
@@ -365,6 +375,8 @@ def _legacy_result_changed(command_name: str, payload: object) -> bool:
     if command_name == "execution prune":
         removed = payload.get("removed_execution_ids")
         return payload.get("applied") is True and isinstance(removed, list) and bool(removed)
+    if command_name in {"event consumer", "event retention"}:
+        return payload.get("applied") is True
     return False
 
 
@@ -396,6 +408,7 @@ def _legacy_error_for_command(command_name: str, message: str, hint: str | None)
     error_types: dict[str, type[AnsiblectlError]] = {
         "config": ConfigurationError,
         "execution": ExecutionError,
+        "event": StateError,
         "inventory": InventoryError,
         "playbook": PlaybookError,
         "plugin": PluginError,
@@ -663,6 +676,39 @@ def build_parser() -> argparse.ArgumentParser:
     execution_prune.add_argument(
         "--apply", action="store_true", help="Apply the plan; otherwise only preview it."
     )
+    event = subcommands.add_parser("event", help="Operate durable public-event delivery safely.")
+    event_commands = event.add_subparsers(dest="event_command", required=True)
+    consumer = event_commands.add_parser("consumer", help="Manage durable event consumers.")
+    consumer_commands = consumer.add_subparsers(dest="consumer_command", required=True)
+    consumer_register = consumer_commands.add_parser(
+        "register", help="Idempotently register one exact consumer."
+    )
+    consumer_register.add_argument("name", help="Canonical consumer identifier.")
+    consumer_register.add_argument(
+        "--start-sequence", type=int, default=1, help="First desired event sequence."
+    )
+    consumer_commands.add_parser("inspect", help="Inspect payload-free consumer status.")
+    consumer_retry = consumer_commands.add_parser(
+        "retry", help="Retry one exact blocked consumer event."
+    )
+    consumer_retry.add_argument("name", help="Canonical consumer identifier.")
+    consumer_retry.add_argument("--sequence", type=int, required=True)
+    consumer_retry.add_argument("--event-id", required=True)
+    consumer_abandon = consumer_commands.add_parser(
+        "abandon", help="Preview or abandon one exact blocked consumer event."
+    )
+    consumer_abandon.add_argument("name", help="Canonical consumer identifier.")
+    consumer_abandon.add_argument("--sequence", type=int, required=True)
+    consumer_abandon.add_argument("--event-id", required=True)
+    consumer_abandon.add_argument(
+        "--apply", action="store_true", help="Apply abandonment; otherwise only preview it."
+    )
+    event_retention = event_commands.add_parser(
+        "retention", help="Preview or apply acknowledged-prefix retention."
+    )
+    event_retention.add_argument(
+        "--apply", action="store_true", help="Apply retention; otherwise only preview it."
+    )
     return parser
 
 
@@ -682,6 +728,7 @@ def main(
     playbook_service: PlaybookValidationService | None = None,
     run_service: RunService | None = None,
     execution_history_service: ExecutionHistoryService | None = None,
+    event_operations_service: EventOperationsService | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
     current_directory: Path | None = None,
@@ -1240,6 +1287,66 @@ def main(
         _render_execution_records(
             records, arguments.execution_command == "show", options.output_format, stdout
         )
+    elif arguments.command == "event":
+        workspace_service_instance = workspace_service or build_workspace_service()
+        try:
+            workspace = workspace_service_instance.resolve(
+                options.workspace, current_directory or Path.cwd()
+            )
+            operations = event_operations_service or build_event_operations_service(workspace.root)
+            if arguments.event_command == "retention":
+                _render_event_retention(
+                    operations.retention(apply=arguments.apply), options.output_format, stdout
+                )
+            elif arguments.consumer_command == "register":
+                _render_event_registration(
+                    operations.register(arguments.name, start_sequence=arguments.start_sequence),
+                    options.output_format,
+                    stdout,
+                )
+            elif arguments.consumer_command == "inspect":
+                _render_event_consumers(operations.inspect(), options.output_format, stdout)
+            elif arguments.consumer_command == "retry":
+                _render_event_retry(
+                    operations.retry(
+                        arguments.name, sequence=arguments.sequence, event_id=arguments.event_id
+                    ),
+                    options.output_format,
+                    stdout,
+                )
+            else:
+                _render_event_action(
+                    operations.abandon(
+                        arguments.name,
+                        sequence=arguments.sequence,
+                        event_id=arguments.event_id,
+                        apply=arguments.apply,
+                    ),
+                    options.output_format,
+                    stdout,
+                )
+        except WorkspaceError as error:
+            if propagate_errors:
+                raise
+            return _render_cli_failure(
+                f"event {arguments.event_command}",
+                str(error),
+                "Initialize or select a valid workspace and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
+        except (StateError, ValueError) as error:
+            if propagate_errors:
+                raise StateError(str(error)) from error
+            return _render_cli_failure(
+                f"event {arguments.event_command}",
+                str(error),
+                "Correct the exact consumer or event target and retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
     return EXIT_SUCCESS
 
 
@@ -1261,6 +1368,103 @@ def _render_status(version: str, message: str, output_format: str, output: TextI
         print(json.dumps({"version": version, "message": message}, sort_keys=True), file=output)
         return
     print(f"ansiblectl {version}: {message}", file=output)
+
+
+def _render_event_registration(
+    result: DurableConsumerRegistrationResult, output_format: str, output: TextIO | None
+) -> None:
+    payload = {
+        "applied": result.applied,
+        "consumer_id": result.consumer_id,
+        "schema_version": 1,
+        "start_sequence": result.start_sequence,
+    }
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    action = "Registered" if result.applied else "Already registered"
+    print(f"{action}: {result.consumer_id} (start sequence {result.start_sequence})", file=output)
+
+
+def _render_event_retry(
+    result: DurableEventRetryResult, output_format: str, output: TextIO | None
+) -> None:
+    payload = {
+        "applied": result.applied,
+        "consumer_id": result.consumer_id,
+        "event_id": result.event_id,
+        "schema_version": 1,
+        "sequence": result.sequence,
+    }
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    print(f"Retry scheduled: {result.consumer_id} sequence {result.sequence}", file=output)
+
+
+def _render_event_action(
+    result: DurableEventActionResult, output_format: str, output: TextIO | None
+) -> None:
+    payload = {
+        "applied": result.applied,
+        "consumer_id": result.consumer_id,
+        "event_id": result.event_id,
+        "schema_version": 1,
+        "sequence": result.sequence,
+    }
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    action = "Abandoned" if result.applied else "Would abandon"
+    print(f"{action}: {result.consumer_id} sequence {result.sequence}", file=output)
+
+
+def _render_event_retention(
+    result: DurableEventRetentionResult, output_format: str, output: TextIO | None
+) -> None:
+    payload = {
+        "applied": result.applied,
+        "event_count": result.event_count,
+        "schema_version": 1,
+        "through_sequence": result.through_sequence,
+    }
+    if output_format == "json":
+        print(json.dumps(payload, sort_keys=True), file=output)
+        return
+    action = "Removed" if result.applied else "Would remove"
+    print(
+        f"{action} {result.event_count} event(s) through sequence {result.through_sequence}",
+        file=output,
+    )
+
+
+def _render_event_consumers(
+    consumers: tuple[DurableConsumerStatus, ...], output_format: str, output: TextIO | None
+) -> None:
+    rows = [
+        {
+            "attempt_count": item.attempt_count,
+            "consumer_id": item.consumer_id,
+            "event_count": item.event_count,
+            "lowest_pending_sequence": item.lowest_pending_sequence,
+            "next_attempt_at": item.next_attempt_at,
+            "pending_count": item.pending_count,
+            "state": item.state,
+        }
+        for item in consumers
+    ]
+    if output_format == "json":
+        print(json.dumps({"consumers": rows, "schema_version": 1}, sort_keys=True), file=output)
+        return
+    if not rows:
+        print("No durable event consumers registered.", file=output)
+        return
+    for row in rows:
+        print(
+            f"{row['consumer_id']}: {row['state']}; {row['pending_count']} pending; "
+            f"next sequence {row['lowest_pending_sequence']}",
+            file=output,
+        )
 
 
 def _render_workspace(workspace: Workspace, output_format: str, output: TextIO | None) -> None:

@@ -197,7 +197,7 @@ class SqliteEventOutbox:
         *,
         start_sequence: int = 1,
         registered_at: str | None = None,
-    ) -> None:
+    ) -> bool:
         """Idempotently establish a consumer's first desired sequence."""
 
         validate_consumer_id(consumer_id)
@@ -217,11 +217,15 @@ class SqliteEventOutbox:
                         "VALUES (?, ?, ?)",
                         (consumer_id, start_sequence, assigned_time),
                     )
+                    applied = True
                 elif row != (start_sequence,):
                     raise StateError(
                         "Durable event consumer is already registered at another sequence."
                     )
+                else:
+                    applied = False
                 connection.commit()
+                return applied
         except (OSError, sqlite3.Error) as error:
             raise StateError("Durable event consumer could not be registered safely.") from error
 
