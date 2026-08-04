@@ -4,6 +4,8 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-04
+
 ### Added
 
 - ADR-0040 and TS-0023 defining the v0.5 durable event outbox, ordered at-least-once delivery,
