@@ -518,6 +518,43 @@ Explicit non-goals:
 - Exactly-once delivery, network filesystems, multi-host writers, background services, inbound APIs,
   hosted control planes, remote commands, or a TUI.
 
+## Active milestone
+
+### v0.16.0 — Workspace Unix socket delivery
+
+- Bounded same-user local process delivery below one fixed private workspace socket root.
+- Exact length-prefixed canonical envelopes with event-bound acknowledgement and one connection per
+  attempt.
+- Kernel-authenticated peer identity with no path, timeout, privilege, or protocol overrides.
+- Stable redacted failure across filesystem, peer, framing, deadline, and crash faults.
+
+Exit criteria:
+
+- [x] ADR-0051 and TS-0034 define selection, custody, peer identity, framing, acknowledgement,
+  lifecycle, compatibility, failure, and redaction contracts before implementation.
+- [ ] Canonical identifiers and fixed socket targets reject every alternate path representation and
+  overlong platform address.
+- [ ] Private directory, socket metadata, and connected same-user peer validation fail closed under
+  replacement and capability faults.
+- [ ] Exact framing, partial-I/O handling, write shutdown, event-bound acknowledgement, EOF, and one
+  monotonic deadline are deterministic.
+- [ ] Real subprocess and adversarial receiver tests prove crash, truncation, surplus, stall,
+  disconnect, replay, and outbox-ack boundaries.
+- [ ] Public and durable surfaces remain free of socket identity, paths, peers, payloads, protocol
+  details, timings, and exceptions.
+- [ ] Existing webhook, archive, outbox, CLI, SDK, history, and event compatibility remain exact.
+- [ ] The complete local quality, build, provenance, and release gates pass.
+- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [ ] The immutable v0.16.0 tag and tagged artifact workflow pass from the release merge commit.
+
+Explicit non-goals:
+
+- Receiver creation, discovery, supervision, service installation, or stale-socket cleanup.
+- Arbitrary or abstract paths, cross-user receivers, datagrams, persistent streams, TCP, brokers,
+  syslog, plugins, commands, shell piping, named pipes, or Windows support.
+- Exactly-once delivery, background workers, inbound APIs, hosted control planes, remote commands,
+  or a TUI.
+
 ### Future — Additional delivery surfaces
 
 - Additional outbound transports only after each transport's trust and lifecycle contract is accepted.
