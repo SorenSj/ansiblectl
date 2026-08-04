@@ -35,3 +35,4 @@ Architecture Handbook and applicable ADRs.
 | [TS-0027](ts-0027-private-webhook-network-policy.md) | Private Webhook Network Policy | Normative |
 | [TS-0028](ts-0028-exclusive-webhook-ca-trust.md) | Exclusive Webhook CA Trust | Normative |
 | [TS-0029](ts-0029-signed-webhook-delivery.md) | Signed Webhook Delivery | Normative |
+| [TS-0030](ts-0030-workspace-file-secret-provider.md) | Workspace File Secret Provider | Normative |

@@ -323,12 +323,6 @@ Explicit non-goals:
 - Leaf/SPKI pinning, client certificates, mutual TLS, private keys, hardware tokens, or PKCS#11.
 - Redirects, proxies, background workers, inbound APIs, hosted control planes, or remote commands.
 
-### Future — Additional delivery surfaces
-
-- Additional outbound transports only after each transport's trust and lifecycle contract is accepted.
-- A TUI only after its authentication, authorization, tenancy, lifecycle, and compatibility model is
-  governed independently from delivery adapters.
-
 ## Most recently completed milestone
 
 ### v0.11.0 — Signed webhook delivery
@@ -369,3 +363,45 @@ Explicit non-goals:
 - Asymmetric keys, certificate signing, mutual TLS, client private keys, KMS, HSM, or PKCS#11.
 - Sender timestamps, nonce persistence, replay windows, exactly-once delivery, or receiver state.
 - Background workers, inbound APIs, hosted control planes, remote commands, or a TUI.
+
+## Active milestone
+
+### v0.12.0 — Workspace file secret resolution
+
+- One fixed workspace-private `file` adapter over the existing secret-provider boundary.
+- Canonical logical names with descriptor-relative, no-follow filesystem validation.
+- Exact bounded UTF-8 material without trimming, fallback, caching, or persistence.
+- Bounded webhook composition with stable redacted authentication and signing failures.
+
+Exit criteria:
+
+- [x] ADR-0047 and TS-0030 define namespace, filesystem custody, material, routing, lifecycle,
+  compatibility, and redaction contracts before implementation.
+- [ ] Strict name validation and fixed `.ansiblectl/secrets/NAME` resolution are implemented.
+- [ ] Directory and file ownership, permissions, type, link, device, race, and capability checks
+  fail closed before material use.
+- [ ] Exact bounded material and provider routing operate without enumeration, fallback, trimming,
+  caching, mutation, or persistence.
+- [ ] Bearer and signing composition resolves all required material before network I/O and retains
+  existing retry semantics.
+- [ ] Adversarial tests prove keys, paths, material, metadata, and exception details never reach
+  public or durable surfaces.
+- [ ] Existing endpoint schemas, `env` references, databases, CLI, SDK, event, history, network,
+  TLS, runner, and transport contracts remain compatible.
+- [ ] The complete local quality, build, provenance, and release gates pass.
+- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [ ] The immutable v0.12.0 tag and tagged artifact workflow pass from the release merge commit.
+
+Explicit non-goals:
+
+- Arbitrary paths, alternate roots, aliases, enumeration, fallback, permission repair, watching,
+  caching, or secret lifecycle management.
+- Binary secrets, implicit newline trimming, templates, interpolation, command execution, plugins,
+  keychains, vaults, or remote secret services.
+- Background workers, inbound APIs, hosted control planes, remote commands, or a TUI.
+
+### Future — Additional delivery surfaces
+
+- Additional outbound transports only after each transport's trust and lifecycle contract is accepted.
+- A TUI only after its authentication, authorization, tenancy, lifecycle, and compatibility model is
+  governed independently from delivery adapters.
