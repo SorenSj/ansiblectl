@@ -5,6 +5,10 @@ from pathlib import Path
 
 from ansiblectl import __version__
 from ansiblectl.application.configuration import ConfigurationService
+from ansiblectl.application.dashboard import (
+    DashboardQueries,
+    DashboardSnapshotService,
+)
 from ansiblectl.application.event_delivery import EventDeliveryService
 from ansiblectl.application.event_operations import EventOperationsService
 from ansiblectl.application.execution import ExecutionService
@@ -162,6 +166,21 @@ def build_event_operations_service(workspace_root: Path) -> EventOperationsServi
     """Create durable-event operator use cases for one workspace."""
 
     return EventOperationsService(SqliteEventOutbox(workspace_root))
+
+
+def build_dashboard_snapshot_service(workspace_root: Path) -> DashboardSnapshotService:
+    """Compose only the four governed read-only dashboard query capabilities."""
+
+    history = build_execution_history_service(workspace_root)
+    events = build_event_operations_service(workspace_root)
+    return DashboardSnapshotService(
+        DashboardQueries(
+            status=build_status_service().get_status,
+            execution_summary=history.summary,
+            executions=history.list,
+            consumers=events.inspect,
+        )
+    )
 
 
 def build_webhook_delivery_service(workspace_root: Path, endpoint_id: str) -> EventDeliveryService:
