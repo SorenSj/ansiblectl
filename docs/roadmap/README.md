@@ -329,7 +329,7 @@ Explicit non-goals:
 - A TUI only after its authentication, authorization, tenancy, lifecycle, and compatibility model is
   governed independently from delivery adapters.
 
-## Active milestone
+## Most recently completed milestone
 
 ### v0.11.0 — Signed webhook delivery
 
@@ -355,7 +355,12 @@ Exit criteria:
 - [x] The complete local quality, build, provenance, and release gates pass.
 - [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
   [PR #50](https://github.com/SorenSj/ansiblectl/pull/50).
-- [ ] The immutable v0.11.0 tag and tagged artifact workflow pass from the reviewed merge commit.
+- [x] The immutable v0.11.0 tag and
+  [tagged artifact workflow](https://github.com/SorenSj/ansiblectl/actions/runs/30873062409) pass
+  from merge commit `2e013af`.
+
+Readiness evidence was last reviewed on 2026-08-04. Version 0.11.0 is released, and its retained
+workflow artifact is named `ansiblectl-v0.11.0`; no existing release tag was moved or recreated.
 
 Explicit non-goals:
 
