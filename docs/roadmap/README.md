@@ -243,6 +243,40 @@ Explicit non-goals:
   revocation, caching, persistence, or background refresh.
 - CLI secret input, interactive prompts, inbound APIs, background delivery, or remote control.
 
+## Active milestone
+
+### v0.9.0 — Private webhook network policy
+
+- Named workspace policies with bounded canonical RFC 1918 and IPv6 unique-local CIDRs.
+- Optional endpoint-to-policy binding while existing endpoints remain global-only.
+- All-address validation bound to the exact connected address without a second DNS lookup.
+- Stable redacted denial for mixed, forbidden, malformed, or out-of-policy resolution results.
+
+Exit criteria:
+
+- [x] ADR-0044 and TS-0027 define configuration, CIDR, resolution, connection, lifecycle,
+  compatibility, and redaction contracts before implementation.
+- [ ] Strict private-policy parsing rejects unsafe files, ambiguous networks, overlaps, excess
+  bounds, unknown fields, and unsupported schemas.
+- [ ] Endpoint schema version 2 binds at most one named policy while version 1 remains global-only.
+- [ ] Every resolved address must be allowed, and the connector uses only that validated tuple.
+- [ ] Loopback, link-local, metadata, mapped, carrier-grade NAT, reserved, and mixed answers remain
+  denied without leaking destination or policy detail.
+- [ ] Existing v0.5 databases and v0.6-v0.8 CLI, SDK, event, history, secret, endpoint, runner, and
+  transport contracts remain compatible.
+- [ ] The complete local quality, build, provenance, and release gates pass.
+- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [ ] The immutable v0.9.0 tag and tagged artifact workflow pass from the reviewed merge commit.
+
+Explicit non-goals:
+
+- Loopback, link-local, carrier-grade NAT, metadata services, service discovery, Unix sockets, or
+  arbitrary private access.
+- Combined public/private answers, route-derived trust, DNS suffix trust, or runtime overrides.
+- IP-literal URLs, redirects, proxies, custom certificate authorities, pinning, mutual TLS, or
+  insecure TLS.
+- Background workers, schedulers, daemons, inbound APIs, hosted control planes, or remote commands.
+
 ### Future — Additional delivery surfaces
 
 - Additional outbound transports only after each transport's trust and lifecycle contract is accepted.
