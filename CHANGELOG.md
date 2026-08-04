@@ -4,6 +4,31 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-04
+
+### Added
+
+- ADR-0043 and TS-0026 defining the production environment-secret provider's canonical key,
+  exact lookup, lifecycle, composition, failure, and redaction contracts.
+- A production `env:NAME` secret provider with exact single-key lookup and no environment
+  enumeration, fallback, expansion, mutation, caching, or persistence.
+- Bounded authenticated webhook CLI composition using process-supervisor or CI-injected secret
+  material without adding secret values or keys to public or durable surfaces.
+
+### Changed
+
+- Authenticated webhook delivery now rejects unavailable or malformed material before DNS
+  resolution or transport activity.
+- The webhook operator documentation now includes the canonical environment-secret workflow and
+  its fail-closed behavior.
+
+### Security
+
+- Environment keys accept only bounded uppercase ASCII identifiers, while empty values and C0,
+  C1, or DEL control characters fail with one stable redacted error.
+- Provider representations, exceptions, delivery outcomes, logs, events, retry state, history,
+  configuration results, and durable state never expose environment keys or secret values.
+
 ## [0.7.0] - 2026-08-04
 
 ### Added
