@@ -583,7 +583,7 @@ Exit criteria:
   resize, and minimum-size boundaries.
 - [x] Real pseudo-terminal and subprocess tests prove input bounds, foreground behavior, and exact
   restoration across normal, error, interrupt, and signal exits.
-- [ ] Forbidden output, diagnostics, paths, targeting, revisions, digests, payloads, secrets, and
+- [x] Forbidden output, diagnostics, paths, targeting, revisions, digests, payloads, secrets, and
   exceptions remain absent from every public and durable surface.
 - [ ] Existing CLI, machine output, services, SDK, history, events, delivery adapters, and exit-code
   compatibility remain exact.
