@@ -64,6 +64,16 @@ class Secrets:
         return SecretMaterial(self.value)
 
 
+@dataclass
+class MappingSecrets:
+    values: dict[str, str]
+    calls: list[SecretReference] = field(default_factory=list)
+
+    def resolve(self, reference: SecretReference) -> SecretMaterial:
+        self.calls.append(reference)
+        return SecretMaterial(self.values[reference.key])
+
+
 def endpoint(*, authenticated: bool = False, signed: bool = False) -> WebhookEndpoint:
     definition: dict[str, object] = {
         "url": "https://hooks.example.test/events",
@@ -203,6 +213,50 @@ def test_adapter_signs_exact_canonical_body_with_fixed_hmac_vector() -> None:
     assert "0123456789abcdef" not in repr(request)
 
 
+def test_bearer_and_signing_secrets_are_resolved_once_before_dns() -> None:
+    transport = Transport()
+    resolver = Resolver()
+    secrets = MappingSecrets(
+        {
+            "WEBHOOK_TOKEN": "bearer-credential",
+            "WEBHOOK_SIGNING_KEY": "0123456789abcdef0123456789abcdef",
+        }
+    )
+
+    outcome = HttpsWebhookDeliveryAdapter(
+        endpoint(authenticated=True, signed=True), resolver, transport, secrets
+    ).deliver(envelope())
+
+    assert outcome.state is DeliveryOutcomeState.DELIVERED
+    assert [str(reference) for reference in secrets.calls] == [
+        "env:WEBHOOK_TOKEN",
+        "env:WEBHOOK_SIGNING_KEY",
+    ]
+    assert resolver.calls == 1
+    request = transport.calls[0][2]
+    assert request.bearer_material is not None
+    assert request.headers["X-Ansiblectl-Signature"].startswith("v1=")
+    representation = repr(request)
+    assert "bearer-credential" not in representation
+    assert "0123456789abcdef" not in representation
+    assert request.headers["X-Ansiblectl-Signature"] not in representation
+
+
+def test_unchanged_event_and_key_produce_same_signature_per_retry_attempt() -> None:
+    transport = Transport()
+    secrets = Secrets("0123456789abcdef0123456789abcdef")
+    adapter = HttpsWebhookDeliveryAdapter(endpoint(signed=True), Resolver(), transport, secrets)
+
+    first = adapter.deliver(envelope())
+    second = adapter.deliver(envelope())
+
+    assert first.state is DeliveryOutcomeState.DELIVERED
+    assert second.state is DeliveryOutcomeState.DELIVERED
+    assert len(secrets.calls) == 2
+    signatures = [call[2].headers["X-Ansiblectl-Signature"] for call in transport.calls]
+    assert signatures[0] == signatures[1]
+
+
 @pytest.mark.parametrize(
     "value",
     ["", "x" * 31, "x" * 257, "x" * 31 + "\n", "x" * 31 + "\x7f"],
@@ -231,6 +285,32 @@ def test_missing_signing_provider_stops_before_dns() -> None:
     assert outcome.failure_reason == SIGNING_UNAVAILABLE
     assert resolver.calls == 0
     assert transport.calls == []
+
+
+def test_signing_provider_exception_is_redacted_and_not_retried() -> None:
+    class BrokenSecrets:
+        calls = 0
+
+        def resolve(self, reference: SecretReference) -> SecretMaterial:
+            self.calls += 1
+            raise RuntimeError(
+                "sentinel-reference sentinel-key sentinel-signature provider-internals"
+            )
+
+    secrets = BrokenSecrets()
+    resolver = Resolver()
+    transport = Transport()
+
+    outcome = HttpsWebhookDeliveryAdapter(
+        endpoint(signed=True), resolver, transport, secrets
+    ).deliver(envelope())
+
+    assert outcome.failure_reason == SIGNING_UNAVAILABLE
+    assert secrets.calls == 1
+    assert resolver.calls == 0
+    assert transport.calls == []
+    for sentinel in ("sentinel-reference", "sentinel-key", "sentinel-signature", "provider"):
+        assert sentinel not in repr(outcome)
 
 
 @pytest.mark.parametrize("value", ["", "unsafe\rvalue", "unsafe\nvalue"])

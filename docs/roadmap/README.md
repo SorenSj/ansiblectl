@@ -348,7 +348,7 @@ Exit criteria:
   fixed header construction.
 - [x] Signing and required secret validation complete before DNS with no unsigned or alternate-key
   fallback.
-- [ ] Signature values, secret references, keys, HMAC state, provider details, and exception text
+- [x] Signature values, secret references, keys, HMAC state, provider details, and exception text
   remain absent from every public and durable surface.
 - [ ] Existing v0.5 databases and v0.6-v0.10 CLI, SDK, event, history, secret, endpoint,
   network-policy, TLS-trust, runner, and transport contracts remain compatible.
