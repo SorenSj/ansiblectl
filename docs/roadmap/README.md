@@ -134,7 +134,7 @@ Explicit non-goals:
 - Exactly-once guarantees or distributed transactions with consumer side effects.
 - Automatic abandonment, unbounded retries, or using execution history as the outbox.
 
-## Active milestone
+## Completed milestone
 
 ### v0.6.0 — Local event delivery operations
 
@@ -167,6 +167,8 @@ Explicit non-goals:
   tenancy.
 - Schedulers, daemons, background threads, infinite polling, or automatic recovery actions.
 - Exactly-once guarantees, automatic abandon, or automatic retention.
+
+## Most recently completed milestone
 
 ### v0.7.0 — Outbound HTTPS webhook delivery
 
@@ -202,6 +204,38 @@ Explicit non-goals:
 - Schedulers, daemons, background threads, service installation, or infinite polling.
 - Private-network destinations, redirects, proxies, custom trust stores, mutual TLS, or insecure TLS.
 - Arbitrary headers, payload transforms, filters, compression, or additional production secret backends.
+
+## Active milestone
+
+### v0.8.0 — Environment secret resolution
+
+- One production `env` adapter over the existing secret-provider boundary.
+- Exact canonical key lookup without enumeration, fallback, expansion, caching, or persistence.
+- Bounded webhook CLI composition with fail-closed authentication before network I/O.
+- Stable redacted failures without secret keys, values, environment details, or exception text.
+
+Exit criteria:
+
+- [x] ADR-0043 and TS-0026 define provider identity, key syntax, lookup, lifecycle, composition,
+  failure, and redaction contracts before implementation.
+- [ ] Canonical key validation and exact injected-mapping lookup are implemented.
+- [ ] Missing, empty, malformed, and invalid material fails with one stable redacted error.
+- [ ] Authenticated webhook delivery composes the provider while unauthenticated delivery remains
+  independent of environment contents.
+- [ ] Adversarial tests prove keys and values never reach output, logs, exceptions, events, retry
+  state, history, configuration results, or durable state.
+- [ ] Existing v0.5 databases and v0.6/v0.7 CLI, SDK, event, history, endpoint, and runner contracts
+  remain compatible.
+- [ ] The complete quality, build, provenance, and release gates pass.
+- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [ ] The immutable v0.8.0 tag and tagged artifact workflow pass from the reviewed merge commit.
+
+Explicit non-goals:
+
+- `.env` files, secret files, keychains, password managers, vaults, cloud secret services, or plugins.
+- Command execution, shell expansion, aliases, fallback, discovery, enumeration, mutation, rotation,
+  revocation, caching, persistence, or background refresh.
+- CLI secret input, interactive prompts, inbound APIs, background delivery, or remote control.
 
 ### Future — Additional delivery surfaces
 
