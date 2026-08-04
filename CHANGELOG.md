@@ -4,6 +4,35 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-08-04
+
+### Added
+
+- ADR-0051 and TS-0034 defining bounded same-user event delivery to one fixed private workspace
+  Unix-domain socket namespace.
+- Explicit `event deliver CONSUMER --socket IDENTIFIER --max-events N` selection alongside the
+  mutually exclusive HTTPS endpoint and immutable archive adapters.
+- Four-byte big-endian framing of canonical event envelopes with exact event-bound acknowledgement
+  and EOF validation.
+
+### Changed
+
+- Local process delivery composes with the existing durable consumer ordering, lease, retry,
+  exhaustion, and acknowledgement contracts without changing webhook or archive behavior.
+- One connection carries one event under a single fixed monotonic deadline; partial I/O is completed
+  without adapter-level retry or stream resumption.
+- Receiver acknowledgement followed by a process crash remains an explicit at-least-once boundary
+  and safely replays the identical stable event identity.
+
+### Security
+
+- Socket identifiers map only below `.ansiblectl/events/sockets/`; private ancestor and socket
+  ownership, modes, types, address limits, and pre/post-connect identity are validated fail-closed.
+- Linux `SO_PEERCRED` and macOS `getpeereid` bind trust to the connected same-user kernel peer with
+  no path, group, privilege, abstract-namespace, timeout, or protocol override.
+- Socket identities, paths, peer credentials, payloads, frames, timing details, operating-system
+  errors, and exception values remain absent from public results and durable diagnostics.
+
 ## [0.15.0] - 2026-08-04
 
 ### Added

@@ -545,7 +545,7 @@ Exit criteria:
 - [x] Existing webhook, archive, outbox, CLI, SDK, history, and event compatibility remain exact.
 - [x] The complete local quality, build, provenance, and release gates pass.
 - [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
-  [PR #83](https://github.com/SorenSj/ansiblectl/pull/83).
+  [release PR #85](https://github.com/SorenSj/ansiblectl/pull/85).
 - [ ] The immutable v0.16.0 tag and tagged artifact workflow pass from the release merge commit.
 
 Explicit non-goals:
