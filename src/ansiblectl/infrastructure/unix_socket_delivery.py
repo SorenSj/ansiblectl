@@ -39,20 +39,25 @@ class WorkspaceUnixSocketDeliveryAdapter:
         compare=False,
     )
     clock: Callable[[], float] = field(default=time.monotonic, repr=False, compare=False)
+    checkpoint: Callable[[str], None] | None = field(default=None, repr=False, compare=False)
 
     def deliver(self, envelope: DurableEventEnvelope) -> DeliveryOutcome:
         try:
             request = self.selection.request_for(envelope)
             path, fingerprint = _prepare_target(self.workspace_root, self.selection.target.filename)
+            checkpoint = self.checkpoint or (lambda _name: None)
+            checkpoint("socket.target_prepared")
             connection = self.socket_factory()
             try:
                 deadline = self.clock() + UNIX_SOCKET_DEADLINE_SECONDS
                 _set_remaining_timeout(connection, deadline, self.clock)
                 connection.connect(os.fspath(path))
+                checkpoint("socket.connected")
                 if _peer_uid(connection) != os.geteuid():
                     raise OSError
                 _verify_target(path, fingerprint)
-                _exchange(connection, request, deadline, self.clock)
+                checkpoint("socket.peer_verified")
+                _exchange(connection, request, deadline, self.clock, checkpoint)
             finally:
                 connection.close()
         except Exception:
@@ -175,14 +180,17 @@ def _exchange(
     request: WorkspaceUnixSocketRequest,
     deadline: float,
     clock: Callable[[], float],
+    checkpoint: Callable[[str], None] = lambda _name: None,
 ) -> None:
     _send_all(connection, request.frame[:4], deadline, clock)
     _reject_early_response(connection)
     _send_all(connection, request.frame[4:], deadline, clock, reject_response=True)
     connection.shutdown(socket.SHUT_WR)
+    checkpoint("socket.request_sent")
     response = _receive_exact(connection, len(request.acknowledgement) + 1, deadline, clock)
     if response != request.acknowledgement:
         raise OSError
+    checkpoint("socket.ack_received")
     _set_remaining_timeout(connection, deadline, clock)
     if connection.recv(1) != b"":
         raise OSError

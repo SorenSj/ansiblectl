@@ -534,15 +534,15 @@ Exit criteria:
   lifecycle, compatibility, failure, and redaction contracts before implementation.
 - [x] Canonical identifiers and fixed socket targets reject every alternate path representation and
   overlong platform address.
-- [ ] Private directory, socket metadata, and connected same-user peer validation fail closed under
+- [x] Private directory, socket metadata, and connected same-user peer validation fail closed under
   replacement and capability faults.
-- [ ] Exact framing, partial-I/O handling, write shutdown, event-bound acknowledgement, EOF, and one
+- [x] Exact framing, partial-I/O handling, write shutdown, event-bound acknowledgement, EOF, and one
   monotonic deadline are deterministic.
-- [ ] Real subprocess and adversarial receiver tests prove crash, truncation, surplus, stall,
+- [x] Real subprocess and adversarial receiver tests prove crash, truncation, surplus, stall,
   disconnect, replay, and outbox-ack boundaries.
-- [ ] Public and durable surfaces remain free of socket identity, paths, peers, payloads, protocol
+- [x] Public and durable surfaces remain free of socket identity, paths, peers, payloads, protocol
   details, timings, and exceptions.
-- [ ] Existing webhook, archive, outbox, CLI, SDK, history, and event compatibility remain exact.
+- [x] Existing webhook, archive, outbox, CLI, SDK, history, and event compatibility remain exact.
 - [ ] The complete local quality, build, provenance, and release gates pass.
 - [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
 - [ ] The immutable v0.16.0 tag and tagged artifact workflow pass from the release merge commit.
