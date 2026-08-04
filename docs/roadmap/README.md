@@ -518,7 +518,7 @@ Explicit non-goals:
 - Exactly-once delivery, network filesystems, multi-host writers, background services, inbound APIs,
   hosted control planes, remote commands, or a TUI.
 
-## Active milestone
+## Most recently completed milestone
 
 ### v0.16.0 — Workspace Unix socket delivery
 
@@ -546,7 +546,12 @@ Exit criteria:
 - [x] The complete local quality, build, provenance, and release gates pass.
 - [x] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14 in
   [release PR #85](https://github.com/SorenSj/ansiblectl/pull/85).
-- [ ] The immutable v0.16.0 tag and tagged artifact workflow pass from the release merge commit.
+- [x] The immutable v0.16.0 tag and
+  [tagged artifact workflow](https://github.com/SorenSj/ansiblectl/actions/runs/30882348392) pass
+  from merge commit `fb44e0c`.
+
+Readiness evidence was last reviewed on 2026-08-04. Version 0.16.0 is released, and its retained
+workflow artifact is named `ansiblectl-v0.16.0`; no existing release tag was moved or recreated.
 
 Explicit non-goals:
 
