@@ -51,7 +51,7 @@ class MutualTlsServer:
                 peer = connection.getpeercert()
                 assert peer
                 self.peer_certificates.append(peer)
-                request = connection.recv(16_384)
+                request = _read_http_request(connection)
                 self.requests.append(request)
                 connection.sendall(
                     b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
@@ -60,6 +60,26 @@ class MutualTlsServer:
             self.errors.append(error)
         finally:
             self.listener.close()
+
+
+def _read_http_request(connection: ssl.SSLSocket) -> bytes:
+    request = bytearray()
+    header_end = -1
+    content_length = 0
+    while len(request) < 16_384:
+        chunk = connection.recv(4_096)
+        if not chunk:
+            break
+        request.extend(chunk)
+        if header_end < 0 and b"\r\n\r\n" in request:
+            header_end = request.index(b"\r\n\r\n") + 4
+            for line in bytes(request[:header_end]).split(b"\r\n"):
+                if line.lower().startswith(b"content-length:"):
+                    content_length = int(line.split(b":", 1)[1].strip())
+                    break
+        if header_end >= 0 and len(request) >= header_end + content_length:
+            return bytes(request)
+    raise RuntimeError("test server did not receive one bounded HTTP request")
 
 
 def authority(common_name: str) -> Authority:
