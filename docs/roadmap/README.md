@@ -205,7 +205,7 @@ Explicit non-goals:
 - Private-network destinations, redirects, proxies, custom trust stores, mutual TLS, or insecure TLS.
 - Arbitrary headers, payload transforms, filters, compression, or additional production secret backends.
 
-## Most recently completed milestone
+## Completed milestone
 
 ### v0.8.0 — Environment secret resolution
 
@@ -282,6 +282,40 @@ Explicit non-goals:
 - IP-literal URLs, redirects, proxies, custom certificate authorities, pinning, mutual TLS, or
   insecure TLS.
 - Background workers, schedulers, daemons, inbound APIs, hosted control planes, or remote commands.
+
+## Active milestone
+
+### v0.10.0 — Exclusive webhook CA trust
+
+- Named workspace TLS policies referencing bounded CA bundles beneath `.ansiblectl/trust/`.
+- Strict X.509 CA validation and immutable one-command trust snapshots.
+- Endpoint schema version 3 with exclusive custom trust or unchanged platform trust.
+- Mandatory certificate, chain, validity, hostname, and original-hostname SNI verification.
+
+Exit criteria:
+
+- [x] ADR-0045 and TS-0028 define policy, bundle, certificate, endpoint, TLS, lifecycle,
+  compatibility, and redaction contracts before implementation.
+- [ ] Strict trust-policy and bundle loading rejects traversal, unsafe files, permissions, ownership,
+  ambiguity, excess bounds, foreign blocks, duplicate certificates, and invalid CA semantics.
+- [ ] Endpoint schema version 3 binds at most one immutable trust snapshot while versions 1 and 2
+  retain platform trust and reject the new field.
+- [ ] Exclusive contexts load no platform roots and retain `CERT_REQUIRED`, hostname checking,
+  original-hostname SNI, and validated-address binding.
+- [ ] Failures never fall back and expose no policy, path, certificate, or TLS detail.
+- [ ] Existing v0.5 databases and v0.6-v0.9 CLI, SDK, event, history, secret, endpoint,
+  network-policy, runner, and transport contracts remain compatible.
+- [ ] The complete local quality, build, provenance, and release gates pass.
+- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [ ] The immutable v0.10.0 tag and tagged artifact workflow pass from the reviewed merge commit.
+
+Explicit non-goals:
+
+- Insecure TLS, hostname override, cleartext, TLS downgrade, or trust-on-first-use.
+- Supplemental platform trust, platform-store mutation, remote CA retrieval, ACME, or revocation
+  service availability guarantees.
+- Leaf/SPKI pinning, client certificates, mutual TLS, private keys, hardware tokens, or PKCS#11.
+- Redirects, proxies, background workers, inbound APIs, hosted control planes, or remote commands.
 
 ### Future — Additional delivery surfaces
 
