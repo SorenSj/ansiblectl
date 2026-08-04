@@ -235,6 +235,32 @@ def test_schema_four_combines_signing_network_and_tls_as_independent_controls() 
         assert sentinel not in representation
 
 
+def test_schema_five_combines_v2_bearer_network_and_tls_controls() -> None:
+    network_policies = parse_webhook_network_policies(private_policies(), "policy")
+    trust = WebhookTlsTrustPolicy("private-ca", b"sentinel-certificate")
+    endpoint = parse_webhook_endpoints(
+        endpoint_document(
+            schema_version=5,
+            network_policy="receiver",
+            tls_trust_policy="private-ca",
+            signature_secret="file:WEBHOOK_SIGNING_KEY",
+            signature_version=2,
+        ),
+        "workspace",
+        network_policies,
+        {"private-ca": trust},
+    )["audit.primary"]
+
+    assert endpoint.network_policy is network_policies["receiver"]
+    assert endpoint.tls_trust_policy is trust
+    assert str(endpoint.bearer_secret) == "env:WEBHOOK_TOKEN"
+    assert str(endpoint.signature_secret) == "file:WEBHOOK_SIGNING_KEY"
+    assert endpoint.signature_version == 2
+    representation = repr(endpoint)
+    for sentinel in ("receiver", "private-ca", "WEBHOOK_TOKEN", "WEBHOOK_SIGNING_KEY"):
+        assert sentinel not in representation
+
+
 def test_older_schemas_reject_signing_reference_and_schema_four_validates_it() -> None:
     for schema_version in (1, 2, 3):
         with pytest.raises(ConfigurationError, match="Unknown field"):
