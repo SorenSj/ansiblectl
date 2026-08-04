@@ -423,10 +423,10 @@ Exit criteria:
 - [x] Fixed vectors prove timestamp bounds, canonical encoding, domain separation, and HMAC bytes.
 - [x] All secret and clock validation precedes DNS with no v1, alternate-clock, or unsigned fallback.
 - [x] Retries retain event/body/idempotency identity while reading a new timestamp per attempt.
-- [ ] V2 composes with bearer authentication, env/file custody, network policy, and TLS trust.
-- [ ] Adversarial tests prove sensitive and request-local signing state never reaches public or
+- [x] V2 composes with bearer authentication, env/file custody, network policy, and TLS trust.
+- [x] Adversarial tests prove sensitive and request-local signing state never reaches public or
   durable surfaces.
-- [ ] The complete local quality, build, provenance, and release gates pass.
+- [x] The complete local quality, build, provenance, and release gates pass.
 - [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
 - [ ] The immutable v0.13.0 tag and tagged artifact workflow pass from the release merge commit.
 

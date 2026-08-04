@@ -314,6 +314,40 @@ def test_v1_and_unsigned_delivery_never_read_clock() -> None:
     assert clock.calls == 0
 
 
+def test_v2_resolves_bearer_and_signing_secrets_before_clock_then_dns() -> None:
+    order: list[str] = []
+
+    class OrderedSecrets:
+        def resolve(self, reference: SecretReference) -> SecretMaterial:
+            order.append(f"secret:{reference.key}")
+            value = {
+                "WEBHOOK_TOKEN": "bearer-credential",
+                "WEBHOOK_SIGNING_KEY": "0123456789abcdef0123456789abcdef",
+            }[reference.key]
+            return SecretMaterial(value)
+
+    class OrderedClock:
+        def now_unix_seconds(self) -> int:
+            order.append("clock")
+            return 1
+
+    class OrderedResolver(Resolver):
+        def resolve(self, hostname: str, port: int) -> tuple[str, ...]:
+            order.append("dns")
+            return super().resolve(hostname, port)
+
+    outcome = HttpsWebhookDeliveryAdapter(
+        endpoint(authenticated=True, timestamped=True),
+        OrderedResolver(),
+        Transport(),
+        OrderedSecrets(),
+        OrderedClock(),
+    ).deliver(envelope())
+
+    assert outcome.state is DeliveryOutcomeState.DELIVERED
+    assert order == ["secret:WEBHOOK_TOKEN", "secret:WEBHOOK_SIGNING_KEY", "clock", "dns"]
+
+
 def test_bearer_and_signing_secrets_are_resolved_once_before_dns() -> None:
     transport = Transport()
     resolver = Resolver()

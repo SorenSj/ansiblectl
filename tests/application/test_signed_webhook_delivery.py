@@ -40,6 +40,11 @@ class Secrets:
         return SecretMaterial(_SIGNING_KEY)
 
 
+class Clock:
+    def now_unix_seconds(self) -> int:
+        return 1_786_144_800
+
+
 @dataclass
 class FailingTransport:
     calls: list[tuple[WebhookEndpoint, WebhookDestination, WebhookRequest]] = field(
@@ -147,6 +152,50 @@ def test_unsafe_file_reference_never_reaches_result_or_raw_retry_database(
     status = outbox.inspect_consumers(now=_NOW)[0]
     database = (tmp_path / ".ansiblectl/events/outbox.sqlite3").read_bytes()
     for sentinel in (key, material, reference, str(candidate), "0o640"):
+        assert sentinel not in repr(result)
+        assert sentinel not in str(result.to_payload())
+        assert sentinel not in repr(status)
+        assert sentinel.encode() not in database
+
+
+def test_v2_timestamp_signature_and_clock_detail_never_reach_durable_state(
+    tmp_path: Path,
+) -> None:
+    endpoint = parse_webhook_endpoints(
+        {
+            "schema_version": 5,
+            "endpoints": {
+                "audit": {
+                    "url": "https://hooks.example.test/events",
+                    "allowed_hostnames": ["hooks.example.test"],
+                    "signature_secret": _REFERENCE,
+                    "signature_version": 2,
+                }
+            },
+        },
+        "workspace",
+    )["audit"]
+    transport = FailingTransport()
+    adapter = HttpsWebhookDeliveryAdapter(endpoint, Resolver(), transport, Secrets(), Clock())
+    outbox = SqliteEventOutbox(tmp_path)
+    outbox.append(Event("workspace.initialized", {}))
+    outbox.register_consumer("timestamp-signed")
+    service = EventDeliveryService(
+        outbox,
+        adapter,
+        DeliveryRetryProfile(3, (10, 30), 30),
+        lambda: _NOW,
+    )
+
+    result = service.step("timestamp-signed")
+
+    assert result.failure_reason == TRANSPORT_FAILURE
+    request = transport.calls[0][2]
+    timestamp = request.headers["X-Ansiblectl-Timestamp"]
+    signature = request.headers["X-Ansiblectl-Signature"]
+    status = outbox.inspect_consumers(now=_NOW)[0]
+    database = (tmp_path / ".ansiblectl/events/outbox.sqlite3").read_bytes()
+    for sentinel in (_SIGNING_KEY, _REFERENCE, timestamp, signature, "signature detail"):
         assert sentinel not in repr(result)
         assert sentinel not in str(result.to_payload())
         assert sentinel not in repr(status)
