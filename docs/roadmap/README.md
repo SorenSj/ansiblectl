@@ -498,9 +498,9 @@ Exit criteria:
 - [x] One immutable mode-0600 file is durably installed per event without partial final content.
 - [x] Exact existing content is an idempotent success; mismatched or unsafe content fails closed.
 - [x] Real crash and multiprocess tests prove the install/ack boundary and same-event races.
-- [ ] Adversarial tests prove archive paths, identifiers, metadata, payloads, and exceptions remain
+- [x] Adversarial tests prove archive paths, identifiers, metadata, payloads, and exceptions remain
   absent from public and durable diagnostic surfaces.
-- [ ] Existing webhook delivery and outbox compatibility remain exact.
+- [x] Existing webhook delivery and outbox compatibility remain exact.
 - [ ] The complete local quality, build, provenance, and release gates pass.
 - [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
 - [ ] The immutable v0.15.0 tag and tagged artifact workflow pass from the release merge commit.

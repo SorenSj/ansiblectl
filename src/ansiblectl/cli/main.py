@@ -40,6 +40,7 @@ from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.cli.boundary import render_exception
 from ansiblectl.cli.composition import (
     build_configuration_service,
+    build_event_archive_delivery_service,
     build_event_operations_service,
     build_execution_history_service,
     build_filesystem_recovery_service,
@@ -685,10 +686,14 @@ def build_parser() -> argparse.ArgumentParser:
     event = subcommands.add_parser("event", help="Operate durable public-event delivery safely.")
     event_commands = event.add_subparsers(dest="event_command", required=True)
     event_deliver = event_commands.add_parser(
-        "deliver", help="Deliver a bounded number of events to one configured HTTPS endpoint."
+        "deliver", help="Deliver a bounded number of events to one exact selected adapter."
     )
     event_deliver.add_argument("consumer", help="Canonical registered consumer identifier.")
-    event_deliver.add_argument("--endpoint", required=True, help="Exact configured endpoint name.")
+    delivery_target = event_deliver.add_mutually_exclusive_group(required=True)
+    delivery_target.add_argument("--endpoint", help="Exact configured HTTPS endpoint name.")
+    delivery_target.add_argument(
+        "--archive", help="Canonical logical workspace archive identifier."
+    )
     event_deliver.add_argument(
         "--max-events", type=int, required=True, help="Positive delivery bound, at most 100."
     )
@@ -1310,10 +1315,15 @@ def main(
             )
             if arguments.event_command == "deliver":
                 if not 1 <= arguments.max_events <= MAX_WEBHOOK_BATCH_EVENTS:
-                    raise ValueError("Webhook delivery bound must be between 1 and 100.")
-                delivery = event_delivery_service or build_webhook_delivery_service(
-                    workspace.root, arguments.endpoint
-                )
+                    raise ValueError("Event delivery bound must be between 1 and 100.")
+                if event_delivery_service is not None:
+                    delivery = event_delivery_service
+                elif arguments.archive is not None:
+                    delivery = build_event_archive_delivery_service(
+                        workspace.root, arguments.archive
+                    )
+                else:
+                    delivery = build_webhook_delivery_service(workspace.root, arguments.endpoint)
                 _render_event_delivery(
                     delivery.run(arguments.consumer, max_events=arguments.max_events),
                     options.output_format,

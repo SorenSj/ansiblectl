@@ -310,6 +310,15 @@ ANSIBLECTL_WEBHOOK_TOKEN='<injected-by-your-secret-manager>' \
   event deliver audit --endpoint audit --max-events 10
 ```
 
+Alternatively, deliver to one logical workspace-private archive. The identifier is never a path;
+each event becomes one immutable mode-`0600` canonical JSON file below the fixed private archive
+root:
+
+```console
+uv run ansiblectl --workspace ~/automation/example \
+  event deliver local-audit --archive audit.primary --max-events 10
+```
+
 The command follows no redirects and performs no polling, background scheduling, automatic
 abandonment, or automatic retention. Authentication and signing accept canonical `env:NAME` or
 `file:NAME` references. Environment names may contain up to 128 uppercase ASCII letters, digits,

@@ -15,6 +15,7 @@ from ansiblectl.domain.durable_events import (
     DurableEventRetentionResult,
 )
 from ansiblectl.domain.event_delivery import DeliveryRunResult, DeliveryRunState
+from ansiblectl.domain.events import Event
 from ansiblectl.domain.workspace import Workspace
 from ansiblectl.infrastructure.event_outbox import SqliteEventOutbox
 
@@ -246,3 +247,47 @@ endpoints:
     assert payload["data"]["state"] == "idle"
     assert payload["data"]["schema_version"] == 1
     assert payload["data"]["delivered_count"] == 0
+
+
+def test_delivery_command_archives_one_event_without_exposing_archive_identity(
+    tmp_path: Path,
+) -> None:
+    build_workspace_service().initialize(tmp_path)
+    outbox = SqliteEventOutbox(tmp_path)
+    outbox.append(
+        Event("workspace.initialized", {"project_name": "sentinel-private-payload"}),
+        event_id="00000000Z80000000000000000",
+        occurred_at="2026-08-04T00:00:00.000000Z",
+    )
+    outbox.register_consumer("local-audit", start_sequence=2)
+    output = StringIO()
+
+    result = cli(
+        [
+            "--workspace",
+            str(tmp_path),
+            "--output",
+            "json",
+            "event",
+            "deliver",
+            "local-audit",
+            "--archive",
+            "private.audit",
+            "--max-events",
+            "1",
+        ],
+        stdout=output,
+    )
+
+    payload = json.loads(output.getvalue())
+    assert result == EXIT_SUCCESS
+    assert payload["data"]["state"] == "delivered"
+    assert "private.audit" not in output.getvalue()
+    archived = (
+        tmp_path
+        / ".ansiblectl/events/archives/private.audit"
+        / "00000000000000000002-00000000Z80000000000000000.json"
+    )
+    assert archived.is_file()
+    assert b"sentinel-private-payload" in archived.read_bytes()
+    assert payload["data"]["delivered_count"] == 1

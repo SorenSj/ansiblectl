@@ -19,6 +19,12 @@ path. The adapter maps it only to `.ansiblectl/events/archives/ARCHIVE_ID/` belo
 validated workspace root. Empty, uppercase, Unicode, separator-containing, parent, absolute,
 overlong, URL, null, and non-string values are invalid.
 
+One bounded foreground invocation selects the adapter explicitly as
+`event deliver CONSUMER --archive ARCHIVE_ID --max-events N`. `--archive` and the existing
+`--endpoint` selection are mutually exclusive and exactly one is required. The command does not
+register a consumer implicitly, enumerate archives, print the selected identifier, or start a
+background worker.
+
 For envelope sequence `N` and canonical 26-character event identifier `E`, the only final filename
 is the 20-digit zero-padded decimal sequence, one ASCII hyphen, the event identifier, and `.json`.
 Sequence values outside `1..99999999999999999999` are rejected. No configured filename, extension,
