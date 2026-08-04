@@ -4,6 +4,34 @@ All notable changes to Ansiblectl are documented here.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-04
+
+### Added
+
+- ADR-0048 and TS-0031 defining opt-in timestamp-bound webhook signature v2 without sender nonce
+  state, receiver storage, or exactly-once claims.
+- Endpoint schema version 5 with fixed `X-Ansiblectl-Timestamp` and v2 signature headers.
+- An injected whole-second UTC clock boundary with deterministic tests and a production system-clock
+  adapter.
+
+### Changed
+
+- Signature v2 authenticates a fixed domain separator, canonical Unix seconds, and the exact JSON
+  body sent by the transport.
+- Each at-least-once retry reads a new timestamp and creates a new v2 signature while retaining the
+  event identifier, body, and idempotency key.
+- Schema versions 1 through 4 retain byte-compatible unsigned and signature-v1 behavior without
+  reading the clock.
+
+### Security
+
+- Bearer and signing secrets validate before the single clock read, which validates before DNS,
+  socket, TLS, or HTTP activity, with no alternate-clock, v1, or unsigned fallback.
+- Signature v2 composes with environment/file custody, private-network policy, and exclusive TLS
+  trust as independent controls.
+- Timestamp, signature, references, keys, clock details, HMAC state, and transport exceptions remain
+  absent from public results, logs, history, retry state, and raw SQLite storage.
+
 ## [0.12.0] - 2026-08-04
 
 ### Added
