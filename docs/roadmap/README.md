@@ -185,8 +185,8 @@ Exit criteria:
 - [x] Secret material remains confined to immediate request construction and never reaches public or
   durable surfaces.
 - [x] The bounded CLI command is schema-aligned, foreground-only, and exact-targeted.
-- [ ] Existing v0.5 databases and v0.6 CLI, SDK, event, history, and runner contracts remain compatible.
-- [ ] The complete quality, build, provenance, and release gates pass.
+- [x] Existing v0.5 databases and v0.6 CLI, SDK, event, history, and runner contracts remain compatible.
+- [x] The complete quality, build, provenance, and release gates pass.
 
 Explicit non-goals:
 
