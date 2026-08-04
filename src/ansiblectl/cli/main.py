@@ -6,7 +6,7 @@ import argparse
 import json
 import os
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from io import StringIO
@@ -16,6 +16,7 @@ from typing import TextIO
 import yaml
 
 from ansiblectl.application.configuration import ConfigurationService
+from ansiblectl.application.dashboard import DashboardSnapshotError, DashboardSnapshotService
 from ansiblectl.application.event_delivery import EventDeliveryService
 from ansiblectl.application.event_operations import EventOperationsService
 from ansiblectl.application.execution import GovernedExecutionResult
@@ -40,6 +41,7 @@ from ansiblectl.application.workspace import WorkspaceService
 from ansiblectl.cli.boundary import render_exception
 from ansiblectl.cli.composition import (
     build_configuration_service,
+    build_dashboard_snapshot_service,
     build_event_archive_delivery_service,
     build_event_operations_service,
     build_execution_history_service,
@@ -56,6 +58,11 @@ from ansiblectl.cli.composition import (
     build_webhook_delivery_service,
     build_workspace_service,
     execution_environment,
+)
+from ansiblectl.cli.dashboard_terminal import (
+    DashboardLoopResult,
+    DashboardTerminalError,
+    DashboardTerminalSession,
 )
 from ansiblectl.cli.outcomes import render_outcome
 from ansiblectl.cli.rendering import render_success
@@ -113,6 +120,7 @@ EXIT_CANCELLED = 3
 EXIT_UNEXPECTED_FAILURE = 1
 _COMMANDS: dict[str, frozenset[str]] = {
     "config": frozenset({"show"}),
+    "dashboard": frozenset(),
     "execution": frozenset({"list", "prune", "show", "summary"}),
     "event": frozenset({"consumer", "deliver", "retention"}),
     "inventory": frozenset({"show", "validate"}),
@@ -131,6 +139,7 @@ def cli(
     *,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
+    stdin: TextIO | None = None,
 ) -> int:
     """Run the installed CLI behind a safe unexpected-failure boundary."""
 
@@ -145,6 +154,7 @@ def cli(
     )
     actual_stdout = sys.stdout if stdout is None else stdout
     actual_stderr = sys.stderr if stderr is None else stderr
+    actual_stdin = sys.stdin if stdin is None else stdin
     invalid_output_source = _invalid_output_source(arguments)
     if invalid_output_source is not None:
         return render_exception(
@@ -157,6 +167,47 @@ def cli(
             actual_stdout,
             actual_stderr,
         )
+    if context.command_name == "dashboard":
+        if output_format != "text":
+            return render_exception(
+                context,
+                UsageError("Dashboard supports text output only."),
+                actual_stdout,
+                actual_stderr,
+            )
+        if "--non-interactive" in arguments:
+            return render_exception(
+                context,
+                UsageError("Dashboard requires interactive mode."),
+                actual_stdout,
+                actual_stderr,
+            )
+        try:
+            with redirect_stderr(actual_stderr), redirect_stdout(actual_stdout):
+                return main(
+                    execution_arguments,
+                    stdin=actual_stdin,
+                    stdout=actual_stdout,
+                    stderr=actual_stderr,
+                    propagate_errors=True,
+                )
+        except SystemExit as error:
+            if error.code is None or error.code == EXIT_SUCCESS:
+                return EXIT_SUCCESS
+            return render_exception(
+                context,
+                UsageError(
+                    "Invalid dashboard arguments.",
+                    hint="Run ansiblectl dashboard --help.",
+                    cause=error,
+                ),
+                actual_stdout,
+                actual_stderr,
+            )
+        except KeyboardInterrupt as error:
+            return render_exception(context, error, actual_stdout, actual_stderr)
+        except Exception as error:
+            return render_exception(context, error, actual_stdout, actual_stderr)
     buffered_stdout = StringIO()
     command_stdout = buffered_stdout
     diagnostics = StringIO()
@@ -480,6 +531,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subcommands = parser.add_subparsers(dest="command", required=True)
     subcommands.add_parser("status", help="Show the local application status.")
+    subcommands.add_parser("dashboard", help="Open the local read-only terminal dashboard.")
     workspace = subcommands.add_parser(
         "workspace", help="Create and inspect Ansiblectl workspaces."
     )
@@ -753,6 +805,12 @@ def main(
     execution_history_service: ExecutionHistoryService | None = None,
     event_operations_service: EventOperationsService | None = None,
     event_delivery_service: EventDeliveryService | None = None,
+    dashboard_snapshot_service: DashboardSnapshotService | None = None,
+    dashboard_session_factory: Callable[
+        [int, int, DashboardSnapshotService], DashboardTerminalSession
+    ]
+    | None = None,
+    stdin: TextIO | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
     current_directory: Path | None = None,
@@ -772,7 +830,40 @@ def main(
         non_interactive=arguments.non_interactive,
         debug=arguments.debug,
     )
-    if arguments.command == "status":
+    if arguments.command == "dashboard":
+        if options.output_format != "human":
+            raise UsageError("Dashboard supports text output only.")
+        if options.non_interactive:
+            raise UsageError("Dashboard requires interactive mode.")
+        if options.workspace is None:
+            raise UsageError("Dashboard requires an explicit workspace selection.")
+        workspace_service_instance = workspace_service or build_workspace_service()
+        try:
+            workspace = workspace_service_instance.resolve(
+                options.workspace, current_directory or Path.cwd()
+            )
+            snapshots = dashboard_snapshot_service or build_dashboard_snapshot_service(
+                workspace.root
+            )
+            initial_snapshot = snapshots.snapshot()
+            input_descriptor = _terminal_file_descriptor(sys.stdin if stdin is None else stdin)
+            output_descriptor = _terminal_file_descriptor(sys.stdout if stdout is None else stdout)
+            session_factory = dashboard_session_factory or DashboardTerminalSession
+            session = session_factory(input_descriptor, output_descriptor, snapshots)
+            dashboard_result: DashboardLoopResult = session.run(initial_snapshot)
+            return int(dashboard_result.exit_code)
+        except (WorkspaceError, DashboardSnapshotError, DashboardTerminalError) as error:
+            if propagate_errors:
+                raise
+            return _render_cli_failure(
+                "dashboard",
+                str(error),
+                "Select a supported foreground terminal and explicit workspace, then retry.",
+                options.output_format,
+                stdout,
+                stderr,
+            )
+    elif arguments.command == "status":
         status_service_instance = status_service or build_status_service()
         status = status_service_instance.get_status()
         _render_status(status.version, status.message, options.output_format, stdout)
@@ -1411,6 +1502,20 @@ def main(
                 stderr,
             )
     return EXIT_SUCCESS
+
+
+def _terminal_file_descriptor(stream: TextIO) -> int:
+    """Return a terminal candidate descriptor without retaining stream details."""
+
+    try:
+        descriptor = stream.fileno()
+    except (AttributeError, OSError) as error:
+        raise DashboardTerminalError(
+            "Dashboard requires one supported foreground terminal.", cause=error
+        ) from error
+    if not isinstance(descriptor, int) or isinstance(descriptor, bool) or descriptor < 0:
+        raise DashboardTerminalError("Dashboard requires one supported foreground terminal.")
+    return descriptor
 
 
 def _run_workspace_command(

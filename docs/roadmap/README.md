@@ -576,10 +576,10 @@ Exit criteria:
 
 - [x] ADR-0052 and TS-0035 define identity, authorization, tenancy, snapshot, interaction, terminal
   lifecycle, compatibility, failure, and redaction contracts before implementation.
-- [ ] The dashboard composes only the closed read-only query set and cannot reach a mutation port.
-- [ ] Snapshot construction is atomic, deterministic, field-allowlisted, and bounded to the governed
+- [x] The dashboard composes only the closed read-only query set and cannot reach a mutation port.
+- [x] Snapshot construction is atomic, deterministic, field-allowlisted, and bounded to the governed
   execution and consumer limits.
-- [ ] Terminal-safe rendering rejects control injection and remains deterministic across truncation,
+- [x] Terminal-safe rendering rejects control injection and remains deterministic across truncation,
   resize, and minimum-size boundaries.
 - [ ] Real pseudo-terminal and subprocess tests prove input bounds, foreground behavior, and exact
   restoration across normal, error, interrupt, and signal exits.
