@@ -283,7 +283,7 @@ Explicit non-goals:
   insecure TLS.
 - Background workers, schedulers, daemons, inbound APIs, hosted control planes, or remote commands.
 
-## Most recently completed milestone
+## Completed milestone
 
 ### v0.10.0 — Exclusive webhook CA trust
 
@@ -328,3 +328,38 @@ Explicit non-goals:
 - Additional outbound transports only after each transport's trust and lifecycle contract is accepted.
 - A TUI only after its authentication, authorization, tenancy, lifecycle, and compatibility model is
   governed independently from delivery adapters.
+
+## Active milestone
+
+### v0.11.0 — Signed webhook delivery
+
+- Optional HMAC-SHA-256 authentication over the exact canonical webhook body.
+- Existing environment-secret custody with bounded per-attempt signing-key resolution.
+- Endpoint schema version 4 with a fixed versioned signature header and no unsigned fallback.
+- Stable at-least-once signatures and redacted public and durable surfaces.
+
+Exit criteria:
+
+- [x] ADR-0046 and TS-0029 define endpoint, key, canonical bytes, algorithm, header, lifecycle,
+  retry, compatibility, and redaction contracts before implementation.
+- [ ] Endpoint schema version 4 binds at most one signing-secret reference while versions 1 through
+  3 retain exact behavior and reject the new field.
+- [ ] Fixed vectors prove domain separation, exact-body HMAC-SHA-256, full lowercase digest, and
+  fixed header construction.
+- [ ] Signing and required secret validation complete before DNS with no unsigned or alternate-key
+  fallback.
+- [ ] Signature values, secret references, keys, HMAC state, provider details, and exception text
+  remain absent from every public and durable surface.
+- [ ] Existing v0.5 databases and v0.6-v0.10 CLI, SDK, event, history, secret, endpoint,
+  network-policy, TLS-trust, runner, and transport contracts remain compatible.
+- [ ] The complete local quality, build, provenance, and release gates pass.
+- [ ] Hosted CI passes on Ubuntu and macOS with Python 3.12, 3.13, and 3.14.
+- [ ] The immutable v0.11.0 tag and tagged artifact workflow pass from the reviewed merge commit.
+
+Explicit non-goals:
+
+- Configurable headers, body transforms, content negotiation, compression, or arbitrary signing
+  algorithms.
+- Asymmetric keys, certificate signing, mutual TLS, client private keys, KMS, HSM, or PKCS#11.
+- Sender timestamps, nonce persistence, replay windows, exactly-once delivery, or receiver state.
+- Background workers, inbound APIs, hosted control planes, remote commands, or a TUI.
