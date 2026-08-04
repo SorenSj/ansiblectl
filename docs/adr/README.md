@@ -46,3 +46,4 @@ New decisions supersede earlier ADRs; accepted ADRs are not silently rewritten.
 | [0039](0039-unattended-plugin-policy.md) | Unattended Plugin Policy | Accepted |
 | [0040](0040-durable-event-outbox.md) | Durable Event Outbox | Accepted |
 | [0041](0041-local-event-delivery-runner.md) | Local Event Delivery Runner | Accepted |
+| [0042](0042-outbound-https-webhook-delivery.md) | Outbound HTTPS Webhook Delivery | Accepted |

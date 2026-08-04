@@ -168,10 +168,35 @@ Explicit non-goals:
 - Schedulers, daemons, background threads, infinite polling, or automatic recovery actions.
 - Exactly-once guarantees, automatic abandon, or automatic retention.
 
-### Future — Remote delivery adapters
+### v0.7.0 — Outbound HTTPS webhook delivery
 
-- Remote API authentication, authorization, tenancy, lifecycle, and compatibility.
-- A TUI implemented only as a delivery adapter over established application services.
+- One outbound HTTPS adapter over the v0.6 transport-neutral delivery port.
+- Named workspace endpoint configuration with fail-closed destination policy.
+- Optional bearer authentication through the existing secret-reference boundary.
+- One explicit bounded foreground delivery command with redacted results.
 
-These capabilities remain deferred under the existing ADRs and have no assigned version until the
-local operational contracts are proven.
+Exit criteria:
+
+- [x] ADR-0042 and TS-0025 define transport, authentication, destination, lifecycle, and
+  compatibility contracts before implementation.
+- [ ] Endpoint parsing and address-bound connection policy prevent redirect, downgrade, and SSRF
+  escape paths.
+- [ ] Canonical bounded requests and stable response classifications preserve v0.6 retry ownership.
+- [ ] Secret material remains confined to immediate request construction and never reaches public or
+  durable surfaces.
+- [ ] The bounded CLI command is schema-aligned, foreground-only, and exact-targeted.
+- [ ] Existing v0.5 databases and v0.6 CLI, SDK, event, history, and runner contracts remain compatible.
+- [ ] The complete quality, build, provenance, and release gates pass.
+
+Explicit non-goals:
+
+- Inbound remote APIs, hosted control planes, tenancy, remote command execution, or a TUI.
+- Schedulers, daemons, background threads, service installation, or infinite polling.
+- Private-network destinations, redirects, proxies, custom trust stores, mutual TLS, or insecure TLS.
+- Arbitrary headers, payload transforms, filters, compression, or additional production secret backends.
+
+### Future — Additional delivery surfaces
+
+- Additional outbound transports only after each transport's trust and lifecycle contract is accepted.
+- A TUI only after its authentication, authorization, tenancy, lifecycle, and compatibility model is
+  governed independently from delivery adapters.
