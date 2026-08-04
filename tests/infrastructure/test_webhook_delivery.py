@@ -19,6 +19,7 @@ from ansiblectl.infrastructure.webhook_delivery import (
     PAYLOAD_TOO_LARGE,
     REMOTE_REJECTED,
     REMOTE_RETRYABLE,
+    SIGNING_UNAVAILABLE,
     TRANSPORT_FAILURE,
     HttpsWebhookDeliveryAdapter,
 )
@@ -63,14 +64,16 @@ class Secrets:
         return SecretMaterial(self.value)
 
 
-def endpoint(*, authenticated: bool = False) -> WebhookEndpoint:
+def endpoint(*, authenticated: bool = False, signed: bool = False) -> WebhookEndpoint:
     definition: dict[str, object] = {
         "url": "https://hooks.example.test/events",
         "allowed_hostnames": ["hooks.example.test"],
     }
     if authenticated:
         definition["bearer_secret"] = "env:WEBHOOK_TOKEN"
-    document = {"schema_version": 1, "endpoints": {"audit": definition}}
+    if signed:
+        definition["signature_secret"] = "env:WEBHOOK_SIGNING_KEY"
+    document = {"schema_version": 4 if signed else 1, "endpoints": {"audit": definition}}
     return parse_webhook_endpoints(document, "test")["audit"]
 
 
@@ -180,6 +183,54 @@ def test_adapter_resolves_bearer_material_immediately_without_repr_leakage() -> 
     assert request.bearer_material is not None
     assert request.bearer_material.reveal_for_operation() == "credential-value"
     assert "credential-value" not in repr(request)
+
+
+def test_adapter_signs_exact_canonical_body_with_fixed_hmac_vector() -> None:
+    transport = Transport()
+    secrets = Secrets("0123456789abcdef0123456789abcdef")
+
+    outcome = HttpsWebhookDeliveryAdapter(
+        endpoint(signed=True), Resolver(), transport, secrets
+    ).deliver(envelope())
+
+    assert outcome.state is DeliveryOutcomeState.DELIVERED
+    assert [str(reference) for reference in secrets.calls] == ["env:WEBHOOK_SIGNING_KEY"]
+    request = transport.calls[0][2]
+    assert request.headers["X-Ansiblectl-Signature"] == (
+        "v1=9cd15a92d21aef0885ed87b07c1690c29a4ad1edef5913f584f46f6c2686e7c0"
+    )
+    assert "WEBHOOK_SIGNING_KEY" not in repr(request)
+    assert "0123456789abcdef" not in repr(request)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["", "x" * 31, "x" * 257, "x" * 31 + "\n", "x" * 31 + "\x7f"],
+)
+def test_signing_failure_stops_before_dns_without_unsigned_fallback(value: str) -> None:
+    resolver = Resolver()
+    transport = Transport()
+
+    outcome = HttpsWebhookDeliveryAdapter(
+        endpoint(signed=True), resolver, transport, Secrets(value)
+    ).deliver(envelope())
+
+    assert outcome.failure_reason == SIGNING_UNAVAILABLE
+    assert resolver.calls == 0
+    assert transport.calls == []
+
+
+def test_missing_signing_provider_stops_before_dns() -> None:
+    resolver = Resolver()
+    transport = Transport()
+
+    outcome = HttpsWebhookDeliveryAdapter(endpoint(signed=True), resolver, transport).deliver(
+        envelope()
+    )
+
+    assert outcome.failure_reason == SIGNING_UNAVAILABLE
+    assert resolver.calls == 0
+    assert transport.calls == []
 
 
 @pytest.mark.parametrize("value", ["", "unsafe\rvalue", "unsafe\nvalue"])

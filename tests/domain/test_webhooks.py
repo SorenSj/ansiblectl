@@ -160,6 +160,35 @@ def test_older_schemas_reject_tls_trust_and_schema_three_requires_exact_policy()
     assert "/sentinel/private" not in str(caught.value)
 
 
+def test_schema_four_binds_one_signing_reference_independently() -> None:
+    endpoint = parse_webhook_endpoints(
+        endpoint_document(schema_version=4, signature_secret="env:WEBHOOK_SIGNING_KEY"),
+        "workspace",
+    )["audit.primary"]
+
+    assert endpoint.schema_version == 4
+    assert str(endpoint.signature_secret) == "env:WEBHOOK_SIGNING_KEY"
+    assert endpoint.network_policy is None
+    assert endpoint.tls_trust_policy is None
+    assert "WEBHOOK_SIGNING_KEY" not in repr(endpoint)
+
+
+def test_older_schemas_reject_signing_reference_and_schema_four_validates_it() -> None:
+    for schema_version in (1, 2, 3):
+        with pytest.raises(ConfigurationError, match="Unknown field"):
+            parse_webhook_endpoints(
+                endpoint_document(
+                    schema_version=schema_version,
+                    signature_secret="env:WEBHOOK_SIGNING_KEY",
+                ),
+                "workspace",
+            )
+    with pytest.raises(ConfigurationError, match="signature_secret.*provider:key"):
+        parse_webhook_endpoints(
+            endpoint_document(schema_version=4, signature_secret="raw-key"), "workspace"
+        )
+
+
 def test_private_policy_requires_every_resolved_address_in_exact_ranges() -> None:
     policies = parse_webhook_network_policies(private_policies(), "policy")
     endpoint = parse_webhook_endpoints(

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 from dataclasses import dataclass
 
@@ -22,7 +24,11 @@ DESTINATION_DENIED = "DESTINATION_DENIED"
 PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
 REMOTE_REJECTED = "REMOTE_REJECTED"
 REMOTE_RETRYABLE = "REMOTE_RETRYABLE"
+SIGNING_UNAVAILABLE = "SIGNING_UNAVAILABLE"
 TRANSPORT_FAILURE = "TRANSPORT_FAILURE"
+WEBHOOK_SIGNATURE_DOMAIN = b"ansiblectl-webhook-signature-v1\n"
+MIN_WEBHOOK_SIGNING_KEY_BYTES = 32
+MAX_WEBHOOK_SIGNING_KEY_BYTES = 256
 
 
 @dataclass(frozen=True)
@@ -51,21 +57,40 @@ class HttpsWebhookDeliveryAdapter:
                     return DeliveryOutcome.failure(AUTHENTICATION_UNAVAILABLE)
             except Exception:
                 return DeliveryOutcome.failure(AUTHENTICATION_UNAVAILABLE)
+        signature = None
+        if self.endpoint.signature_secret is not None:
+            if self.secrets is None:
+                return DeliveryOutcome.failure(SIGNING_UNAVAILABLE)
+            try:
+                signing_material = self.secrets.resolve(self.endpoint.signature_secret)
+                signing_value = signing_material.reveal_for_operation()
+                signing_key = signing_value.encode("utf-8")
+                if not MIN_WEBHOOK_SIGNING_KEY_BYTES <= len(
+                    signing_key
+                ) <= MAX_WEBHOOK_SIGNING_KEY_BYTES or any(
+                    ord(char) < 32 or 127 <= ord(char) <= 159 for char in signing_value
+                ):
+                    return DeliveryOutcome.failure(SIGNING_UNAVAILABLE)
+                digest = hmac.new(
+                    signing_key, WEBHOOK_SIGNATURE_DOMAIN + body, hashlib.sha256
+                ).hexdigest()
+                signature = f"v1={digest}"
+            except Exception:
+                return DeliveryOutcome.failure(SIGNING_UNAVAILABLE)
         try:
             destination = resolve_webhook_destination(self.endpoint, self.resolver)
         except Exception:
             return DeliveryOutcome.failure(DESTINATION_DENIED)
-        request = WebhookRequest(
-            body,
-            {
-                "Content-Type": "application/json",
-                "Idempotency-Key": envelope.event_id,
-                "User-Agent": "ansiblectl-webhook/1",
-                "X-Ansiblectl-Event-Id": envelope.event_id,
-                "X-Ansiblectl-Event-Sequence": str(envelope.sequence),
-            },
-            bearer,
-        )
+        headers = {
+            "Content-Type": "application/json",
+            "Idempotency-Key": envelope.event_id,
+            "User-Agent": "ansiblectl-webhook/1",
+            "X-Ansiblectl-Event-Id": envelope.event_id,
+            "X-Ansiblectl-Event-Sequence": str(envelope.sequence),
+        }
+        if signature is not None:
+            headers["X-Ansiblectl-Signature"] = signature
+        request = WebhookRequest(body, headers, bearer)
         try:
             status = self.transport.post(self.endpoint, destination, request)
         except Exception:
@@ -86,5 +111,7 @@ __all__ = [
     "PAYLOAD_TOO_LARGE",
     "REMOTE_REJECTED",
     "REMOTE_RETRYABLE",
+    "SIGNING_UNAVAILABLE",
     "TRANSPORT_FAILURE",
+    "WEBHOOK_SIGNATURE_DOMAIN",
 ]

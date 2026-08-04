@@ -15,7 +15,7 @@ from ansiblectl.domain.secrets import SecretMaterial, SecretReference
 from ansiblectl.domain.webhook_network_policy import WebhookNetworkPolicy
 from ansiblectl.domain.webhook_tls_trust import WebhookTlsTrustPolicy
 
-WEBHOOK_CONFIGURATION_SCHEMA_VERSION = 3
+WEBHOOK_CONFIGURATION_SCHEMA_VERSION = 4
 MAX_WEBHOOK_TIMEOUT_SECONDS = 60
 MAX_WEBHOOK_PAYLOAD_BYTES = 262_144
 MAX_WEBHOOK_BATCH_EVENTS = 100
@@ -30,6 +30,7 @@ _ENDPOINT_FIELDS = {
 }
 _ENDPOINT_FIELDS_V2 = _ENDPOINT_FIELDS | {"network_policy"}
 _ENDPOINT_FIELDS_V3 = _ENDPOINT_FIELDS_V2 | {"tls_trust_policy"}
+_ENDPOINT_FIELDS_V4 = _ENDPOINT_FIELDS_V3 | {"signature_secret"}
 
 
 @dataclass(frozen=True, repr=False)
@@ -46,12 +47,14 @@ class WebhookEndpoint:
     read_timeout_seconds: int
     network_policy: WebhookNetworkPolicy | None = None
     tls_trust_policy: WebhookTlsTrustPolicy | None = None
+    signature_secret: SecretReference | None = None
     schema_version: int = WEBHOOK_CONFIGURATION_SCHEMA_VERSION
 
     def __repr__(self) -> str:
         return (
             "WebhookEndpoint(endpoint_id=<redacted>, url=<redacted>, "
-            "network_policy=<redacted>, tls_trust_policy=<redacted>)"
+            "network_policy=<redacted>, tls_trust_policy=<redacted>, "
+            "signature_secret=<redacted>)"
         )
 
 
@@ -111,9 +114,9 @@ def parse_webhook_endpoints(
     if unknown:
         raise ConfigurationError(f"Unknown webhook field '{sorted(unknown)[0]}' in {origin}.")
     schema_version = values.get("schema_version")
-    if schema_version not in {1, 2, WEBHOOK_CONFIGURATION_SCHEMA_VERSION}:
+    if schema_version not in {1, 2, 3, WEBHOOK_CONFIGURATION_SCHEMA_VERSION}:
         raise ConfigurationError(
-            f"Webhook schema_version in {origin} must be 1, 2, or "
+            f"Webhook schema_version in {origin} must be 1, 2, 3, or "
             f"{WEBHOOK_CONFIGURATION_SCHEMA_VERSION}."
         )
     assert isinstance(schema_version, int)
@@ -176,8 +179,10 @@ def _parse_endpoint(
         allowed_fields = _ENDPOINT_FIELDS
     elif schema_version == 2:
         allowed_fields = _ENDPOINT_FIELDS_V2
-    else:
+    elif schema_version == 3:
         allowed_fields = _ENDPOINT_FIELDS_V3
+    else:
+        allowed_fields = _ENDPOINT_FIELDS_V4
     unknown = set(values) - allowed_fields
     if unknown:
         raise ConfigurationError(
@@ -199,7 +204,10 @@ def _parse_endpoint(
             f"Webhook endpoint '{endpoint_id}' hostname must be explicitly allowed."
         )
     bearer_value = values.get("bearer_secret")
-    bearer_secret = _parse_secret_reference(bearer_value, endpoint_id)
+    bearer_secret = _parse_secret_reference(bearer_value, endpoint_id, "bearer_secret")
+    signature_secret = _parse_secret_reference(
+        values.get("signature_secret"), endpoint_id, "signature_secret"
+    )
     connect_timeout = _positive_timeout(
         values.get("connect_timeout_seconds", 10), endpoint_id, "connect_timeout_seconds"
     )
@@ -221,6 +229,7 @@ def _parse_endpoint(
         read_timeout_seconds=read_timeout,
         network_policy=network_policy,
         tls_trust_policy=tls_trust_policy,
+        signature_secret=signature_secret,
         schema_version=schema_version,
     )
 
@@ -310,19 +319,19 @@ def _canonical_hostname(value: object, endpoint_id: str) -> str:
     return value
 
 
-def _parse_secret_reference(value: object, endpoint_id: str) -> SecretReference | None:
+def _parse_secret_reference(value: object, endpoint_id: str, field: str) -> SecretReference | None:
     if value is None:
         return None
     if not isinstance(value, str) or value.count(":") != 1:
         raise ConfigurationError(
-            f"Webhook endpoint '{endpoint_id}' bearer_secret must be a provider:key reference."
+            f"Webhook endpoint '{endpoint_id}' {field} must be a provider:key reference."
         )
     provider, key = value.split(":", 1)
     try:
         return SecretReference(provider, key)
     except Exception as error:
         raise ConfigurationError(
-            f"Webhook endpoint '{endpoint_id}' bearer_secret must be a provider:key reference."
+            f"Webhook endpoint '{endpoint_id}' {field} must be a provider:key reference."
         ) from error
 
 
